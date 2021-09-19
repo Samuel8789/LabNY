@@ -8,9 +8,9 @@ import logging
 logger = logging.getLogger(__name__)
 import os 
 import sys
-sys.path.insert(0, r'C:\Users\sp3660\Documents\Github\ProjectManager')
+sys.path.insert(0, r'C:\Users\Samuel\Documents\Github\ProjectManager')
 
-from ProjectsCLass import Project
+from project_manager.ProjectsCLass import Project
 #
 from .database import MouseDatabase
 from .dataManaging.data_managing import DataManaging
