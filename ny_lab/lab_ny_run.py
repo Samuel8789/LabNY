@@ -8,7 +8,7 @@ import logging
 logger = logging.getLogger(__name__)
 import os 
 import sys
-sys.path.insert(0, r'C:\Users\Samuel\Documents\Github\ProjectManager')
+sys.path.insert(0, r'C:\Users\sp3660\Documents\Github\ProjectManager')
 
 from project_manager.ProjectsCLass import Project
 #
@@ -20,8 +20,8 @@ from ny_lab.AllFunctions.select_values_gui import select_values_gui
 
 
 class RunNYLab(Project):    
-    def __init__(self, gui=False):
-        Project.__init__(self,'LabNY')
+    def __init__(self,  githubtoken_path, gui=False):
+        Project.__init__(self,'LabNY', githubtoken_path)
         #loadmicedatabase     
         self.databasefile=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\MouseDatabase.db'
         self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
