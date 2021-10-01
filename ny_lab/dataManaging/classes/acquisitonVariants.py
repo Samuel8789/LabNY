@@ -22,7 +22,19 @@ class NonimagingAquisition(Aquisition):
     def __init__(self, aqu_name, mouse_imaging_session_object, raw_input_path=None, non_imaging=False):
         aqu_name=os.path.split(aqu_name)[1]
         Aquisition.__init__(self, aqu_name, raw_input_path, mouse_imaging_session_object=mouse_imaging_session_object, subaq_object='NonimagingAquisition',non_imaging=non_imaging)
-          
+ 
+class AtlasOverview(Aquisition):
+    def __init__(self, aqu_name, atlas_object, raw_input_path=None):
+        aqu_name=os.path.split(aqu_name)[1]
+        Aquisition.__init__(self, aqu_name, raw_input_path, atlas_object=atlas_object, subaq_object='AtlasOverview')
+class AtlasPreview(Aquisition):
+    def __init__(self, aqu_name, atlas_object, raw_input_path=None):
+        aqu_name=os.path.split(aqu_name)[1]
+        Aquisition.__init__(self, aqu_name, raw_input_path, atlas_object=atlas_object, subaq_object='AtlasPreview')
+class AtlasVolume(Aquisition):
+    def __init__(self, aqu_name, atlas_object, raw_input_path=None):
+        aqu_name=os.path.split(aqu_name)[1]
+        Aquisition.__init__(self, aqu_name, raw_input_path, atlas_object=atlas_object, subaq_object='AtlasVolume')         
         
         
         

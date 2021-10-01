@@ -7,8 +7,6 @@ Created on Tue May 11 08:43:30 2021
 Database full calss
 """
 
-import sys
-sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
 import tkinter as Tkinter
 import pandas as pd
 import numpy as np
@@ -119,7 +117,7 @@ class MouseDatabase():
         
     def database_backup(self):
         backuppath=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\DatabaseBackups'
-        backuppath_dropbox=r'C:\Users\sp3660\Dropbox\Projects\LabNY\DatabaseBackups'
+        backuppath_dropbox=os.path.join(self.LabProjectObject.all_paths_for_this_system['Dropbox'],'LabNY\\DatabaseBackups')
         backuppath_F=r'F:\Projects\LabNY\DatabaseBackups'
         list_of_backups = glob.glob(backuppath+'\\*') # * means all if need specific format then *.csv
         latest_file = max(list_of_backups, key=os.path.getctime)
@@ -205,7 +203,7 @@ class MouseDatabase():
         query_stock="""
         SELECT 
             Lab_number,
-            Sex_types, 
+            Sex_types AS Sex, 
             Cage, 
             round(julianday('now') - julianday(DOB)) AS DaysOld,
             round(round(julianday('now') - julianday(DOB))/7) AS WeeksOld,
@@ -224,8 +222,8 @@ class MouseDatabase():
         WHERE Alive=1 AND (Experimental_Status=1 OR Experimental_Status=3)  AND Breeding_status=3   AND Room=2     
         """
         Alive_non_exp_stock =self.arbitrary_query_to_df(query_stock)
-        Alive_non_exp_stock_sorted= Alive_non_exp_stock.sort_values(by=['Sex_types','Lab_Number'],ascending=True)       
-        Alive_non_exp_stock_grouped = Alive_non_exp_stock_sorted.groupby(['Breeders_types', 'Cage', 'Line_Short' ])['Lab_Number'].apply(list)
+        Alive_non_exp_stock_sorted= Alive_non_exp_stock.sort_values(by=['Sex','Lab_Number'],ascending=True)       
+        Alive_non_exp_stock_grouped = Alive_non_exp_stock_sorted.groupby(['Breeders_types', 'Cage', 'Line_Short', 'Sex' ])['Lab_Number'].apply(list)
         Alive_non_exp_stock_grouped_frame=Alive_non_exp_stock_grouped.to_frame()
         self.stock_mice=pd.DataFrame(Alive_non_exp_stock_grouped_frame.Lab_Number.values.tolist(), Alive_non_exp_stock_grouped_frame.index).add_prefix('Mouse_').astype('Int64')
         self.stock_mice.reset_index(inplace=True)
@@ -251,15 +249,17 @@ class MouseDatabase():
         LEFT JOIN Genotypings_table ON Genotypings_table.ID=MICE_table.Genotyping_Status
         LEFT JOIN Lines_table ON Lines_table.ID=MICE_table.Line
         LEFT JOIN Rooms_table ON Rooms_table.ID=MICE_table.Room
-        WHERE Alive=1 AND (Experimental_Status=1 OR Experimental_Status=3)  AND Breeding_status=3 AND Genotyping_Status=1       
+        WHERE Alive=1 AND (Experimental_Status=1 OR Experimental_Status=3)  AND Breeding_status=3 AND Genotyping_Status IN (1,2)      
         """
         Alive_non_exp_stock_to_genotype =self.arbitrary_query_to_df(query_to_genotype)
         Alive_non_exp_stock_to_genotype.sort_values(by=['Sex_types'],ascending=False)
         Alive_non_exp_stock_to_genotype_sorted= Alive_non_exp_stock_to_genotype.sort_values(by=['Sex_types'],ascending=False)      
         Alive_non_exp_stock_to_genotype_grouped = Alive_non_exp_stock_to_genotype_sorted.groupby(['Breeders_types', 'Cage', 'Line_Short' ])['Lab_Number'].apply(list)
         Alive_non_exp_stock_to_genotype_grouped_frame=Alive_non_exp_stock_to_genotype_grouped.to_frame()
-        self.mice_to_genotype=pd.DataFrame(Alive_non_exp_stock_to_genotype_grouped_frame.Lab_Number.values.tolist(),Alive_non_exp_stock_to_genotype_grouped_frame.index).add_prefix('Mouse_')
+        self.mice_to_genotype=pd.DataFrame(Alive_non_exp_stock_to_genotype_grouped_frame.Lab_Number.values.tolist(), Alive_non_exp_stock_to_genotype_grouped_frame.index).add_prefix('Mouse_')
+        self.mice_to_genotype.reset_index(inplace=True)
        
+        
     def table_breeders(self):
         query_breeders="""
         SELECT 
@@ -526,17 +526,22 @@ class MouseDatabase():
                line=22       
         elif 21 in lines and 4 in lines:
                line=23
-        maleID  = int(linesdf ['ID'][0])
-        female1ID=int(linesdf ['ID'][1])
+        elif 5 in lines and 2 in lines:
+               line=5
+             
+               
+             
+        maleID  = int(linesdf[ linesdf['Lab_Number']== male]['ID'].iloc[0])
+        female1ID=int(linesdf[ linesdf['Lab_Number']== females[0]]['ID'].iloc[0])
         female1=int(females[0])
         female2=None
         female2ID='NULL'
-        MaleCage =int(linesdf ['Cage'][0])
-        Female1Cage=int(linesdf ['Cage'][1])
+        MaleCage =int(linesdf[ linesdf['Lab_Number']== male]['Cage'].iloc[0])
+        Female1Cage=int(linesdf[ linesdf['Lab_Number']== females[0]]['Cage'].iloc[0])
         if len(females)==2:
             female2=int(females[1])
-            Female2Cage=int(linesdf ['Cage'][2])
-            female2ID=int(linesdf ['ID'][2])
+            Female2Cage=int(linesdf[ linesdf['Lab_Number']== females[1]]['Cage'].iloc[0])
+            female2ID=int(linesdf[ linesdf['Lab_Number']== females[1]]['ID'].iloc[0])
         requires_genotyping=0
         if line in (2,18,19,20):
             requires_genotyping=1
@@ -561,7 +566,7 @@ class MouseDatabase():
             if Female2Cage==Female1Cage:
                 actions_dictionary[Female1Cage]={Action_Type_Transfer:((female1,female2),(cage),(date_performed))}                
             else:
-                actions_dictionary[Female2Cage]={Action_Type_Transfer:((female2),(cage),(date_performed))}          
+                actions_dictionary[Female2Cage]={Action_Type_Transfer:((female2,),(cage),(date_performed))}          
         
         self.add_multiple_actions(actions_dictionary)
         
@@ -828,7 +833,7 @@ class MouseDatabase():
                 genes_switcher['Ai65']=6
                 Genotyping_Status=1
                 Label=7
-              
+        notes=''     
         common_values= (Breeding_status,DOB,Label,Parent_Breeding,
                     genes_switcher['Ai14'],
                     genes_switcher['Ai65'],
@@ -841,7 +846,7 @@ class MouseDatabase():
                     genes_switcher['VRC'],
                     genes_switcher['PVF'],
                     genes_switcher['SLF'],
-                    Line,Room,Experimental_Status,Genotyping_Status,Alive)
+                    Line,Room,Experimental_Status,Genotyping_Status,Alive,notes)
         
         OnlyMales=False
         OnlyFemales=False
@@ -852,7 +857,7 @@ class MouseDatabase():
 
         if OnlyFemales:
             Females_Lab_Numbers=[ int(self.max_current_code+i+1 )   for i in range(FemaleNumber)]   
-            self.add_new_cage(Females_Lab_Numbers, 2, FemaleCage, common_values, commit=True)          
+            self.add_new_cage(Lab_Numbers=Females_Lab_Numbers, Sex=2, Cage=FemaleCage, common_values=common_values, commit=True)          
            
             actions_dictionary_females={BreedingCage:{Action_Type:((Females_Lab_Numbers),(FemaleCage),()) }        
                                         }    
@@ -860,7 +865,7 @@ class MouseDatabase():
             
         elif OnlyMales:
             Males_Lab_Numbers=[ int(self.max_current_code+i+1 )   for i in range(MaleNumber)]
-            self.add_new_cage(Males_Lab_Numbers, 1, MaleCage, common_values, commit=True)
+            self.add_new_cage(Lab_Numbers=Males_Lab_Numbers, Sex=1, Cage=MaleCage, common_values=common_values, commit=True)
             
             actions_dictionary_males={BreedingCage:{Action_Type:((Males_Lab_Numbers),(MaleCage),()) }         
                                       }      
@@ -870,8 +875,8 @@ class MouseDatabase():
             Males_Lab_Numbers=[ int(self.max_current_code+i+1 )   for i in range(MaleNumber)]
             Females_Lab_Numbers=[  int(Males_Lab_Numbers[-1]+i+1)    for i in range(FemaleNumber)]
             
-            self.add_new_cage(Males_Lab_Numbers, 1, MaleCage, common_values, commit=True)
-            self.add_new_cage(Females_Lab_Numbers, 2, FemaleCage, common_values, commit=True)
+            self.add_new_cage(Lab_Numbers=Males_Lab_Numbers, Sex=1,Cage= MaleCage, common_values=common_values, commit=True)
+            self.add_new_cage(Lab_Numbers=Females_Lab_Numbers, Sex=2,Cage= FemaleCage, common_values=common_values, commit=True)
             
             actions_dictionary_males={BreedingCage:{Action_Type:(tuple(Males_Lab_Numbers),(MaleCage),()) }         
                                       }   
@@ -908,13 +913,11 @@ class MouseDatabase():
                                    
         self.independent_commit()
         print('Litter Updated')
-    def add_new_litters(self, new_litter_number):
+    def add_new_litters(self,gui, new_litter_number):
         
-        root = Tkinter.Tk()
-        # app = UpdateLitterInput(root, len(self.current_litters.index), self.current_litters)
-        app = UpdateLitterInput(root, new_litter_number)   
-        root.mainloop()
-        new_litters=app.values
+        self.update_litter_window = UpdateLitterInput(gui, new_litter_number)  
+        self.update_litter_window.wait_window()
+        new_litters=self.update_litter_window.values
    
         new_litter= ''' INSERT INTO Litters_table(Cage,Breeding_Parents,Date_Seen, Age,Line,NumberAlive,NumberDead)
               VALUES(?,?,date('now'),?,?,?,?) 
@@ -984,7 +987,7 @@ class MouseDatabase():
 
         
         
-    def genotyping(self, cage_list):
+    def genotyping(self,gui, cage_list):
         
         Action_Type_Genotyping=10
 
@@ -1000,10 +1003,9 @@ class MouseDatabase():
                     genes_to_genotype.append(column)
             app_rows=len(mice_genotypes[column].to_list())+1
 
-            root = Tkinter.Tk()
-            app = input_genotypes(root,mice_codes, app_rows, genes_to_genotype)
-            root.mainloop()
-            updated_genotypes=app.values
+            self.input_genotypes_window= input_genotypes(gui,mice_codes, app_rows, genes_to_genotype)
+            self.input_genotypes_window.wait_window()
+            updated_genotypes=self.input_genotypes_window.values
             only_genotypes=updated_genotypes[1:]
             
             
@@ -1252,24 +1254,39 @@ class MouseDatabase():
         params=((action_date, action_type, cage_start, cage_end,) + mice_tuple_for_action) 
         self.arbitrary_inserting_record(query_add_action, params, commit=commit)
 
-    def add_new_cage(self, Lab_Numbers, Sex, Cage, common_values, commit=False):
-        commit=commit
-        for new_mouse in Lab_Numbers:  
-            Lab_Number=new_mouse
-            self.add_single_mouse(Lab_Number, Sex, Cage, common_values, commit)
+
+
+
+    def add_new_cage(self, Lab_Numbers=None, Sex=None, Cage=None, common_values=None, commit=False, number_of_animals=None, outside_mice=None):
+        if not outside_mice:
+            for new_mouse in Lab_Numbers:  
+                Lab_Number=new_mouse
+                self.add_single_mouse(Lab_Number, Sex, Cage, common_values, commit=commit)
+        else:
+            Cage=self.max_current_cage + 1
+            max_lab_number=self.max_current_code  
+            next_number=max_lab_number + 1
+            for new_mouse in range(number_of_animals):
+                next_number=next_number + new_mouse 
+                Lab_Number=next_number
+                self.add_single_mouse(Lab_Number, Sex, Cage, common_values, commit=commit)
                 
-    def add_single_mouse(self, Lab_Number, Sex, Cage, common_values, commit=False):    
-         
+            
+                
+    def add_single_mouse(self, Lab_Number, Sex, Cage, common_values, commit=False, external=False):    
         new_mice= ''' INSERT INTO MICE_table( Lab_Number,Sex,Cage,Breeding_status,DOB,Label,Parent_Breeding,
                                             Ai14,Ai65,Ai75,Ai80,Ai148,Ai162,G2C,VGC,VRC,PVF,SLF,
-                                            Line,Room,Experimental_Status,Genotyping_Status,Alive)
-                      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
+                                            Line,Room,Experimental_Status,Genotyping_Status,Alive,Notes)
+                      VALUES(?,?,?,?,date(?),?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) '''
        
-        individual_values=(Lab_Number, Sex,Cage)       
-        params=individual_values + common_values           
-        self.arbitrary_inserting_record (new_mice, params, commit=commit)
-           
-           
+        individual_values=[Lab_Number, Sex,Cage]     
+        params= tuple(individual_values + list(common_values))
+
+        self.arbitrary_inserting_record(new_mice, params, commit=commit)
+       
+
+       
+        
            
 #%% sqlite queries              
     def arbitrary_query_to_df(self, query, params=False):   

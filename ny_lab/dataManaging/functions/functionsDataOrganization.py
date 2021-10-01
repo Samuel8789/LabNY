@@ -37,7 +37,7 @@ def recursively_copy_changed_files_and_directories_from_slow_to_fast(slow_path, 
                  recursively_copy_changed_files_and_directories_from_slow_to_fast(os.path.join(slow_path,direc), os.path.join(fast_path,direc))
 
 def recursively_eliminate_empty_folders(path_to_check):
-    print('removing empty folders')
+    # print('removing empty folders')
     if os.path.isdir(path_to_check):      
               
         is_files=any(os.path.isfile(os.path.join(path_to_check, i)) for i in os.listdir(path_to_check))           
@@ -51,10 +51,15 @@ def recursively_eliminate_empty_folders(path_to_check):
             
         if not (is_files or is_directories):
             os.rmdir(path_to_check)
- 
+            
+def recursively_delete_back_directories(directory):
+
+    if len(os.listdir(directory))== 0:
+         os.rmdir(directory) 
+         recursively_delete_back_directories(os.path.split(directory[0])) 
              
 def short_metadata_type_check(aq_path):
-    print('Fast checking metadata')
+    # print('Fast checking metadata')
     imaging_metadata_file=os.path.join(aq_path,os.path.split(aq_path)[1]+'.xml')  
     tree = ET.parse( imaging_metadata_file)       
     root = tree.getroot()
@@ -63,10 +68,17 @@ def short_metadata_type_check(aq_path):
     if aquisition_type=='TSeries ZSeries Element':
         framenumber=len(root.findall('Sequence'))
         planenumber=len(seqinfo.findall('Frame'))
+    elif aquisition_type=='AtlasVolume': 
+        framenumber=len(root.findall('Sequence'))
+        planenumber=len(seqinfo.findall('Frame'))     
     elif aquisition_type!='TSeries ZSeries Element':  
         planenumber=1
         framenumber=len(seqinfo.findall('Frame'))   
-            
+      
+
+
+
+      
     return aquisition_type, framenumber, planenumber
 
 def channel_and_plane_of_image(single_image_full_path, multiplane, aq_type):
@@ -79,6 +91,8 @@ def channel_and_plane_of_image(single_image_full_path, multiplane, aq_type):
         
     if aq_type=='TSeries ZSeries Element' or  aq_type=='ZSeries':
         Plane=int(single_image_full_path[-14:-8])          
+    elif aq_type=='AtlasVolume':
+        Plane=int(single_image_full_path[-14:-8])
     else:
         Plane=1   
          
@@ -103,8 +117,8 @@ def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type)
 
 
 
-def check_channels_and_planes(image_sequence_directory_full_path, correction):
-    print('Cheking file structure')       
+def check_channels_and_planes(image_sequence_directory_full_path, correction=False):
+    # print('Cheking file structure')       
     sq_type=short_metadata_type_check(image_sequence_directory_full_path)
     
     # if 'TSeries ZSeries Element' separate by plane
@@ -155,7 +169,7 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction):
                 moviestructure['Ch'+str(channel)]={}
             
                 cycles_truth=[]
-                print('Creting movistructure')
+                # print('Creting movistructure')
                 moviestructure['Ch'+str(channel)]['cycles']={}
                 moviestructure['Ch'+str(channel)]['aqs']={}
 
@@ -209,7 +223,7 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction):
                     moviestructure['Ch'+str(channel)]['aqs']['aqsnumber']=len(aq_truth)
                     moviestructure['Ch'+str(channel)]['aqs']['firstaq']=aq_truth[0]
                     moviestructure['Ch'+str(channel)]['aqs']['lastaq']=aq_truth[-1]
-                    print('finsihed movistructure')
+                    # print('finsihed movistructure')
         
             
                 # elif sq_type[1]*sq_type[2]==len(chlist):

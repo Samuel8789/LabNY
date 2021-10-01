@@ -22,10 +22,8 @@ cc = mean(mean(mean(cc,1),3),4);
 
 % max shift of +/-5 pixels
 [cx, ix] = max(cc(floor(Lx/2)+1 + [-5:5]));
-ix       = ix - (6);
+ix     = ix - (6);
 
 BiDiPhase = -1 * ix;
 
 
-
-    

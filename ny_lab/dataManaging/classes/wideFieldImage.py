@@ -23,11 +23,9 @@ class WideFieldImage:
             self.WidefieldImagePath_stored=os.path.join(self.mouse_imaging_session_object.mouse_session_path,'widefield image',file_name)
 
 
-            
-
-
-
-
     def plot_image(self):
-        I = plt.imread(self.WidefieldImagePath_stored)
-        self.imgplot = plt.imshow(I,cmap='inferno')
+        self.load_image()
+        self.imgplot = plt.imshow(self.widefield_image,cmap='inferno')
+    def load_image(self):
+        self.widefield_image = plt.imread(self.WidefieldImagePath_stored)
+

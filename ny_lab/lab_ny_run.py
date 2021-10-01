@@ -22,7 +22,8 @@ class RunNYLab(Project):
     def __init__(self,  githubtoken_path, gui=False ):
         Project.__init__(self,'LabNY', githubtoken_path)
         #loadmicedatabase     
-        self.databasefile=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\MouseDatabase.db'
+        
+        self.databasefile=os.path.join(Project.all_paths_for_this_system['Dropbox'],'LabNY', 'MouseDatabase.db')
         self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
 
         print('Loading Mouse Database')
@@ -31,7 +32,6 @@ class RunNYLab(Project):
         self.all_mouse_info=self.database.allEXPERIMENTAL
         self.data_paths_roots={}
         self.load_datbaseSaved_paths_roots()
-
         try:
             # self.raw_data_path='\\\?\\' + os.path.join(self.all_paths_for_this_system[self.project_raw_data_path],'LabNY')
             # self.main_directory= '\\\?\\' +os.path.join(self.all_paths_for_this_system[self.project_primary_data_path],'LabNY')

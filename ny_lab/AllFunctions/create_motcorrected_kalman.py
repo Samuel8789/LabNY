@@ -11,88 +11,51 @@ import caiman as cm
 import numpy as np
 import tifffile
 
-
-
 from .kalman_stack_filter import kalman_stack_filter
 from .save_imagej_hdf5_tiff import save_imagej_hdf5
- 
+from ..data_pre_processing.correct_bidi_movie import correct_bidi_movie
 #%%'
 
-def create_motcorrected_kalman(mmap_path, save_MC_mmap=False):
+def create_motcorrected_kalman(mmap_path, save_MC_mmap=False, correct=None):
     pass
-    mmap_path=mmap_path
     rawmovpath=mmap_path
     motion_corrected_fullpath=os.path.splitext(rawmovpath)[0]+'MCkalman.tiff'
-    if not os.path.isfile(motion_corrected_fullpath):
-        rawmov=cm.load(rawmovpath)
+    if correct or not os.path.isfile(motion_corrected_fullpath):
+
+        filename=os.path.split(rawmovpath)[1]
+        good_filename=filename[:filename.find('_d1_')]
+        temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp', good_filename)
+        caiman_extra=filename[filename.find('_d1_'):filename.find('_mmap')-4]
         
-        # CHECK IF ALREADY EXIST
-        # if 
+        temporary_bidi_path, bidiphases=correct_bidi_movie(rawmovpath, temporarypath, caiman_extra)  
+        # temporary_bidi_path, bidiphases=correct_bidi_movie(rawmovpath)    
         
-        
-        
-        # TO ADD AN OPTION TO CHECK LNENGTH OF VIDEO
-    
-        
-        # if 'dview' in locals():
-        #     cm.stop_server(dview=dview)
-        #     dview.terminate()
-        # c, dview, n_processes = cm.cluster.setup_cluster(backend='local', n_processes=None,
-        #                                     single_thread=False)
-          
-        # rawmovMC=cm.motion_correction.MotionCorrect(rawmovpath, dview=dview,max_deviation_rigid=10)
-        rawmovMC=cm.motion_correction.MotionCorrect(rawmovpath, max_deviation_rigid=10)
+        rawmovMC=cm.motion_correction.MotionCorrect(temporary_bidi_path, max_deviation_rigid=10)
+
+        # rawmovMC=cm.motion_correction.MotionCorrect(rawmovpath, max_deviation_rigid=10)
         print('Doing motion correction')
         rawmovMC.motion_correct(save_movie=False)
-        corrected=rawmovMC.apply_shifts_movie(mmap_path)
+        corrected=rawmovMC.apply_shifts_movie(temporary_bidi_path)
+        list_of_files = os.listdir('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp')
+        full_path = ['\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp\{0}'.format(x) for x in list_of_files]
+        oldest_file = min(full_path, key=os.path.getctime)
+        if len(list_of_files)>5 and oldest_file !=  temporary_bidi_path:
+                os.remove(oldest_file)
         
-        
-        # rawmovMC.motion_correct_rigid(save_movie=True)
-        # rawmovMC.motion_correct_pwrigid(save_movie=True)
-    
-        # cm.stop_server(dview=dview)
-        # dview.terminate()
-        
-        # rawmovMCpath=os.path.splitext(rawmovpath)[0]  +  '._rig_'  +   os.path.split(mmap_path)[1][os.path.split(mmap_path)[1].find('_d1_'):]
-        
-        # rawmovMCmov=cm.load(rawmovpath)
-        # rawmovMCpath.play()
+
         print('Doing kalman on '+ os.path.split(rawmovpath)[1]+'motioncorrected')
         dataset_kalman_array=kalman_stack_filter(corrected)
         dataset_kalman_array_changed_type=dataset_kalman_array.astype(np.uint16)
         dataset_kalman_caiman_movie=cm.movie(dataset_kalman_array_changed_type, fr=300,start_time=0,file_name=None, meta_data=None)
-        
-        
-        # rawmov.play(fr=500,gain=0.2)
-        # rawmovMCpath.play(fr=500,gain=0.2)
-        # dataset_kalman_caiman_movie_raw.play(fr=500,gain=0.2)
-        # dataset_kalman_caiman_movie.play(fr=500,gain=0.2)
-        
-        # return rawmov, rawmovMCmov, dataset_kalman_caiman_movie_raw, dataset_kalman_caiman_movie, rawmovMC
-        
+    
         
         save_imagej_hdf5(dataset_kalman_caiman_movie, os.path.splitext(rawmovpath)[0]+'MCkalman', '.tiff', )
         
         if save_MC_mmap:
             save_imagej_hdf5(dataset_kalman_caiman_movie, os.path.splitext(rawmovpath)[0]+'MC', '.mmap',)
         
-        # os.remove(rawmovMCpath)
-        # cm.stop_server(dview=dview)
-        # if 'dview' in locals():
-        #     cm.stop_server(dview=dview)
-        #     dview.terminate()
-    
-    
-        # rawmovMCpath=os.path.splitext(rawmovpath)[0]  +  '._rig_'  +   os.path.split(mmap_path)[1][os.path.split(mmap_path)[1].find('_d1_'):]
-        # rawmovMC=cm.load(rawmovpath)
-        # # rawmovMCpath.play()
-        # dataset_kalman_array=kalman_stack_filter(rawmovMC)
-        # dataset_kalman_array_changed_type=dataset_kalman_array.astype(np.uint16)
-        # dataset_kalman_caiman_movie=cm.movie(dataset_kalman_array_changed_type, fr=300,start_time=0,file_name=None, meta_data=None) 
-        # dataset_kalman_caiman_movie.play(fr=500,gain=0.2)
-    
-        # save_imagej_hdf5(dataset_kalman_caiman_movie, mmap_path+'kalmanraw', '.tiff',)
-    return motion_corrected_fullpath
+      
+    return motion_corrected_fullpath, bidiphases
 
 
 if __name__ == '__main__':    

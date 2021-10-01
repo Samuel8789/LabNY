@@ -63,7 +63,7 @@ class new_window_update_done_windows( tk.Toplevel):
             self.select()
             
             self.destroy()
-            update_window_params(self.gui, self.window_cage.get(), self.selected_mice, self.window_date_entry.get(), database_object=self.gui.MouseDat)
+            update_window_params(self.gui, self.window_cage.get(), self.selected_mice, self.window_date.get(), database_object=self.gui.MouseDat)
            
             if self.selected_dead_mice:
                 print('ss')

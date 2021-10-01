@@ -25,7 +25,7 @@ class MouseImagingTab(tk.Frame):
                            ]
         self.frames={}
         for i in range(len(self.frames_names)):
-              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4)
+              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4,relief='groove')
               
         self.frames[self.frames_names[0]].grid(row=0, column=0, sticky="nswe") 
         self.frames[self.frames_names[1]].grid(row=1, column=0, sticky="nswe") 
@@ -35,11 +35,11 @@ class MouseImagingTab(tk.Frame):
 
         self.frame1= self.frames[self.frames_names[0]]  
         self.frame1.buttons={}
-        self.frame1.buttons_names=['Add New Imaging Session',
+        self.frame1.buttons_names=[
                                    'All MouseImaging Info', 
                                    'Print Cage Info For Imaging'
                                    ]
-        self.frame1.buttons_commands=[self.add_new_imaging_session_button, 
+        self.frame1.buttons_commands=[ 
                                       self.check_all_mouse_imaging_info_button, 
                                       self.print_cage_info_for_imaging
                                       ]
@@ -47,14 +47,14 @@ class MouseImagingTab(tk.Frame):
               self.frame1.buttons[self.frame1.buttons_names[i]]= ttk.Button(self.frame1 , text=self.frame1.buttons_names[i], command=self.frame1.buttons_commands[i])
  
         self.frame1.entries={}
-        self.frame1.entries_names=['Session Path',
+        self.frame1.entries_names=[
                                    'Mouse Code'
                                    ]
         for i in range(len(self.frame1.entries_names)):
             self.frame1.entries[self.frame1.entries_names[i]]=ttk.Entry(self.frame1 , text='', width=45)
  
         self.frame1.labels={}
-        self.frame1.labels_names=['Session Path',
+        self.frame1.labels_names=[
                                   'Mouse Code',
                                   'Cage List'
                                   ]
@@ -67,22 +67,19 @@ class MouseImagingTab(tk.Frame):
  
  
  
-        self.frame1.entries[self.frame1.entries_names[0]].grid(column=1, row=0)
-        self.frame1.entries[self.frame1.entries_names[0]].insert(0, r'F:\Projects\LabNY\Imaging\2021\2021MMDD')
-        self.frame1.labels[self.frame1.labels_names[0]].grid(column=0, row=0)
-        self.frame1.buttons[self.frame1.buttons_names[0]].grid(column=2, row=0)
+   
          
          
-        self.frame1.buttons[self.frame1.buttons_names[1]].grid(column=2, row=2)
-        self.frame1.entries[self.frame1.entries_names[1]].grid(column=1, row=2)
-        self.frame1.entries[self.frame1.entries_names[1]].insert(0, 'SPJA')
-        self.frame1.entries[self.frame1.entries_names[1]]['width']=6
-        self.frame1.labels[self.frame1.labels_names[1]].grid(column=0, row=2)
+        self.frame1.buttons[self.frame1.buttons_names[0]].grid(column=2, row=2)
+        self.frame1.entries[self.frame1.entries_names[0]].grid(column=1, row=2)
+        self.frame1.entries[self.frame1.entries_names[0]].insert(0, 'SPJA')
+        self.frame1.entries[self.frame1.entries_names[0]]['width']=6
+        self.frame1.labels[self.frame1.labels_names[0]].grid(column=0, row=2)
          
          
          
-        self.frame1.buttons[self.frame1.buttons_names[2]].grid(column=2, row=3)
-        self.frame1.labels[self.frame1.labels_names[2]].grid(column=0, row=3)
+        self.frame1.buttons[self.frame1.buttons_names[1]].grid(column=2, row=3)
+        self.frame1.labels[self.frame1.labels_names[1]].grid(column=0, row=3)
         self.frame1.cage_lstbox.grid(column=1, row=3, columnspan=1)
  
  
@@ -106,10 +103,10 @@ class MouseImagingTab(tk.Frame):
         
         open_multiple_df_in_tkinter_frame(self, self.frame2, df_dictionary)
         
-    def add_new_imaging_session_button(self):
-        sessions=['\\\?\\' +self.frame1.entries[self.frame1.entries_names[0]].get()]
-        self.gui_ref.MouseDat.ImagingDatabase_class.add_new_session_to_database(sessions)
-        button_update_database(self.gui_ref)
+    # def add_new_imaging_session_button(self):
+    #     sessions=['\\\?\\' +self.frame1.entries[self.frame1.entries_names[0]].get()]
+    #     self.gui_ref.MouseDat.ImagingDatabase_class.add_new_session_to_database(sessions)
+    #     button_update_database(self.gui_ref)
 
         
         

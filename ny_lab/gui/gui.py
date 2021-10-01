@@ -22,6 +22,7 @@ from .tabs.mouseExperimental.mouseExperimentalTab import MouseExperimentalTab
 from .tabs.mouseImaging.mouseImagingTab import MouseImagingTab
 from .tabs.dataProcessing.dataProcessingTab import DataProcessingTab
 from .tabs.dataAnalysis.dataAnalysisTab import DataAnalysisTab
+from .tabs.dataExploration.dataExplorationsTab import DataExplorationsTab
 
 
 
@@ -32,19 +33,18 @@ class Gui(tk.Tk):
 
         # configure the root window
         self.title('LAB App')
-        self.geometry('800x800')
+        self.geometry('1200x1200')
         self.todays_date=datetime.date.today().strftime("%Y%m%d")
         self.lab=lab_object
         self.datamanaging=self.lab.datamanaging
         self.MouseDat=self.lab.database
-        button_update_database(self)
 
 #%% TAB DEFINITIONS
         self.main_tabs={}
         self.main_tabControl = ttk.Notebook(self)
         self.main_tabs_names=['General Navigation','Mouse Database','Mouse Visit',
                               'Mouse Experimental','Mouse Imaging','Data Processing',
-                              'Data Analysis']
+                              'Data Explorations', 'Data Analysis']
       
         self.main_tabs['General Navigation']=MainGuiTab(self, self.main_tabControl)
         self.main_tabControl.add(self.main_tabs['General Navigation'], text='General Navigation')
@@ -64,11 +64,15 @@ class Gui(tk.Tk):
         self.main_tabs['Data Processing']=DataProcessingTab(self, self.main_tabControl)
         self.main_tabControl.add(self.main_tabs['Data Processing'], text='Data Processing')
         
+        self.main_tabs['Data Explorations']=DataExplorationsTab(self, self.main_tabControl)
+        self.main_tabControl.add(self.main_tabs['Data Explorations'], text='Data Explorations')
+        
         self.main_tabs['Data Analysis']=DataAnalysisTab(self, self.main_tabControl)
         self.main_tabControl.add(self.main_tabs['Data Analysis'], text='Data Analysis')
         self.main_tabControl.pack(expand=1, fill="both")  
    
-    
+        button_update_database(self)
+
    # self.message_window
     
 if __name__ == "__main__":

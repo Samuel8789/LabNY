@@ -9,9 +9,10 @@ import os
 import glob
 import numpy as np
 import tifffile
-
+import matplotlib.pyplot as plt
 
 from ...AllFunctions.create_motcorrected_kalman import create_motcorrected_kalman, save_imagej_hdf5
+from ...data_pre_processing.bidicorrect_image import shiftBiDi, biDiPhaseOffsets
 
 
 class ImageSequenceDataset:
@@ -21,8 +22,8 @@ class ImageSequenceDataset:
         self.associated_aquisiton=aquisition_object        
         self.selected_dataset_mmap_path=selected_dataset_mmap_path
         self.dataset_name=dataset_name
-        
-        
+    
+  
         if selected_dataset_raw_path:
             self.selected_dataset_raw_path=selected_dataset_raw_path
             self.only_read_dataset()
@@ -30,14 +31,18 @@ class ImageSequenceDataset:
             if not os.path.isfile(self.dataset_full_file_path):
                 if not os.path.isfile(os.path.join(self.selected_dataset_mmap_path, self.associated_aquisiton.aquisition_name) + '.mmap' ):
                     self.load_dataset_from_image_sequence()
-                    print(self.associated_aquisiton)
-                    print(self.dataset_name)
+                    self.bidi_shift=biDiPhaseOffsets()
+
+                    # print(self.associated_aquisiton)
+                    # print(self.dataset_name)
                     self.save_dataset_as_mmap()
                     
                 
         else:
-            print('Reading Exiting Datasets')
+            # print('Reading Exiting Datasets')
             self.only_read_dataset()
+            
+            
             
 
         
@@ -45,13 +50,14 @@ class ImageSequenceDataset:
     def load_dataset_from_image_sequence(self):
         image_sequence_files=os.listdir(self.selected_dataset_raw_path)
         image_sequence_paths= [os.path.join(self.selected_dataset_raw_path, image) for image in image_sequence_files]
-        print(self.dataset_name)
+        # print(self.dataset_name)
         self.image_sequence=cm.load(image_sequence_paths)
         
     def save_dataset_as_mmap(self):
+        
         self.image_sequence.save(os.path.join(self.selected_dataset_mmap_path, self.associated_aquisiton.aquisition_name) + '.mmap' ,to32=False)       
         self.only_read_dataset()
-        print(self.selected_dataset_mmap_path)
+        # print(self.selected_dataset_mmap_path)
         
     def load_dataset_from_mmap(self): 
         self.image_sequence=cm.load(self.dataset_full_file_path)
@@ -72,10 +78,10 @@ class ImageSequenceDataset:
         self.read_projections()
         
         
-    def create_mot_corrected_kalman_tiff(self, save_MC_mmap=False):
+    def create_mot_corrected_kalman_tiff(self, save_MC_mmap=False, correct=None):
         
-        print('moticorrected tiff '+self.dataset_name)
-        self.motion_corrected_fullpath=create_motcorrected_kalman(self.dataset_full_file_path, save_MC_mmap)
+        # print('moticorrected tiff '+self.dataset_name)
+        self.motion_corrected_fullpath, self.bidiphases=create_motcorrected_kalman(self.dataset_full_file_path, save_MC_mmap, correct=correct)
             
     def read_dataset_metadat_from_database(self):
         print('in progress')
@@ -127,16 +133,16 @@ class ImageSequenceDataset:
         self.projection_paths_dic={'average_projection_path':os.path.splitext(self.path_to_project)[0]+'average_projection.tiff',
                              'max_projection_path':os.path.splitext(self.path_to_project)[0]+'max_projection.tiff',
                              'std_projection_path':os.path.splitext(self.path_to_project)[0]+'std_projection.tiff',
-                             'local_correlations_path':os.path.splitext(self.path_to_project)[0]+'local_correlations.tiff',
+                             # 'local_correlations_path':os.path.splitext(self.path_to_project)[0]+'local_correlations.tiff',
                              }
-        print('projecting' + self.path_to_project)
+        # print('projecting' + self.path_to_project)
 
     def load_projections(self):    
         self.read_projections()
-        self.average_projection=cm.load(self.projection_paths_dic['average_projection_path'])
-        self.max_projection=cm.load(self.projection_paths_dic['max_projection_path'])
-        self.std_projection=cm.load(self.projection_paths_dic['std_projection_path'])
-        self.local_correlations=cm.load(self.projection_paths_dic['local_correlations_path'])
+        self.average_projection=plt.imread(self.projection_paths_dic['average_projection_path'])
+        self.max_projection=plt.imread(self.projection_paths_dic['max_projection_path'])
+        self.std_projection=plt.imread(self.projection_paths_dic['std_projection_path'])
+        # self.local_correlations=plt.imread(self.projection_paths_dic['local_correlations_path'])
             
 
         

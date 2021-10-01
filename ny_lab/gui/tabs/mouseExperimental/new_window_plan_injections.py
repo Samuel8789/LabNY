@@ -7,9 +7,7 @@ Created on Tue Sep  7 11:41:13 2021
 
 import tkinter as tk
 from tkinter import ttk
-import tkinter as Tkinter
-from tkinter import *
-from tkinter import StringVar, Listbox, DoubleVar
+from tkinter import StringVar, Listbox, DoubleVar, MULTIPLE
 from ....database.fun.guiFunctions.modify_injection_params import modify_injection_params
 
 
@@ -111,13 +109,13 @@ class new_window_plan_injections(tk.Toplevel):
 
             self.destroy()
 
-            modify_injection_params(self.gui, self.selected_mice, self.number_of_injections.get(),  self.virus_dilutions, self.selected_cage.get())
-
+            self.modify_injection_window=modify_injection_params(self.gui, self.selected_mice, self.number_of_injections.get(),  self.virus_dilutions, self.selected_cage.get())
+            self.modify_injection_window.wait_window()
 
         
     def update_mice_in_cage(self, *a):
         cage=self.selected_cage.get()
-        if cage not in  self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Cage']:
+        if cage not in  self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Cage'].values.to_numpy().tolist():
             mice=self.gui.MouseDat.allMICE[self.gui.MouseDat.allMICE['Cage']==cage]['Lab_Number'].values.to_numpy().tolist()
         else:
             mice=  self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter[self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Cage']==cage][self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Experiment']=='Planned']['Code'].tolist()
@@ -154,7 +152,13 @@ class new_window_plan_injections(tk.Toplevel):
             cage_selec.sort()
             self.cage_selection['values']=cage_selec
 
-
+        if project ==8:
+            stocks=  self.gui.MouseDat.stock_mice[self.gui.MouseDat.stock_mice['Line_Short'].isin(['Other Colony'])]['Cage'].tolist()
+    
+            exp_siblings=  self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter[self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Line_Short'].isin(['Other Colony'])][self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Experiment']=='Planned']['Cage'].tolist()
+            cage_selec=stocks+list(set(exp_siblings))
+            cage_selec.sort()
+            self.cage_selection['values']=cage_selec
 
              
              
@@ -171,6 +175,6 @@ class new_window_plan_injections(tk.Toplevel):
 if __name__ == "__main__":
     
 
-    root = Tkinter.Tk()
+    root = tk.Tk()
     app = new_window_plan_injections(root,)
     root.mainloop()

@@ -21,7 +21,7 @@ class DataAnalysisTab(tk.Frame):
         self.frames_names=['TO DO']
         self.frames={}
         for i in range(len(self.frames_names)):
-              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4)
+              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4,relief='groove')
               
         self.frames[self.frames_names[0]].grid(row=0, column=0, sticky="nswe") 
         

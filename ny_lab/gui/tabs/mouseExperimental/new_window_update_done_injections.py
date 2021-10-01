@@ -72,16 +72,22 @@ class new_window_update_done_injections(tk.Toplevel):
             exp_and_injection_ids=[res[0], res[-1]] 
             self.destroy()
 
-            update_injection_params(self.gui, exp_and_injection_ids[0], exp_and_injection_ids[1], self.injection_date.get(), self.injection_cage.get(),
+            self.update_injection_parameter_window=update_injection_params(self.gui, exp_and_injection_ids[0], exp_and_injection_ids[1], self.injection_date.get(), self.injection_cage.get(),
                                     self.selected_mice, database_object=self.gui.MouseDat)
-            print('something')
-            plan_window_parameters(self.gui, self.selected_mice)
-            print('something')
             
+            self.update_injection_parameter_window.wait_window()
+            
+            print('injections updated')
             if self.selected_dead_mice:
                 print('ss')
                 for code in self.selected_dead_mice:
-                  self.gui_ref.MouseDat.Experimental_class.mouse_dead_during_surgery(code)
+                  self.gui.MouseDat.Experimental_class.mouse_dead_during_surgery(code)
+                  
+            self.plan_window_parameters_window=plan_window_parameters(self.gui, self.selected_mice)
+            self.plan_window_parameters_window.wait_window()
+            print('windows planned')
+            
+           
 
 
         

@@ -11,9 +11,8 @@ import pandas as pd
 import tkinter as tk
 
 class UpdateLitterInput(tk.Toplevel):
-    def __init__(self, app, mousedat):
-        
-        tk.Toplevel.__init__(self, gui)
+    def __init__(self, app, mousedat):       
+        tk.Toplevel.__init__(self, app)
         self.gui=app
         self.mousedat=mousedat     
         rows= len(self.mousedat.current_litters.index)

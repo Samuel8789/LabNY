@@ -4,15 +4,15 @@ Created on Thu Apr  1 10:08:27 2021
 
 @author: sp3660
 """
-import sys
-sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
-sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/ProcessingScripts')
-sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/MainClasses')
+
 import os
 import time
 import numpy as np
 import xml.etree.ElementTree as ET
 import scipy as sp
+import pandas as pd
+import datetime
+from .recursively_read_metadata import recursively_read_metadata
 
 
 
@@ -21,7 +21,6 @@ from ...AllFunctions.manually_get_some_metadata import manually_get_some_metadat
 
 
 
-import pandas as pd
 #%%
 class Metadata():
     
@@ -34,7 +33,7 @@ class Metadata():
                 self.voltage_output=voltageoutput_metadataPath
                 
                 if os.path.isfile(self.imaging_metadata_file):
-                        print('getting metadata')
+                        # print('getting metadata')
                         self.imaging_metadata=self.process_metadata()
                 if  voltagerec_metadataPath:       
                     if os.path.isfile(self.voltage_file):        
@@ -77,100 +76,105 @@ class Metadata():
 
         tree = ET.parse( self.imaging_metadata_file)       
         root = tree.getroot()
-        if not root.find('PVStateShard'):
+        full_metadata=recursively_read_metadata(root)  
+
+        if not full_metadata:
             return []
         else:
-            MicroscopeInfo=root.find('PVStateShard')
-            seqinfo=root.find('Sequence')
+            MicroscopeInfo=full_metadata['PVStateShard']
+            seqinfo=full_metadata['Sequence']
             
                 
             
-            params={'ImagingTime':time.strftime('%H:%M:%S',time.strptime(root.attrib['date'],'%m/%d/%Y %X %p')),
-                    'Date':root.attrib['date'],
+            params={'ImagingTime':time.strftime('%H:%M:%S',time.strptime(full_metadata['date'],'%m/%d/%Y %X %p')),
+                    'Date':full_metadata['date'],
                     'AquisitionName':os.path.splitext(os.path.basename(self.imaging_metadata_file))[0]}
-            
-            for element in MicroscopeInfo:
+              
+            for element in MicroscopeInfo['Childs'].values():
                 
-                if element.attrib['key']=='activeMode':
-                    params['ScanMode']= element.attrib['value']
+                if element['key']=='activeMode':
+                    params['ScanMode']= element['value']
                     
-                if element.attrib['key']=='bitDepth':
-                    params['BitDepth']=int(element.attrib['value'])
+                if element['key']=='bitDepth':
+                    params['BitDepth']=int(element['value'])
                     
-                if element.attrib['key']=='dwellTime':
-                    params['dwellTime']=float(element.attrib['value'])
+                if element['key']=='dwellTime':
+                    params['dwellTime']=float(element['value'])
                     
-                if element.attrib['key']=='framePeriod':
-                    params['framePeriod']=float(element.attrib['value'] )
+                if element['key']=='framePeriod':
+                    params['framePeriod']=float(element['value'] )
                     
-                if element.attrib['key']=='laserPower':
-                    params['ImagingLaserPower']=float(element[0].attrib['value'])
+                if element['key']=='laserPower':
+                    params['ImagingLaserPower']=float(element['IndexedValue']['value'])
                     
-                if element.attrib['key']=='laserPower':
-                    params['UncagingLaserPower']=float(element[1].attrib['value'] )
+                if element['key']=='laserPower':
+                    params['UncagingLaserPower']=float(element['IndexedValue_1']['value'] )
                     
-                if element.attrib['key']=='linesPerFrame':
-                    params['LinesPerFrame']=int(element.attrib['value'])
+                if element['key']=='linesPerFrame':
+                    params['LinesPerFrame']=int(element['value'])
                     
-                if element.attrib['key']=='micronsPerPixel':
-                    params['MicronsPerPixelX']=float(element[0].attrib['value'])
+                if element['key']=='micronsPerPixel':
+                    params['MicronsPerPixelX']=float(element['IndexedValue']['value'])
                     
-                if element.attrib['key']=='micronsPerPixel':
-                    params['MicronsPerPixelY']=float(element[1].attrib['value'])
+                if element['key']=='micronsPerPixel':
+                    params['MicronsPerPixelY']=float(element['IndexedValue_1']['value'])
                     
-                if element.attrib['key']=='objectiveLens':
-                    params['Objective']=element.attrib['value']
+                if element['key']=='objectiveLens':
+                    params['Objective']=element['value']
                     
-                if element.attrib['key']=='objectiveLensMag':
-                    params['ObjectiveMag']=int(element.attrib['value'])
+                if element['key']=='objectiveLensMag':
+                    params['ObjectiveMag']=int(element['value'])
                     
-                if element.attrib['key']=='objectiveLensNA':
-                    params['ObjectiveNA']=float(element.attrib['value'])
+                if element['key']=='objectiveLensNA':
+                    params['ObjectiveNA']=float(element['value'])
                     
-                if element.attrib['key']=='opticalZoom':
-                    params['OpticalZoom']=float(element.attrib['value'] )
+                if element['key']=='opticalZoom':
+                    params['OpticalZoom']=float(element['value'] )
                     
-                if element.attrib['key']=='pixelsPerLine':
-                    params['PixelsPerLine']=int(element.attrib['value'])
+                if element['key']=='pixelsPerLine':
+                    params['PixelsPerLine']=int(element['value'])
                     
-                if element.attrib['key']=='pmtGain':
-                    params['PMTGainRed']=float(element[0].attrib['value'] )
+                if element['key']=='pmtGain':
+                    params['PMTGainRed']=float(element['IndexedValue']['value'] )
                     
-                if element.attrib['key']=='pmtGain':
-                    params['PMTGainGreen']=float(element[1].attrib['value'])
+                if element['key']=='pmtGain':
+                    params['PMTGainGreen']=float(element['IndexedValue_1']['value'])
                     
-                if element.attrib['key']=='positionCurrent':
-                    params['PositionX']=float(element[0][0].attrib['value'])
+                if element['key']=='positionCurrent':
+                    params['PositionX']=float(element['SubindexedValues']['Childs']['SubindexedValue']['value'])
                     
-                if element.attrib['key']=='positionCurrent':
-                    params['PositionY']=float(element[1][0].attrib['value'])
+                if element['key']=='positionCurrent':
+                    params['PositionY']=float(element['SubindexedValues_1']['Childs']['SubindexedValue']['value'])
                     
-                if element.attrib['key']=='positionCurrent':
-                    params['PositionZphysical']=float(element[2][0].attrib['value'])
+                if element['key']=='positionCurrent':
+                    params['PositionZphysical']=float(element['SubindexedValues_2']['Childs']['SubindexedValue']['value'])
                     
-                if element.attrib['key']=='positionCurrent':
-                    params['PositionZETL']=float(element[2][1].attrib['value'])
-                    
-                if element.attrib['key']=='rastersPerFrame':
-                    params['RasterAveraging']=int(element.attrib['value'])
-                    
-                if element.attrib['key']=='resonantSamplesPerPixel':
-                    params['ResonantSampling']=int(element.attrib['value'] )
-                    
-                if element.attrib['key']=='scanLinePeriod':
-                    params['ScanLinePeriod']=float(element.attrib['value'])
-                    
-                if element.attrib['key']=='zDevice':
-                    params['ZDevice']=int(element.attrib['value'] )
+                if element['key']=='positionCurrent':
+                    params['PositionZETL']=float(element['SubindexedValues_2']['Childs']['SubindexedValue_1']['value'])
                     
                     
-    
+                    
+                    
+                if element['key']=='rastersPerFrame':
+                    params['RasterAveraging']=int(element['value'])
+                    
+                if element['key']=='resonantSamplesPerPixel':
+                    params['ResonantSampling']=int(element['value'] )
+                    
+                if element['key']=='scanLinePeriod':
+                    params['ScanLinePeriod']=float(element['value'])
+                    
+                if element['key']=='zDevice':
+                    params['ZDevice']=int(element['value'] )
+                    
+                    
+
                 
-            video_params={'MultiplanePrompt':seqinfo.attrib['type'],                                  
-                          'ParameterSet':seqinfo.find("Frame").attrib['parameterSet'],
+            video_params={'MultiplanePrompt':seqinfo['type'],                                  
+                          'ParameterSet':seqinfo['Childs']["Frame"]['parameterSet'],
                           'RedChannelName':'No Channel',
                           'GreenChannelName':'No Channel',           
-                          'FrameNumber':int(len(list(seqinfo.findall('Frame')))),
+                          'FrameNumber':int(len(list(seqinfo['Childs']))),
                           'PlaneNumber':'Single',
                           'PlanePositionsOBJ':params['PositionZphysical'],
                           'PlanePositionsETL':params['PositionZETL'],           
@@ -182,7 +186,7 @@ class Metadata():
             # MultiPlane=0
             SingleChannel=0
            
-            if len(list(root))>3 and video_params['MultiplanePrompt']=="TSeries ZSeries Element":
+            if len(list(root))>3 and (video_params['MultiplanePrompt']=="TSeries ZSeries Element" or video_params['MultiplanePrompt']=="AtlasVolume"):
                 FirstVolumeMetadat=root[2]
                 del video_params['FrameNumber']
                 video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
@@ -247,48 +251,76 @@ class Metadata():
                 video_params['PlaneNumber']=len(list(FirstVolumeMetadat.findall('Frame')))               
                 video_params['PlanePositionsOBJ']=[all_volumes[0]['TopPlane']['ObjectiveZ'], all_volumes[0]['MediumPlane']['ObjectiveZ'], all_volumes[0]['BottomPlane']['ObjectiveZ']]
                 video_params['PlanePositionsETL']=[all_volumes[0]['TopPlane']['ETLZ'], all_volumes[0]['MediumPlane']['ETLZ'], all_volumes[0]['BottomPlane']['ETLZ']]
-                video_params['Planepowers']= [all_volumes[0]['TopPlane']['ImagingSlider'], all_volumes[0]['MediumPlane']['ImagingSlider'], all_volumes[0]['BottomPlane']['ImagingSlider']]          
-                                     
+                video_params['Planepowers']= [all_volumes[0]['TopPlane']['ImagingSlider'], all_volumes[0]['MediumPlane']['ImagingSlider'], all_volumes[0]['BottomPlane']['ImagingSlider']]    
+                                 
             else:
-                SequenceInfo=root.find('Sequence')
-                seqinfo=SequenceInfo
+                
+                seqinfo=full_metadata['Sequence']
                 
                 all_frames=[]
-                for frame in SequenceInfo.findall('Frame'):
-                    iframe={}
-                    iframe['LastGoodFrame']='Default_0'
-                    iframe['scanLinePeriod']='Default_' + str(params['ScanLinePeriod'])
-                    iframe['absoluteTime']=float(frame.attrib['absoluteTime'])
-                    iframe['index']=int(frame.attrib['index'])
-                    iframe['relativeTime']=float(frame.attrib['relativeTime'])
-                    if frame.find('ExtraParameters'):     
-                        iframe['LastGoodFrame']=int(frame.find('ExtraParameters').attrib['lastGoodFrame'])
-                    ExtraMetadata=frame.find('PVStateShard')    
-                    iframe['framePeriod']=float(ExtraMetadata[0].attrib['value'])
-                    if len(ExtraMetadata)>1:
-                        iframe['scanLinePeriod']=float(ExtraMetadata[1].attrib['value'])
-                    all_frames.append(iframe)
+                for key, frame in seqinfo['Childs'].items() :
+                    if 'Frame' in  key:
+                        iframe={}
+                        iframe['LastGoodFrame']='Default_0'
+                        iframe['scanLinePeriod']='Default_' + str(params['ScanLinePeriod'])
+                        iframe['absoluteTime']=float(frame['absoluteTime'])
+                        iframe['index']=int(frame['index'])
+                        iframe['relativeTime']=float(frame['relativeTime'])
+                        if 'ExtraParameters' in frame:     
+                            iframe['LastGoodFrame']=int(frame['ExtraParameters']['lastGoodFrame'])
+                        ExtraMetadata=frame['PVStateShard']
+                        iframe['framePeriod']=float(ExtraMetadata['Childs']['PVStateValue']['value'])
+                        if len(ExtraMetadata['Childs'])>1:
+                            if 'value' in ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]:
+                                iframe['scanLinePeriod']=float(ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]['value'])
+                        all_frames.append(iframe)
                 video_params['FullAcquisitionTime']=all_frames[-1]['relativeTime']
     
             
-            if seqinfo.find('PVStateShard').attrib:
-                SingleChannel=1
-                SingleColorPMTInfo=seqinfo.find('PVStateShard').find('PVStateValue').findall('IndexedValue')
-                SingleColorPMTinfo2=[pmt.attrib for pmt in  SingleColorPMTInfo] 
-                if 'Green' in  seqinfo.find('Frame').find('File').attrib.values():
-                    ChannelName=seqinfo.find('Frame').find('File').attrib['filename']
-                    video_params['GreenChannelName']=ChannelName
+            if seqinfo['Childs']['PVStateShard'] and video_params['MultiplanePrompt']=="AtlasVolume":
+                SingleChannel=0 
+                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                for chan in files.values():
+                    ChannelName=chan['filename']
+                    if 'Green' in chan.values() :              
+                        video_params['GreenChannelName']=ChannelName
+                    elif 'Red' in chan.values():
+                        video_params['RedChannelName']=ChannelName
+                if not all( video_params['RedChannelName'] and video_params['GreenChannelName']):
+                    SingleChannel=1
+            
+            elif seqinfo['Childs']['PVStateShard'] and not video_params['MultiplanePrompt']=="AtlasVolume":
+                # SingleChannel=1
+                # SingleColorPMTInfo=seqinfo['Childs']['PVStateShard']['PVStateValue']['Childs']
+                # SingleColorPMTinfo2=[pmt for pmt in  SingleColorPMTInfo.values()] 
+                # if 'Green' in  seqinfo['Childs']['Frame']['File'].values():
+                #     ChannelName=seqinfo['Childs']['Frame']['File']['filename']
+                #     video_params['GreenChannelName']=ChannelName               
+                SingleChannel=0 
+                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                for chan in files.values():
+                    ChannelName=chan['filename']
+                    if 'Green' in chan.values() :              
+                        video_params['GreenChannelName']=ChannelName
+                    elif 'Red' in chan.values():
+                        video_params['RedChannelName']=ChannelName
+                if not all( video_params['RedChannelName'] and video_params['GreenChannelName']):
+                    SingleChannel=1
+                
+                    
             else:
                 SingleChannel=0 
-                for chan in seqinfo.find('Frame').findall('File'):
-                    ChannelName=chan.attrib['filename']
-                    if 'Green' in chan.attrib.values() :              
+                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                for chan in files.values():
+                    ChannelName=chan['filename']
+                    if 'Green' in chan.values() :              
                         video_params['GreenChannelName']=ChannelName
-                    elif 'Red' in chan.attrib.values():
+                    elif 'Red' in chan.values():
                         video_params['RedChannelName']=ChannelName
-                
+                if not all( video_params['RedChannelName'] and video_params['GreenChannelName']):
+                    SingleChannel=1
            
-            if video_params['MultiplanePrompt']=="TSeries ZSeries Element":
+            if video_params['MultiplanePrompt']=="TSeries ZSeries Element" or video_params['MultiplanePrompt']=="AtlasVolume":
                 return [params, video_params, all_volumes]
     
             else:
@@ -296,7 +328,7 @@ class Metadata():
             
    
     def add_metadata_manually(self):   
-        print('getting manual metadata')
+        # print('getting manual meta1data')
         
         self.imaging_metadata=[{},{},[]]
         aquisition_to_process=os.path.split(self.imaging_metadata_file)[0]
@@ -318,7 +350,7 @@ class Metadata():
         self.imaging_metadata[0]['Pixels Per Line']=mtdata[1]
         
 
-        print('finsihed with manual metadata')
+        # print('finsihed with manual metadata')
          
     def process_photostim_metadata(self):
 

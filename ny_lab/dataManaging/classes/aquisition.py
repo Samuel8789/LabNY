@@ -19,11 +19,12 @@ from ...data_pre_processing.voltageSignalsExtractions import VoltageSignalsExtra
 
 
 class Aquisition:   
-    def __init__(self, aqu_name, raw_input_path=None, FOV_object=None, mouse_imaging_session_object=None, subaq_object=None, non_imaging=False):
+    def __init__(self, aqu_name, raw_input_path=None, FOV_object=None, mouse_imaging_session_object=None, atlas_object=None, subaq_object=None, non_imaging=False,):
         self.subaq_object=subaq_object
         self.FOV_object=FOV_object
+        self.Atlas_object=atlas_object
         self.non_imaging=non_imaging
-        print(aqu_name)
+        # print(aqu_name)
 
         if raw_input_path and not non_imaging:
             Prairireaqpath=os.path.split(glob.glob( raw_input_path +'\\**\\**.env', recursive=True)[0])[0]      
@@ -48,16 +49,37 @@ class Aquisition:
                 self.mouse_aquisition_path=os.path.join(self.mouse_imaging_session_object.mouse_session_path, 
                                                         'nonimaging acquisitions',
                                                          self.aquisition_name)
-            
-            
 
             self.mouse_name = self.mouse_imaging_session_object.mouse_object.mouse_name
-            print('associating with mouse object ' + self.mouse_name)           
+            # print('associating with mouse object ' + self.mouse_name)           
             if self.mouse_name:
                 self.mouse_object=self.mouse_imaging_session_object.mouse_object
         
         
-        
+        elif atlas_object:              
+            self.Atlas=self.Atlas_object.atlas_name
+    
+            if subaq_object=='AtlasOverview':   
+                self.mouse_aquisition_path=os.path.join(self.Atlas_object.mouse_session_atlas_path, 
+                                                        'Overview',
+                                                         self.aquisition_name)
+            if subaq_object=='AtlasPreview':       
+                self.mouse_aquisition_path=os.path.join(self.Atlas_object.mouse_session_atlas_path, 
+                                                        'Preview',
+                                                         self.aquisition_name)
+               
+            if subaq_object=='AtlasVolume':       
+                self.mouse_aquisition_path=os.path.join(self.Atlas_object.mouse_session_atlas_path, 
+                                                        'Volumes',
+                                                         self.aquisition_name)
+                
+                
+            self.mouse_name = self.Atlas_object.mouse_imaging_session_object.mouse_object.mouse_name
+            # print('associating with mouse object ' + self.mouse_name)           
+            if self.mouse_name:
+                self.mouse_object=self.Atlas_object.mouse_imaging_session_object.mouse_object    
+                
+                
         elif FOV_object:        
             self.FOV=self.FOV_object.FOV_name
 
@@ -87,30 +109,35 @@ class Aquisition:
             
     
             self.mouse_name = self.FOV_object.mouse_imaging_session_object.mouse_object.mouse_name
-            print('associating with mouse object ' + self.mouse_name)           
+            # print('associating with mouse object ' + self.mouse_name)           
             if self.mouse_name:
                 self.mouse_object=self.FOV_object.mouse_imaging_session_object.mouse_object
     
     
     
-    
+#%% standarrd    
         if raw_input_path and not non_imaging:
             # Prairireaqpath=os.path.split(glob.glob( raw_input_path +'\\**\\**.env', recursive=True)[0])[0]      
             # self.aquisition_path=Prairireaqpath
             # self.aquisition_name= os.path.split(Prairireaqpath)[1]
             
-            
-            
-            print('processing raw aquisition '+ self.aquisition_name)  
+                
+ #%% prairie clenauo           
+            # print('processing raw aquisition '+ self.aquisition_name)  
             if self.FOV_object:
                 self.aquisition_dir_strucutre=self.FOV_object.mouse_imaging_session_object.mouse_object.data_managing_object.file_cleanup_prairie_new(Prairireaqpath) 
+            elif self.FOV_object:
+                self.aquisition_dir_strucutre=self.Atlas_object.mouse_imaging_session_object.mouse_object.data_managing_object.file_cleanup_prairie_new(Prairireaqpath) 
             else:
                 self.aquisition_dir_strucutre=self.mouse_imaging_session_object.mouse_object.data_managing_object.file_cleanup_prairie_new(Prairireaqpath) 
-            print('checking dir structure') 
+                
+                
+#%%  readin files              
+            # print('checking dir structure') 
             if any(self.aquisition_dir_strucutre):
                 self.read_aquisition_structure()
                 self.create_aquisition_structure_in_mouse_file()
-                print('now convert to mmap and transfer to folder')     
+                # print('now convert to mmap and transfer to folder')     
                 self.raw_main_path_equivalence()
                 self.solve_all_datasets()
             else:
@@ -122,13 +149,13 @@ class Aquisition:
                 self.create_aquisition_structure_in_mouse_file()  
                 self.aquisition_path=raw_input_path
                 self.solve_all_datasets()
-            
+#%% not raw           
         elif not non_imaging:    
 
             self.read_existing_datasets()
-            
+#%% non imaging            
         elif raw_input_path and non_imaging:
-            print('processing raw aquisition '+ self.aquisition_name)  
+            # print('processing raw aquisition '+ self.aquisition_name)  
             self.aquisition_dir_strucutre=[]            
             aquisition_to_process=raw_input_path
             temp_path=os.path.split(os.path.split(aquisition_to_process)[0])[0]
@@ -139,11 +166,11 @@ class Aquisition:
             self.aquisition_path=raw_input_path
             self.solve_all_datasets()
             
- 
+ #%%
         elif non_imaging:                
-             print('i have to give tit a name to do facecamera')
+              print('i have to give tit a name to do facecamera')
     
-         
+#%% methiods         
     def read_aquisition_structure(self):
 
           self.plane_number=self.aquisition_dir_strucutre[1]
@@ -225,7 +252,7 @@ class Aquisition:
                                                                      dataset_name,
                                                                      selected_dataset_raw_path=key, 
                                                                  selected_dataset_mmap_path=value[2])
-            print(dataset_name)   
+            # print(dataset_name)   
         self.read_existing_datasets()   
         self.transfer_vis_stim_info()
         self.process_raw_voltage_recording()
@@ -336,19 +363,21 @@ class Aquisition:
         self.all_vis_stim_mat_files=glob.glob(self.working_vistim_path+'\\**', recursive=False)
         
     def process_face_camera(self):
-        print(self.aquisition_path)
-        print(self.aquisition_name)
+        # print(self.aquisition_path)
+        # print(self.aquisition_name)
         self.face_camera_raw_path=os.path.join(self.aquisition_path, 'FaceCamera')
         if os.path.isdir(self.face_camera_raw_path):
             self.face_camera=EyeVideo(self, selected_eyevideo_raw_path=self.face_camera_raw_path)
         else:
+            # pass
             print('No Raw Face Camera')
      
     def read_face_camera(self):
         if glob.glob(self.working_facecamera_path+'\\**', recursive=False):
             self.face_camera=EyeVideo(self)
         else:
-            print('No Processed Face Camera')
+            pass
+            # print('No Processed Face Camera')
             
     def run_voltage_processing(self):
         self.voltage_analysis=VoltageSignalsExtractions(self)

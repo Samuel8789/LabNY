@@ -7,10 +7,10 @@ Created on Sat Sep 11 09:20:16 2021
 
 import tkinter as tk
 from tkinter import ttk
-
+import datetime
 from pandastable import Table
 
-from ...utils import open_multiple_df_in_new_tkinter_window
+from ...utils import open_multiple_df_in_new_tkinter_window, button_update_database
 
 class MouseDatabaseTab(tk.Frame):
     def __init__(self, gui_object, gui_tab_control):
@@ -20,16 +20,21 @@ class MouseDatabaseTab(tk.Frame):
         self.gui_ref=gui_object
 
         self.frames_names=['Raw Table Buttons', 
-                           'Stock Table' ]
+                           'Stock Table',
+                           'Outside Mouse']
         self.frames={}
         for i in range(len(self.frames_names)):
-              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4)
+              self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4,relief='groove')
     
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=1)
         self.grid_rowconfigure(0, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+
         self.frames[self.frames_names[0]].grid(row=0, column=0, sticky="nswe") 
         self.frames[self.frames_names[1]].grid(row=0, column=1, sticky="nswe")
+        self.frames[self.frames_names[2]].grid(row=1, column=0, sticky="nswe")
+
 
 #%%TAB 1 'Mouse Database' 'Raw Table Buttons' 
         self.frame1= self.frames[self.frames_names[0]]
@@ -54,13 +59,69 @@ class MouseDatabaseTab(tk.Frame):
        
 #%%TAB 1 'Mouse Database' 'Stock Table'  
         self.frame2=self.frames[self.frames_names[1]]
-        self.update_table()
-  
-        
-    def update_table(self): 
         self.frame2_table = Table(self.frame2, dataframe=self.gui_ref.MouseDat.stock_mice, showtoolbar=True, showstatusbar=True)
         self.frame2_table.sortTable(columnIndex=1, ascending=1, index=False)
         self.frame2_table.show()
+#%%TAB 1 'Mouse Database' 'Add Outside Mouse'  
+        self.frame_add_external=self.frames[self.frames_names[2]]
+        self.frame_add_external.buttons={}
+        self.frame_add_external.buttons_names=['Add External Cage',
+                                               ]
+        self.frame_add_external.buttons_commands=[self.external_cage_add_button,
+                                                  ]
+        for i in range(len(self.frame_add_external.buttons_names)):
+              self.frame_add_external.buttons[self.frame_add_external.buttons_names[i]]= ttk.Button(self.frame_add_external , text=self.frame_add_external.buttons_names[i], command=self.frame_add_external.buttons_commands[i])
+             
+        self.frame_add_external.entries={}
+        self.frame_add_external.entries_names=[ 'Number of Animals', 
+                                   'DOB', 
+                                   'Notes'
+                                   ]
+        for i in range(len(self.frame_add_external.entries_names)):
+            self.frame_add_external.entries[self.frame_add_external.entries_names[i]]=ttk.Entry(self.frame_add_external , text='', width=9)
+        todays_date=datetime.date.today().strftime("%Y-%m-%d")
+   
+        self.frame_add_external.number_of_animals=tk.IntVar()   
+        self.frame_add_external.dob=tk.StringVar()     
+        self.frame_add_external.notes=tk.StringVar()                
+        self.frame_add_external.entries[self.frame_add_external.entries_names[0]]['textvariable']= self.frame_add_external.number_of_animals
+        self.frame_add_external.entries[self.frame_add_external.entries_names[1]]['textvariable']= self.frame_add_external.dob
+        self.frame_add_external.entries[self.frame_add_external.entries_names[2]]['textvariable']= self.frame_add_external.notes
+        self.frame_add_external.entries[self.frame_add_external.entries_names[1]].insert(0, todays_date)
+
+        self.frame_add_external.labels={}
+        self.frame_add_external.labels_names=['Number of Animals', 
+                                  'DOB',
+                                  'Notes', 
+                                  'Add External Cage'
+                                  ]
+        for i in range(len(self.frame_add_external.labels_names)):
+            self.frame_add_external.labels[self.frame_add_external.labels_names[i]]=ttk.Label(self.frame_add_external, text=self.frame_add_external.labels_names[i], width=25)    
+
+        self.frame_add_external.sex=tk.StringVar()    
+        self.frame_add_external.sex_selection=ttk.Combobox(self.frame_add_external, values= ['Male','Female'], textvariable=self.frame_add_external.sex, width=30) 
+        
+        self.frame_add_external.labels[self.frame_add_external.labels_names[0]].grid(column=0, row=1)      
+        self.frame_add_external.labels[self.frame_add_external.labels_names[1]].grid(column=1, row=1)      
+        self.frame_add_external.labels[self.frame_add_external.labels_names[2]].grid(column=2, row=1)      
+        self.frame_add_external.labels[self.frame_add_external.labels_names[3]].grid(column=0, row=0)      
+
+        self.frame_add_external.sex_selection.grid(column=0, row=3)      
+        self.frame_add_external.buttons[self.frame_add_external.buttons_names[0]].grid(column=1, row=3)      
+        
+        self.frame_add_external.entries[self.frame_add_external.entries_names[0]].grid(column=0, row=2)      
+        self.frame_add_external.entries[self.frame_add_external.entries_names[1]].grid(column=1, row=2)      
+        self.frame_add_external.entries[self.frame_add_external.entries_names[2]].grid(column=2, row=2)      
+
+
+
+ 
+     #%%   
+    def update_table(self): 
+
+        self.frame2_table = Table(self.frame2, dataframe=self.gui_ref.MouseDat.stock_mice, showtoolbar=True, showstatusbar=True)
+        self.frame2_table.sortTable(columnIndex=1, ascending=1, index=False)
+        self.frame2_table.redraw()
         
     def button_open_database_raw_tables(self):
         window_title="Raw Database Tables"       
@@ -102,10 +163,10 @@ class MouseDatabaseTab(tk.Frame):
         window_title="Global Tables"       
         df_dictionary={'Colony Mice':self.gui_ref.MouseDat.all_colony_mice,
                        'Actions':self.gui_ref.MouseDat.actions, 
-                       'Database Attributes':self.Database_attributes, 
-                       'Database Structure':self.database_structure,
-                       'ExpDatabase Attributes':self.ExpDatabase_attributes,
-                       'ImDatabase Attributes':self.ImagingDatabase_attributes,
+                       'Database Attributes':self.gui_ref.Database_attributes, 
+                       'Database Structure':self.gui_ref.database_structure,
+                       'ExpDatabase Attributes':self.gui_ref.ExpDatabase_attributes,
+                       'ImDatabase Attributes':self.gui_ref.ImagingDatabase_attributes,
                        }     
         open_multiple_df_in_new_tkinter_window(self, window_title, df_dictionary)        
         
@@ -132,3 +193,45 @@ class MouseDatabaseTab(tk.Frame):
                        'TIGRE Mice':self.gui_ref.MouseDat.TIGRES,
                        'TIGRE Stock':self.gui_ref.MouseDat.TIGRES[(self.gui_ref.MouseDat.TIGRES['Breeders_types']=='Stock') & (self.gui_ref.MouseDat.TIGRES['Experimental_Status']==1)]}   
         open_multiple_df_in_new_tkinter_window(self, window_title, df_dictionary)   
+        
+        
+    def external_cage_add_button(self):
+        if self.frame_add_external.sex.get()=='Male':
+            sex=1
+        else:
+            sex=2
+        number_of_animals= self.frame_add_external.number_of_animals.get()
+        
+        common_values={'Breeding_status':3, 
+                       'DOB':'',                   
+                        'Label':7,
+                        'Parent_Breeding':158,
+                        'Ai14':9,
+                        'Ai65':9,
+                        'Ai75':9,
+                        'Ai80':9,
+                        'Ai148':9,
+                        'Ai162':9,
+                        'G2C':9,
+                        'VGC':9,
+                        'VRC':9,
+                        'PVF':9,
+                        'SLF':9,
+                        'Line':26, 
+                        'Room':2,
+                        'Experimental_Status':3,
+                        'Genotyping_Status':4,
+                        'Alive':1,
+                        'Notes':''
+                           }
+    
+    
+        common_values['Notes']= self.frame_add_external.notes.get()
+        common_values['DOB']= self.frame_add_external.dob.get()
+    
+        common_values_list=list(common_values.values())
+    
+     
+        self.gui_ref.MouseDat.add_new_cage(Sex=sex, common_values=common_values_list, number_of_animals=number_of_animals, outside_mice=True)
+        self.gui_ref.MouseDat.independent_commit()
+        button_update_database(self.gui_ref)

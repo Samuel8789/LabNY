@@ -81,6 +81,7 @@ class MainGuiTab(tk.Frame):
                 self.gui_ref.database_structure[key]=names   
             self.gui_ref.database_structure = pd.DataFrame(list( self.gui_ref.database_structure.values()), index= self.gui_ref.database_structure.keys())
             self.update_static_stock_table()
+            self.gui_ref.main_tabs['Mouse Experimental'].update_dataframes()
             print('Database Updated')
     def button_close_database(self):     
          self.gui_ref.MouseDat.close_database()
@@ -91,4 +92,4 @@ class MainGuiTab(tk.Frame):
          self.button_update_database()
          print('Database Restarted')
     def update_static_stock_table(self) :
-         self.gui_ref.main_tabs['Mouse Database'].update_table
+         self.gui_ref.main_tabs['Mouse Database'].update_table()

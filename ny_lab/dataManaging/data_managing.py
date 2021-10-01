@@ -15,7 +15,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from .functions import select_face_camera
-from .functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast
+from .functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
 from .classes.mouse import Mouse
 from .classes.prairieImagingSession  import PrairieImagingSession
 
@@ -62,6 +62,8 @@ class DataManaging():
         # this checks all sessions in the the database dont build prairire imagibg sessions
         self.all_existing_sessions_database_objects={}
         self.build_all_paririe_session_from_database()
+        self.all_existing_unprocessed_sessions=[]
+        self.read_all_immaging_session_not_in_database()
         # this builds all prairie imaging sessions based on the database list
         print('Building Mouse Objects')
         self.all_experimetal_mice_objects={}
@@ -70,15 +72,11 @@ class DataManaging():
         
         
         print('Reading directory structure')
-        # list of mouse codes in C
-        # self.read_current_primary_data_structure() # this check all mouse codes and paths in C
-        # # list of mouse codes in D/Ftemp
-        # self.read_current_secondary_data_structure()  # this check all mouse codes and paths in D or F now that broke
         self.read_all_data_path_structures()
         
                 
-        # self.update_pre_process_slow_data_structure() # this adds new mouse folders to D(altern F) after new experimental mice are added
-        
+        self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
+        print('Damanagaing done')
 #%% building mouse objects and prairire imaging sessions        
     def build_all_mice_objects_from_database(self):
     
@@ -213,25 +211,18 @@ class DataManaging():
           self.all_existing_sessions_database_objects[session_name]=PrairieImagingSession(self.Database_ref.ImagingDatabase_class, session_ID=ID, data_managing_object=self)
         
     def read_all_imaging_sessions_from_directories(self):
-        self.all_existing_sessions={session[35:]:session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
-       
+        self.all_existing_sessions={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
+        
+    def read_all_immaging_session_not_in_database(self):     
+        test=[session[2] for session in self.all_existing_sessions_database]
+        self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in  test]
+    
+        
     def read_all_imaging_sessions_from_database(self):
           
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
         self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
 #%% reading data_path _structures
-    
-    # def read_current_primary_data_structure(self):
-    #     self.primary_data_mice_paths=glob.glob(self.primary_data_directory+'\\**\\SP**', recursive=True)
-    #     self.primary_data_mice_codes=[i[-4:] for i in self.primary_data_mice_paths]
-        
-    # def read_current_secondary_data_structure(self):
-    #     self.secondary_data_mice_paths=glob.glob(self.secondary_data_path+'\\**\\SP**', recursive=True)
-    #     self.secondary_data_mice_paths=[file for file in self.secondary_data_mice_paths if len(file)<120]
-    #     self.secondary_data_mice_codes=[i[-4:] for i in self.secondary_data_mice_paths]
-
-    #     self.secondary_data_mice_projects={  self.secondary_data_mice_codes[i]   :j[j.find('\\Mice_Projects\\')+15:j.find('\\Mice_Projects\\')+41][:j[j.find('\\Mice_Projects\\')+15:j.find('\\Mice_Projects\\')+41].find('\\')] for i, j in enumerate(self.secondary_data_mice_paths)}
-    #     self.secondary_data_mice_paths={i[-4:]: i for i in self.secondary_data_mice_paths }
 
     
     def read_all_data_path_structures(self):
@@ -252,14 +243,13 @@ class DataManaging():
     def delete_pre_procesed_strucutre_mouse_without_data(self):
         mouse_to_delete=[ mouse for mouse in self.mouse_data_structure_paths['Pre_proccessed_slow'].keys() if mouse not in  list(self.all_experimetal_mice_objects.keys())]
         for mouse in mouse_to_delete:
-            if len(os.listdir(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse]))== 0:
-                 os.rmdir(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse]) 
-        
+            if os.path.isdir(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse]):
+               recursively_delete_back_directories(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse])
 #%% creating data_path_structures        
         
         
-    def update_pre_process_slow_data_structure(self):
-        print('updating experimnetal folders')
+    def update_pre_process_slow_data_structure(self, update=False):
+        # print('updating experimnetal folders')
         query_new_codes="""
                 SELECT a.Code
                 FROM ExperimentalAnimals_table a   
@@ -270,18 +260,22 @@ class DataManaging():
         mice_codes=[mouse[0] for mouse in mice_codes]
         self.new_working_directories=self.create_pre_process_slow_data_structure(self.data_paths_data['Pre_proccessed_slow'], mice_codes)
         
-        query_all_codes="""
-                SELECT a.Code, a.SlowStoragePath, a.WorkingStoragePath
-                FROM ExperimentalAnimals_table a   
-                WHERE Project!=6 
-                """
-        params=()
-        all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
-        self.all_working_directories={mouse[0]:[mouse[2], mouse[1]] for mouse in all_mouse_info}
-              
+        if update:
+            query_all_codes="""
+                    SELECT a.Code, a.SlowStoragePath, a.WorkingStoragePath
+                    FROM ExperimentalAnimals_table a   
+                    WHERE Project!=6 
+                    """
+            params=()
+            all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
+            self.all_working_directories={mouse[0]:[mouse[2], mouse[1]] for mouse in all_mouse_info}
+            mice_codes=list(self.all_working_directories.keys())
+            self.new_working_directories=self.create_pre_process_slow_data_structure( mice_codes, update=update)
+
+        self.delete_pre_procesed_strucutre_mouse_without_data()      
         
     def create_pre_process_slow_data_structure(self, mice_codes, update=None):
-        print('creating new experimnetal folders')
+        # print('creating new experimnetal folders')
         query_projects="""
                SELECT a.Project, a.Code, b.Projects, c.Line, d.Line_Short
                FROM ExperimentalAnimals_table a
@@ -291,6 +285,7 @@ class DataManaging():
                WHERE a.Code IN (%s)""" % ','.join('?' for i in mice_codes) 
         params=tuple(mice_codes)
         if update:
+            params=()
             query_projects="""
                SELECT a.Project, a.Code, b.Projects, c.Line, d.Line_Short
                FROM ExperimentalAnimals_table a
@@ -321,6 +316,8 @@ class DataManaging():
                 fast_disk='Analysis_Fast_2'
             if 'TEST' in project   : 
                 fast_disk='Analysis_Fast_2'
+            if 'Collaborations' in project   : 
+                fast_disk='Analysis_Fast_1'   
             
             # os.makedirs(os.path.join(self.secondary_data_path,projects[i],line[i],code))
             if '::' in line:
@@ -369,7 +366,6 @@ class DataManaging():
 
         for mouse in all_mouse_info:
 
-    
             slow_path='\\\\?\\'+ mouse[2]
             fast_path='\\\\?\\'+ mouse[3]
             
@@ -381,6 +377,7 @@ class DataManaging():
  
     
 #%% reading and updating all database imaging stroage paths  
+
     def update_all_imaging_data_paths(self) :
         query_all_codes="""
                 SELECT a.Code,a.ID, a.SlowStoragePath, a.WorkingStoragePath
@@ -597,12 +594,7 @@ class DataManaging():
                                         params=(new_slow_visstim_path,new_fast_visstim_path, isSlowStorage, isWorkingStorage, visual_stim[0])
                                         self.LabProjectObject.database.arbitrary_updating_record(query_visualstimulations_paths_update, params, commit=True)          
                 
-                
 
-       
-  
-  
-    
 #%% processing paririe imaging sessin raw folders 
     def cleaning_up_raw_acquisitions(self, session_path):
             
@@ -619,8 +611,7 @@ class DataManaging():
             allAq_folders=[Coordinate0path, nonimagingacquisitionspath, Testacquisitionspath]
             
             self.process_aquisition_folder(allAq_folders, mouse_path)
-            
-            
+            emptyatlases=glob.glob( mouse_path+'\\Atlas_', recursive=False)
             emptyfovs=glob.glob( mouse_path+'\\FOV_', recursive=False)
             for  emptyfov in emptyfovs:
                 noimagin=0
@@ -653,16 +644,59 @@ class DataManaging():
                         if curent_good_fovs==0:
                             to_change_to=[1]                         
                         os.rename(emptyfov, emptyfov+str(to_change_to[0]))  
+                        
+            for  emptyatlas in emptyatlases:
+                if not glob.glob( emptyatlas+'\\**\\**.env', recursive=True) :
+                    recursively_eliminate_empty_folders(emptyatlas) 
+                else:    
+                     if emptyatlas.endswith('Atlas_'):
+                         all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
+                         empty_atlases=glob.glob(mouse_path +'\\Atlas_', recursive=False) 
+                         current_atlas=[i for i in all_atlases if i not in empty_atlases]
+                         curent_good_atlases=len(current_atlas)
+                         atlas_number=[os.path.split(i)[1] for i in all_atlases if i not in empty_atlases]
+                         current_atlas=[int(i[i.find('_')+1:]) for i in atlas_number]
+                         wanted_atlas=[i+1 for i in range(curent_good_atlases)]
+                         to_change_atlases=[i for i in current_atlas if i not in wanted_atlas ]                  
+                         to_change_to_atlases=[i for i in wanted_atlas if i not in current_atlas ]
+                         
+                         if curent_good_atlases==0:
+                             to_change_to_atlases=[1]                         
+                         os.rename(emptyatlas, emptyatlas+str(to_change_to_atlases[0]))     
                     
-                    
+                
+            all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
             all_fovs=glob.glob(mouse_path +'\\FOV_**', recursive=False) 
+            
             empty_fovs=glob.glob(mouse_path +'\\FOV_', recursive=False) 
+            empty_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
+
             current_fov=[i for i in all_fovs if i not in empty_fovs]
+            current_atlas=[i for i in all_atlases if i not in empty_atlases]
+
             curent_good_fovs=len(current_fov)
+            curent_good_atlases=len(current_atlas)
+
             fov_number=[os.path.split(i)[1] for i in all_fovs if i not in empty_fovs]
+            atlas_number=[os.path.split(i)[1] for i in all_atlases if i not in empty_atlases]
+
             current=[int(i[i.find('_')+1:]) for i in fov_number]
+            current_atlas=[int(i[i.find('_')+1:]) for i in atlas_number]
+            
             wanted=[i+1 for i in range(curent_good_fovs)]
-            to_change=[i for i in current if i not in wanted ]
+            wanted_atlas=[i+1 for i in range(curent_good_atlases)]
+
+            to_change=[i for i in current_atlas if i not in wanted_atlas ]
+            to_change_atlases=[i for i in current_atlas if i not in wanted_atlas ]
+            
+            
+            for atlas in current_atlas:
+                 if to_change_atlases:
+                    if atlas.find('Atlas_' + str(to_change[0]))!=-1: 
+                        os.rename(atlas, atlas[:atlas.find('Atlas_')+5]+str(to_change_to_atlases[0]))   
+                        to_change_atlases.remove(to_change_atlases[0])
+                             
+            all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
             
             for fov in current_fov:
                 if to_change:
@@ -671,6 +705,8 @@ class DataManaging():
                        to_change.remove(to_change[0])
                             
             all_fovs=glob.glob(mouse_path +'\\FOV_**', recursive=False) 
+            
+            
             for FOV in all_fovs:
         
                 Plane3Tomato1050=os.path.join(FOV, '1050_3PlaneTomato')
@@ -684,7 +720,19 @@ class DataManaging():
         
                 self.process_aquisition_folder(all_FOVs_Aq_folders, mouse_path)
                               
-                # recursively_eliminate_empty_folders(FOV)
+            for atlas in all_atlases:
+          
+                  Overview=os.path.join(atlas, 'Overview')
+                  Preview=os.path.join(atlas, 'Preview' )  
+                  Volumes=os.path.join(atlas, 'Volumes')
+                  Coordinates=os.path.join(atlas, 'Coordinates')
+                  if os.path.isdir(Coordinates):
+                    if  len(os.listdir(Coordinates))==0:
+                        recursively_eliminate_empty_folders(Coordinates)  
+                  
+                  all_atlases_Aq_folders=[Overview, Preview, Volumes]       
+          
+                  self.process_aquisition_folder(all_atlases_Aq_folders, mouse_path)
                             
     def process_aquisition_folder(self, aq_folder_list, mouse_path):
     
@@ -704,6 +752,8 @@ class DataManaging():
         for generic_aq_folder in aq_folder_list:
             # print(generic_aq_folder)
             if 'FOV' in os.path.split(generic_aq_folder)[1]:
+                generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False)  
+            elif 'Atlas' in os.path.split(generic_aq_folder)[1] :
                 generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False)  
             else:
                 generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False) 
@@ -818,10 +868,7 @@ class DataManaging():
                                         shutil.move(f, visstimdir)   
                            
                            
-                           
-                           
-                           
-                      
+   
                 UnprocessedFaceCameraspaths=glob.glob(UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
                 UnprocessedFaceCamerasnames=[os.path.split(UnprocessedFaceCameraspath)[1] for UnprocessedFaceCameraspath in UnprocessedFaceCameraspaths]
                 UnprocessedVisStimpaths=glob.glob(UnprocessedVisStim +'\\**.mat', recursive=False)
@@ -849,9 +896,9 @@ class DataManaging():
                    if aq.find('Aq_' + str(to_change[0]))!=-1: 
                        os.rename(aq, aq[:aq.find('Aq_')+3]+str(to_change_to[0]))   
                        to_change.remove(to_change[0])
-            print('finalremoval')           
+            # print('finalremoval')           
             recursively_eliminate_empty_folders(generic_aq_folder)
-            print('finalremovaldone')                   
+            # print('finalremovaldone')                   
   
     def file_cleanup_prairie_new(self, prairie_imaging_path):
                
@@ -921,11 +968,10 @@ class DataManaging():
                             if not os.path.exists(ChannelPaths[i]+PlanePaths[n]):
                                 os.makedirs(ChannelPaths[i]+PlanePaths[n])
     
-                            
-                            
+           
                             
             # move files  
-            print('Moving Files')     
+            # print('Moving Files')     
             Multiplane=aq_info[8]
             if correction:
                 if glob.glob(prairie_imaging_path+'\\**.tif', recursive=False):             

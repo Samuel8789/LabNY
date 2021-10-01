@@ -10,7 +10,7 @@ import itertools
 
 def get_combination_from_virus(virus_tuple, database_object):
 
-    if not virus_tuple[1]:
+    if len(virus_tuple)==1:
         virus_tuple=tuple(virus_tuple[0])
     database_connection=database_object.database_connection
 

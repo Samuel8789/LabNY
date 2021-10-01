@@ -11,21 +11,20 @@ logger = logging.getLogger(__name__)
 import sys
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/MainClasses')
-import tkinter as Tkinter
+# import tkinter as Tkinter
 import pandas as pd
 import numpy as np
 import datetime
 import os
 import glob
 
+from .fun.guiFunctions.addSessionInfo import AddSessionInfo
+from .fun.guiFunctions.addImagedmouseInfo import AddImagedmouseInfo
+from .fun.guiFunctions.addWidefieldInfo import AddWidefieldInfo
+from .fun.guiFunctions.addAcquisitionInfo import AddAcquisitionInfo
+from .fun.guiFunctions.addImagingInfo import AddImagingInfo
+from .fun.guiFunctions.addFacecameraInfo import AddFacecameraInfo
 
-
-from .fun.guiFunctions.add_session_info import add_session_info
-from .fun.guiFunctions.add_imagedmouse_info import add_imagedmouse_info
-from .fun.guiFunctions.add_widefield_info import add_widefield_info
-from .fun.guiFunctions.add_imaging_info import add_imaging_info
-from .fun.guiFunctions.add_acquisition_info import add_acquisition_info
-from .fun.guiFunctions.add_facecamera_info import add_facecamera_info
 
 from .fun.databaseCodesTransformations import transform_filterinfo_to_codes
 
@@ -624,21 +623,11 @@ class ImagingDatabase():
             for i, df in enumerate(all_dfs):
                 df.to_excel(writer,sheet_name='Imaging',startrow=i*(len(all_dfs[0])+3) , startcol=0)
                 
-        
-        
-        
-        
-        
-        
-        
-        
-        
-        
+  
 
 #%% ADDING FUNCTIOSN        
-    def add_new_session_to_database(self, session_path):
+    def add_new_session_to_database(self,gui, session_path):
         self.update_variables()
-        session_path=   '\\\?\\' + session_path
         session_ID=self.max_imagingsession_id+1
         ImagingDate=datetime.datetime.strptime(os.path.split(session_path)[1],'%Y%m%d')
         
@@ -646,7 +635,7 @@ class ImagingDatabase():
         imagedmicepaths=glob.glob( SessionMiceRawPath+'\\SP**', recursive=False)
         
         for mouse_path in imagedmicepaths:         
-            self.add_new_imaged_mice(session_ID, mouse_path)
+            self.add_new_imaged_mice(gui, session_ID, mouse_path)
         
         ImagingSessionRawPath=session_path
         CalibrationsRawPath=os.path.join(session_path,'Calibrations')
@@ -656,15 +645,21 @@ class ImagingDatabase():
         AlignmentCalibrationsPath=os.path.join(CalibrationsRawPath,'Alignment')
         MiceRawPath=os.path.join(session_path,'Mice')
         
-        root = Tkinter.Tk()
-        app = add_session_info(root, ImagingDate)
-        root.mainloop()
-        get_values=app.values
+ 
+        # root = Tkinter.Tk()
+        # app = add_session_info(root, ImagingDate)
+        # root.mainloop()
+        self.add_session_info_window=AddSessionInfo(gui,ImagingDate)
+        self.add_session_info_window.wait_window()
+        get_values= self.add_session_info_window.values
         
         query_microscopes="""SELECT* FROM Microscopes_table WHERE Microscope=?"""
         params=(get_values[1][1],)
         Microscope=int(self.databse_ref.arbitrary_query_to_df(query_microscopes, params).ID.iloc[0])
-        StartTime=format(datetime.datetime.strptime(get_values[2][1], "%H:%M\n"),"%H:%M")
+        if get_values[2][1]:
+            StartTime=format(datetime.datetime.strptime(get_values[2][1], "%H:%M\n"),"%H:%M")
+        else:
+            StartTime=''
         Objectives=get_values[3][1]
         EndOfSessionSummary=get_values[4][1]
         IssuesDuringImaging=get_values[5][1]
@@ -709,7 +704,7 @@ class ImagingDatabase():
           
         self.databse_ref.arbitrary_inserting_record(query_add_session, params, commit=True)  
         
-    def add_new_imaged_mice(self, session_ID, mice_code_path):
+    def add_new_imaged_mice(self, gui, session_ID, mice_code_path):
         self.update_variables()
         imaged_mice_id=self.max_imagedmice_id+1
         
@@ -743,18 +738,22 @@ class ImagingDatabase():
         
         
         for aq in true_aq_folders:
-            self.add_new_acquisition(aq, slowstoragepath, workingstoragepath,imaged_mice_id )
+            self.add_new_acquisition(gui,aq, slowstoragepath, workingstoragepath,imaged_mice_id )
          
         if WideFieldPath:
             IsWideFIeld=1
-            WideFieldID=self.add_new_widefield(imaged_mice_id, WideFieldPath,slowstoragepath, workingstoragepath)
+            WideFieldID=self.add_new_widefield(gui,imaged_mice_id, WideFieldPath,slowstoragepath, workingstoragepath)
         
         
         
-        root = Tkinter.Tk()
-        app = add_imagedmouse_info(root, SessionDate, Mouse_Code)
-        root.mainloop()
-        get_values=app.values
+        
+        self.add_imaged_mouse_info_window=AddImagedmouseInfo(gui, SessionDate, Mouse_Code)
+        self.add_imaged_mouse_info_window.wait_window()
+        get_values= self.add_imaged_mouse_info_window.values
+        # root = Tkinter.Tk()
+        # app = add_imagedmouse_info(root, SessionDate, Mouse_Code)
+        # root.mainloop()
+        # get_values=app.values
 
         TimeSetOnWheel=get_values[1][1]
         EyesComments=get_values[2][1]
@@ -824,7 +823,7 @@ class ImagingDatabase():
         
         self.databse_ref.arbitrary_inserting_record(query_add_imagedmouse, params,)    
     
-    def add_new_widefield(self, imaged_mice_ID, WideFieldFolderPath, mousesessionslowstoragepath, mousesessionworkingstoragepath):
+    def add_new_widefield(self,gui, imaged_mice_ID, WideFieldFolderPath, mousesessionslowstoragepath, mousesessionworkingstoragepath):
          self.update_variables()
          widefield_id=self.max_widefield_id+1
          ImagedMouseID=imaged_mice_ID   
@@ -833,10 +832,16 @@ class ImagingDatabase():
          WideFieldDate=WideFieldFileName[:WideFieldFileName.find('SP')-1]
          WideFieldCode=WideFieldFileName[WideFieldFileName.find('SP'):-4]
          
-         root = Tkinter.Tk()
-         app = add_widefield_info(root, WideFieldDate, WideFieldCode)
-         root.mainloop()
-         get_values=app.values
+         
+         
+         self.add_widefield_info_window=AddWidefieldInfo(gui, WideFieldDate, WideFieldCode)
+         self.add_widefield_info_window.wait_window()
+         get_values= self.add_widefield_info_window.values
+
+         # root = Tkinter.Tk()
+         # app = add_widefield_info(root, WideFieldDate, WideFieldCode)
+         # root.mainloop()
+         # get_values=app.values
 
          WideFieldComments=get_values[1][1]
          
@@ -872,7 +877,7 @@ class ImagingDatabase():
          self.databse_ref.arbitrary_inserting_record(query_add_widefield, params, )       
          return widefield_id
          
-    def add_new_acquisition(self, acquisition_path, mousesessionslowstoragepath, mousesessionworkingstoragepath, imaged_mice_ID=False ):
+    def add_new_acquisition(self,gui, acquisition_path, mousesessionslowstoragepath, mousesessionworkingstoragepath, imaged_mice_ID=False ):
         self.update_variables()
         acquisition_id=self.max_acquisition_id+1
         IsMouse=0
@@ -897,11 +902,18 @@ class ImagingDatabase():
         IsBehaviour=0
         IsVisualStimulation=0
         IsOptogenetic=0
-        
-        root = Tkinter.Tk()
-        app = add_acquisition_info(root, AcquisitonRawPath)
-        root.mainloop()
-        get_values=app.values
+        IsAtlas=0
+        IsAtlasPreview=0
+        IsAtlasOverview=0
+        IsAtlasVolume=0
+      
+        self.add_acquisition_info_window=AddAcquisitionInfo(gui, AcquisitonRawPath)
+        self.add_acquisition_info_window.wait_window()
+        get_values= self.add_acquisition_info_window.values
+        # root = Tkinter.Tk()
+        # app = add_acquisition_info(root, AcquisitonRawPath)
+        # root.mainloop()
+        # get_values=app.values
         Comments=get_values[1][1]
         
         
@@ -958,11 +970,25 @@ class ImagingDatabase():
                 
                 slowstoragepath=os.path.join(mousesessionslowstoragepath,'nonimaging acquisitions', 'Aq_1_NonImaging')   
                 workingstoragepath=os.path.join(mousesessionworkingstoragepath,'nonimaging acquisitions','Aq_1_NonImaging')  
-                
-                
-            
+
        
-     
+        if 'Atlas' in acquisition_path:
+            IsAtlas=1    
+            slowstoragepath=os.path.join(mousesessionslowstoragepath,'atlases',Prairieimagingname)   
+            workingstoragepath=os.path.join(mousesessionworkingstoragepath,'atlases',Prairieimagingname)   
+            
+            if 'Overview' in acquisition_path:
+                IsAtlasOverview=1   
+                slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'Overview',Prairieimagingname)   
+                workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'Overview',Prairieimagingname)    
+            elif 'Preview' in acquisition_path:
+                IsAtlasPreview=1   
+                slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'Preview',Prairieimagingname)   
+                workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'Preview',Prairieimagingname)     
+            elif 'Volumes' in acquisition_path:
+                IsAtlasVolume=1   
+                slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'AtlasVolume',Prairieimagingname)   
+                workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'AtlasVolume',Prairieimagingname)     
 
 
 
@@ -1018,7 +1044,7 @@ class ImagingDatabase():
            IsFaceCamera=1
            face_camera_path=os.path.join(acquisition_path,'FaceCamera')
            if face_camera_path:    
-               FaceCameraID=self.add_face_camera(acquisition_id, face_camera_path, slowstoragepath, workingstoragepath)    
+               FaceCameraID=self.add_face_camera(gui,acquisition_id, face_camera_path, slowstoragepath, workingstoragepath)    
                
                
         VisStimulationID=np.nan       
@@ -1041,9 +1067,9 @@ class ImagingDatabase():
         ImagingID=np.nan    
         if imaging_path:
             if IsImaging:
-              ImagingID=self.add_new_imaging(acquisition_id, imaging_path, metadata, slowstoragepath, workingstoragepath )    
+              ImagingID=self.add_new_imaging(gui,acquisition_id, imaging_path, metadata, slowstoragepath, workingstoragepath )    
             else:
-              ImagingID=self.add_new_imaging(acquisition_id, imaging_path, metadata, slowstoragepath, workingstoragepath, locomotion_only=True )    
+              ImagingID=self.add_new_imaging(gui,acquisition_id, imaging_path, metadata, slowstoragepath, workingstoragepath, locomotion_only=True )    
    
             
             
@@ -1076,10 +1102,14 @@ class ImagingDatabase():
                         IsSlowDisk,
                         SlowDiskPath,
                         IsWOrkingDisk,
-                        WorkingDiskPath
+                        WorkingDiskPath,
+                        IsAtlas,
+                        IsAtlasPreview,
+                        IsAtlasOverview,
+                        IsAtlasVolume
                         
                         )
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """    
         params=(acquisition_id,
                 IsMouse,
@@ -1108,21 +1138,24 @@ class ImagingDatabase():
                 0,
                 slowstoragepath,
                 0,
-                workingstoragepath
+                workingstoragepath,
+                IsAtlas,
+                IsAtlasPreview,
+                IsAtlasOverview,
+                IsAtlasVolume
                 )
 
 
         self.databse_ref.arbitrary_inserting_record(query_add_acquisition, params ) 
         
-    def add_new_imaging(self, acquisition_ID, imaging_path, metadata_object, aqslowstoragepath, aqworkingstoragepath, locomotion_only=False):
+    def add_new_imaging(self,gui, acquisition_ID, imaging_path, metadata_object, aqslowstoragepath, aqworkingstoragepath, locomotion_only=False):
         self.update_variables()
         ImagingID=self.max_imaging_id+1
         metadata=metadata_object
         AcquisitionID=acquisition_ID  
         ImagingFullFilePath=imaging_path
         ImagingFilename=os.path.split(imaging_path)[1]
-        
-        
+                
         PowerSetting=np.nan
         Objective=np.nan
         PMT1GainRed=np.nan
@@ -1158,6 +1191,11 @@ class ImagingDatabase():
         GreenFilter=np.nan
         DichroicBeamsplitter=np.nan
         IsBlockingDichroic=np.nan
+        OverlapPercentage=np.nan
+        AtlasOverlap=np.nan
+        OverlapPercentageMetadata=np.nan
+        AtlasDirection=np.nan
+        AtlasZStructure=np.nan
 
         if not locomotion_only:
             PowerSetting=metadata.imaging_metadata[1]['Planepowers']    
@@ -1168,8 +1206,6 @@ class ImagingDatabase():
             ObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
             ETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
 
-            
-            
             if metadata.imaging_metadata[1]['PlaneNumber']=='Single':
                     IsETLStack=0
                     IsObjectiveStack=0
@@ -1201,11 +1237,15 @@ class ImagingDatabase():
             if 'FOV_' in imaging_path:            
                  FOVNumber=imaging_path[ imaging_path.index('FOV_')+4]
                  
-        
-            root = Tkinter.Tk()
-            app = add_imaging_info(root, ImagingFilename)
-            root.mainloop()
-            get_values=app.values
+                    
+                 
+            self.add_imaging_info_window=AddImagingInfo(gui, ImagingFilename)
+            self.add_imaging_info_window.wait_window()
+            get_values= self.add_imaging_info_window.values
+            # root = Tkinter.Tk()
+            # app = add_imaging_info(root, ImagingFilename)
+            # root.mainloop()
+            # get_values=app.values
 	
             RedFilter=get_values[2][1]
             GreenFilter=get_values[1][1]
@@ -1245,9 +1285,6 @@ class ImagingDatabase():
             LinePeriod=metadata.imaging_metadata[0]['ScanLinePeriod']
             FramePeriod=metadata.imaging_metadata[0]['framePeriod']
             FullAcquisitionTime=metadata.imaging_metadata[1]['FullAcquisitionTime']
-
-
-
 
 
         IsVoltageRecording=0
@@ -1306,9 +1343,14 @@ class ImagingDatabase():
                     SlowStoragePath,
                     WorkingStoragePath,
                     IsWorkingStorage,
-                    IsSlowStorage
+                    IsSlowStorage,
+                    OverlapPercentage,
+                    AtlasOverlap,
+                    OverlapPercentageMetadata,
+                    AtlasDirection,
+                    AtlasZStructure
                     )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """    
         params=( ImagingID,
                 AcquisitionID,
@@ -1355,11 +1397,16 @@ class ImagingDatabase():
                 aqslowstoragepath,
                 aqworkingstoragepath,
                 0,
-                0)
+                0,
+                OverlapPercentage,
+                AtlasOverlap,
+                OverlapPercentageMetadata,
+                AtlasDirection,
+                AtlasZStructure)
         self.databse_ref.arbitrary_inserting_record(query_add_imaging, params )   
         return ImagingID
     
-    def add_face_camera(self, acquisition_ID, face_camera_path, aqslowstoragepath, aqworkingstoragepath, ):
+    def add_face_camera(self,gui, acquisition_ID, face_camera_path, aqslowstoragepath, aqworkingstoragepath, ):
         self.update_variables()
         FaceCameraID= self.max_facecamera_id+1
         AcquisitionID=acquisition_ID
@@ -1375,11 +1422,14 @@ class ImagingDatabase():
         Resolution='640x480'
         BitDepth=8
         VideoFormat='.tif'
-                
-        root = Tkinter.Tk()
-        app = add_facecamera_info(root, face_camera_path)
-        root.mainloop()
-        get_values=app.values
+              
+        self.add_face_camera_info_window=AddFacecameraInfo(gui, face_camera_path)
+        self.add_face_camera_info_window.wait_window()
+        get_values= self.add_face_camera_info_window.values
+        # root = Tkinter.Tk()
+        # app = add_facecamera_info(root, face_camera_path)
+        # root.mainloop()
+        # get_values=app.values
         
 
         
@@ -1416,7 +1466,7 @@ class ImagingDatabase():
                     """    
         params=(AcquisitionID,
                 VideoPath,
-                EyeCameraFilename,
+                EyeCameraFilename_processed,
                 Exposure,
                 Frequency,
                 Resolution,

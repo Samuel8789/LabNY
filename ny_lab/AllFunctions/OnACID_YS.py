@@ -32,7 +32,7 @@ from caiman.source_extraction import cnmf as cnmf
 import time
 
 # %%
-def run_on_acid(caiman_extraction_object,parameter_dict, dataset_object=False ):
+def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False ):
     pass # For compatibility between running under Spyder and the CLI
 
 #%%
@@ -57,6 +57,10 @@ def run_on_acid(caiman_extraction_object,parameter_dict, dataset_object=False ):
     # %% plot contours (this may take time)
     logging.info('Number of components: ' + str(cnm.estimates.A.shape[-1]))
     images = cm.load(fnamestemp)
+    
+    
+    
+    
     Cn = images.local_correlations(swap_dim=False, frames_per_chunk=500)
     # cnm.estimates.plot_contours(img=Cn, display_numbers=False)
     

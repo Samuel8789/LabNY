@@ -35,7 +35,7 @@ class EyeVideo():
 
         
     def load_and_save_raw_camera_movies(self):  
-        print('Loading Face Camera')
+        # print('Loading Face Camera')
         for file_name in self.raw_image_sequence_paths:
              with tifffile.TiffFile(file_name) as tffl:
                  input_arr = tffl.asarray()
@@ -48,9 +48,9 @@ class EyeVideo():
              
         del(input_arr)
         self.associated_aquisiton.aquisition_name
-        print('Saving Face Camera')
+        # print('Saving Face Camera')
         self.full_eye_camera.save(self.working_camera_full_path, to32=False,  imagej=False, bigtiff=True)
-        print('Saved Face Camera')
+        # print('Saved Face Camera')
 
         
     def load_and_save_raw_camera_metadata(self):      

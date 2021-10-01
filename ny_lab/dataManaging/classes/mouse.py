@@ -63,7 +63,7 @@ class Mouse:
     
     def add_prairie_session(self, raw_imaging_session_path, session_name):
         print('Processing '+self.mouse_name)
-        print('Adding prairie sessions')
+        # print('Adding prairie sessions')
         self.raw_imaging_sessions_objects={}
         self.raw_imaging_sessions_objects[session_name]=MouseImagingSession(session_name, raw_imaging_session_path=raw_imaging_session_path, mouse_object=self)
         # self.load_all_imaging_sessions()

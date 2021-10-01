@@ -12,6 +12,8 @@ logger = logging.getLogger(__name__)
 from ...AllFunctions.create_dir_structure import create_dir_structure
 
 from .fov import FOV
+from .atlas import Atlas
+
 from .acquisitonVariants import Coordinate0Aquisition, TestAquisition, NonimagingAquisition
 from .wideFieldImage import WideFieldImage
 
@@ -41,10 +43,13 @@ class MouseImagingSession():
                                     'widefield landmarking',
                                     '0Coordinate acquisition',
                                     'nonimaging acquisitions',
+                                    'atlases'
                                     }
        
             create_dir_structure(self.mouse_session_path, imaging_session_struc)
-            
+        #tem[porary to create atlas folders]
+        if not os.path.isdir(os.path.join(self.mouse_session_path,'atlases')):
+            os.mkdir(os.path.join(self.mouse_session_path,'atlases'))    
         if raw_imaging_session_path:
             print('adding prairie session'+self.imaging_session_name)
             # if self.imaging_session_name=='20210522':
@@ -52,16 +57,18 @@ class MouseImagingSession():
             self.imaging_session_path=raw_imaging_session_path           
             self.mouse_imaging_session_path=os.path.join(self.imaging_session_path,'Mice',
                                               self.mouse_object.mouse_name)
-            print('adding raw fovs')
+            # print('adding raw fovs')
             self.load_raw_FOVs()
-            print('adding raw testaq')
+            # print('adding raw testaq')
             self.load_raw_Test_Aquisitions()
-            print('adding raw widefield')
+            # print('adding raw widefield')
             self.load_raw_widefield_image()
-            print('adding raw nonimaging')
+            # print('adding raw nonimaging')
             self.load_raw_nonimaging_Aquisitions()
-            print('adding raw 0coordinates')
+            # print('adding raw 0coordinates')
             self.load_raw_0coordinate_Aquisitions()
+            # self.load_raw_atlas()
+
         else:
             quey_imaging_session="""SELECT b.ImagingDate AS SessionDate, a.*, b.* ,c.*, d.*
                             FROM ImagedMice_table a 
@@ -83,6 +90,7 @@ class MouseImagingSession():
             self.load_existing_widefield_image()
             self.load_existing_nonimaging_Aquisitions()
             self.load_existing_0coordinate_Aquisitions()
+            # self.load_existing_atlas()
     
     def load_raw_nonimaging_Aquisitions(self):   
         self.all_raw_nonimaging_Aquisitions={}
@@ -174,3 +182,19 @@ class MouseImagingSession():
                          
                         for i, aqu in enumerate(os.listdir(os.path.join(self.mouse_session_path, '0Coordinate acquisition')))
                         if os.path.isdir(os.path.join( self.mouse_session_path ,'0Coordinate acquisition', aqu))}     
+
+
+    def load_raw_atlas(self):
+        self.all_raw_atlas={str(directory):Atlas(str(directory), 
+                                          os.path.join(self.mouse_imaging_session_path, directory),
+                                          self) 
+                       for  directory in os.listdir(self.mouse_imaging_session_path)
+                       if 'Atlas' in directory}
+        self.load_existing_atlas()
+        
+    def load_existing_atlas(self):
+    
+          self.all_atlas={str(directory):Atlas(str(directory), mouse_imaging_session_object=self) 
+                     
+                       for  directory in os.listdir(os.path.join(self.mouse_session_path, 'atlases'))
+                       if 'Atlas' in directory} 

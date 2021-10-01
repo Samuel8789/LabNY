@@ -20,12 +20,16 @@ function [data2, bidi_phase] = f_bidi_shift(data, n_frames, bidi_phase_frames)
         end
     else
         for yy = 1:n_frames-bidi_phase_frames
+%     for yy = 1:1
             bidi_phase(yy) = BiDiPhaseOffsets(data(:,:,1,yy));
         end
     end
 
     disp('Shifting...')
     for yy = 1:n_frames
+        if bidi_phase(yy)==0;
+            bidi_phase(yy)=-1;
+        end
         data2(:,:,:,yy) = ShiftBiDi(bidi_phase(yy), data(:,:,:,yy), Ly, Lx);
     end
     

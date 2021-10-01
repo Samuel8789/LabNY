@@ -26,7 +26,7 @@ class FOV():
         self.all_existing_OtherAcq={}
         self.all_existing_SurfaceImage={}
         
-        print('loading mouse FOV:' + FOV_name)
+        # print('loading mouse FOV:' + FOV_name)
         self.FOV_name=FOV_name       
         self.mouse_imaging_session_object=mouse_imaging_session_object
         self.mouse_session_FOV_path=os.path.join(self.mouse_imaging_session_object.mouse_session_path,
@@ -39,19 +39,19 @@ class FOV():
           
         if raw_FOV_path:
             self.FOV_path=raw_FOV_path
-            print('adding raw fovaquisitions')
+            # print('adding raw fovaquisitions')
             self.load_raw_aquisitions()
-            print('adding raw 1050tom')
+            # print('adding raw 1050tom')
             self.load_raw_1050tomato()
-            print('adding 10503planetom')
+            # print('adding 10503planetom')
             self.load_raw_10503planetomato()
-            print('adding 1050higres')
+            # print('adding 1050higres')
             self.load_raw_1050HighResStackTomato()
-            print('adding greenhighres')
+            # print('adding greenhighres')
             self.load_raw_HighResStackGreen()
-            print('adding otheracq')
+            # print('adding otheracq')
             self.load_raw_OtherAcq()
-            print('adding surfaceimage')
+            # print('adding surfaceimage')
             self.load_raw_SurfaceImage()
         else:
             self.load_existing_aquisitions() 

@@ -10,8 +10,6 @@ Created on Sat Sep 11 12:25:16 2021
 
 import tkinter as tk
 from tkinter import ttk
-import tkinter as Tkinter
-from tkinter import StringVar, Listbox, DoubleVar
 
 class WidgetSelectAcquisition:
         def __init__(self,gui, frame):
@@ -22,8 +20,6 @@ class WidgetSelectAcquisition:
             self.project=tk.StringVar()   
             self.project.trace_add('write', self.update_mice) #
             
-            
-           
             self.frame.project_label=ttk.Label(self.frame, text='Project', width=20)
             self.frame.project_label.grid(column=0, row=0)
         

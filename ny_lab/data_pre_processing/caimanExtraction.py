@@ -6,10 +6,11 @@ Created on Fri Apr  2 14:18:55 2021
 """
 
 import numpy as np
-import shutil
+# import shutil
 import os
 
-from  ..AllFunctions.OnACID_YS import run_on_acid
+from ..AllFunctions.OnACID_YS import run_on_acid
+from .correct_bidi_movie import correct_bidi_movie
 
 
 
@@ -26,8 +27,13 @@ class CaimanExtraction():
             print(self.dataset_mouse_path)
             print(self.dataset_mouse_path[0:-5] + 'cnmf_results.hdf5')
         else:            
-            self.temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp',self.filename)
-            shutil.copyfile(self.dataset_mouse_path, self.temporarypath)
+            
+            self.temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp', self.filename)           
+            good_filename=self.filename[:self.filename.find('_d1_')]
+            self.temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp', good_filename)
+            caiman_extra=self.filename[self.filename.find('_d1_'):self.filename.find('_mmap')-4]
+
+            temporary_bidi_path, self.bidiphases=correct_bidi_movie(self.dataset_mouse_path, self.temporarypath, caiman_extra)    
             list_of_files = os.listdir('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp')
             full_path = ['\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp\{0}'.format(x) for x in list_of_files]
             oldest_file = min(full_path, key=os.path.getctime)

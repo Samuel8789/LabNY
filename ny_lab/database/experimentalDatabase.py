@@ -5,17 +5,10 @@ Created on Mon May 17 08:01:22 2021
 @author: sp3660
 """
 import math 
-import tkinter as Tkinter
 import numpy as np
 import datetime
 
-from .fun.databaseCodesTransformations import *
-
-from .fun.guiFunctions.modify_injection_params import modify_injection_params
-# from .fun.guiFunctions.update_injection_params import update_injection_params
-from .fun.guiFunctions.plan_window_parameters import plan_window_parameters
-# from .fun.guiFunctions.update_window_params import update_window_params
-
+from .fun.databaseCodesTransformations import transform_earlabels_to_codes, get_combination_from_virus, get_next_twolettercode
 
 class ExperimentalDatabase():
     
@@ -32,6 +25,7 @@ class ExperimentalDatabase():
        self.get_max_experimental_code()
        self.get_max_injection_code()
        self.get_max_window_code()
+       self.get_max_brain_code()
        self.table_all_experimental_all_info()
        self.table_all_mouse_to_do_injection()
        self.table_all_animals_in_recovery()
@@ -60,6 +54,14 @@ class ExperimentalDatabase():
         c.execute(query_max_code)
         max_current_code=c.fetchall()
         self.max_current_window_code=max_current_code[0][0]
+        
+    def get_max_brain_code(self):
+        c=self.database_connection.cursor()
+        query_max_code="SELECT MAX(ID) FROM BrainProcessing_table"
+        c.execute(query_max_code)
+        max_current_code=c.fetchall()
+        self.max_current_brain_code=max_current_code[0][0]    
+        
 
 #%% experimental animal queries
 
@@ -143,6 +145,8 @@ class ExperimentalDatabase():
         
         """
         self.all_experimental_all_info= self.databse_ref.arbitrary_query_to_df(query_all_experimental_all_info)     
+        self.all_experimental_all_info= self.all_experimental_all_info.convert_dtypes(infer_objects=True, convert_string=False, convert_integer=True, convert_boolean=False, convert_floating=False)
+
 
     def table_all_animals_in_recovery(self):
  
@@ -437,6 +441,8 @@ class ExperimentalDatabase():
                 project.append(2)               
             elif line in [16,17]:
                 project.append(7)
+            elif line in [26]:
+                project.append(8)
                                 
         query_mice_exp="""
          UPDATE MICE_table
@@ -444,7 +450,7 @@ class ExperimentalDatabase():
          WHERE ID=?
          """
         query_add_exps=""" 
-              INSERT INTO ExperimentalAnimals_table( ID, Code ,Project,Mouse_ID,EarMark,Experimental_status,Experiment)
+              INSERT INTO ExperimentalAnimals_table( ID, Code, Project, Mouse_ID, EarMark, Experimental_status, Experiment)
               VALUES(?,?,?,?,?,1,3) 
             """              
         actions_dictionary={cage:{11:((),(),())                                   
@@ -475,8 +481,12 @@ class ExperimentalDatabase():
             else:
                 EarMark=mice_exp_labels[i]
                 
-            params=(next_code,nextletter_code, project[i], mouse, EarMark)    
-            self.databse_ref.arbitrary_inserting_record(query_add_exps,params, commit=False)          
+            params_insert=(next_code, 
+                    nextletter_code,
+                    project[i],
+                    mouse, 
+                    EarMark)    
+            self.databse_ref.arbitrary_inserting_record(query_add_exps, params_insert, commit=False)          
             mice_exp[i].append(next_code)
             
             
@@ -488,13 +498,23 @@ class ExperimentalDatabase():
         virus_tuple=res[0]
         viruscomb=get_combination_from_virus(virus_tuple, self)
         
-        mice_exp=self.add_new_planned_experimental_cage(cage) 
-        seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[1] in animals_selected]
-        selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
-          
-        params=tuple(selected_mouse_IDs)    
-        query_mice_exp_info='SELECT ID FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)    
-        mice_experiments_IDs = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()
+        if 'SP' not in animals_selected[0]:
+            mice_exp=self.add_new_planned_experimental_cage(cage) 
+            seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[1] in animals_selected]
+            selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
+            params=tuple(selected_mouse_IDs)    
+            query_mice_exp_info='SELECT ID FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)   
+            mice_experiments_IDs = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()
+        else:    
+            params=tuple(animals_selected)
+            query_mice_exp_info='SELECT ID, Mouse_ID FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in params)  
+            mice_experiments_IDs = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()
+            selected_mouse_IDs=[i[1] for i in mice_experiments_IDs ]
+            selected_mouse_exp_IDs=[i[0] for i in mice_experiments_IDs ]
+            params=tuple(selected_mouse_IDs)
+            query_mice_exp_info2='SELECT ID, Lab_number, Line, Label, Room FROM MICE_table   WHERE ID IN (%s)' % ','.join('?' for i in params)  
+            mice_exp = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info2, params).values.tolist()
+            seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[0] in selected_mouse_IDs]
 
         for mouse in  seleced_mice_exp:
             if mouse[2] in [5,12,13]:
@@ -565,8 +585,11 @@ class ExperimentalDatabase():
         self.databse_ref.independent_commit()    
 
     def update_performed_injections(self, all_inject_params, cage, selected_codes, date_performed):
-       
-        query_mice_exp_info="SELECT ExperimentalAnimals_table.ID, MICE_table.ID, Lab_number,Code,Label,Room,ExperimentalAnimals_table.Experimental_status,MICE_table.Experimental_status, Experiment,Injection1ID FROM ExperimentalAnimals_table LEFT JOIN MICE_table ON MICE_table.ID = ExperimentalAnimals_table.Mouse_ID WHERE Cage=?"
+        
+        date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')
+      
+              
+        query_mice_exp_info="SELECT ExperimentalAnimals_table.ID, MICE_table.ID, Lab_number,Code,Label,Room,ExperimentalAnimals_table.Experimental_status, MICE_table.Experimental_status, Experiment,Injection1ID FROM ExperimentalAnimals_table LEFT JOIN MICE_table ON MICE_table.ID = ExperimentalAnimals_table.Mouse_ID WHERE Cage=?"
         cage=cage       
         params=(cage,)
         mice_exp=self.databse_ref.arbitrary_query_to_df(query_mice_exp_info,params).values.tolist()  
@@ -749,16 +772,9 @@ class ExperimentalDatabase():
                        
     def update_performed_window(self,all_inject_params, cage, animals_selected, date_performed=False):   
         # cage=cage[0]
-        # if date_performed:
-        #      date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')
-        # else:     
-        #      date_performed=datetime.date.today()
-        
-         
-        
-        
-        
-        
+        date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')
+
+    
         query_mice_exp_info="""
         SELECT 
             ExperimentalAnimals_table.ID,
@@ -929,7 +945,7 @@ class ExperimentalDatabase():
         
         query_update_mouse_dead="""
                 UPDATE MICE_table
-                SET  Cage=NULL, Alive=0, Experimental_Status=9
+                SET  Cage=NULL, Alive=0, Experimental_Status=9, Room=1
                 WHERE ID=?
                 """       
         params=(dead_mouse_ID,)
@@ -942,11 +958,7 @@ class ExperimentalDatabase():
                         """                                        
         params=(dead_mouse_ID,)
         self.databse_ref.arbitrary_updating_record(query_update_experimental_status,params, commit=True)
-        
-        
-        
-        
-        
+
     def mouse_dead_postop(self, mouse_code): 
         Action_Type_mouse_dead=19
         query_mouse_dead_info="SELECT Mouse_ID, Cage, Lab_number FROM ExperimentalAnimals_table LEFT JOIN MICE_table a ON a.ID=ExperimentalAnimals_table.Mouse_ID  WHERE Code=?"      
@@ -965,7 +977,7 @@ class ExperimentalDatabase():
         
         query_update_mouse_dead="""
                 UPDATE MICE_table
-                SET  Cage=NULL, Alive=0, Experimental_Status=9
+                SET  Cage=NULL, Alive=0, Experimental_Status=9, Room=1
                 WHERE ID=?
                 """       
         params=(dead_mouse_ID,)
@@ -999,7 +1011,7 @@ class ExperimentalDatabase():
          
          query_update_mouse_dead="""
                  UPDATE MICE_table
-                 SET  Cage=NULL, Alive=0, Experimental_Status=10
+                 SET  Cage=NULL, Alive=0, Experimental_Status=10, Room=1
                  WHERE ID=?
                  """       
          params=(dead_mouse_ID,)
@@ -1013,4 +1025,87 @@ class ExperimentalDatabase():
          params=(dead_mouse_ID,)
          self.databse_ref.arbitrary_updating_record(query_update_experimental_status,params, commit=True)
    
+    def brain_fixation(self, values, mouse_codes, date_performed):
+        
+        if date_performed:
+            corrected_date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')               
+        else:     
+            corrected_date_performed=datetime.date.today()
+            
+            
+        for i, mouse in  enumerate(mouse_codes):
+            params=(mouse,)
+            query_mouse_brain_info="SELECT ExperimentalAnimals_table.ID, Mouse_ID, Cage, Lab_number FROM ExperimentalAnimals_table LEFT JOIN MICE_table a ON a.ID=ExperimentalAnimals_table.Mouse_ID  WHERE Code=?"     
+            brain_mouse_info= self.databse_ref.arbitrary_query_to_df(query_mouse_brain_info, params).values.tolist()[0]
+
+            dead_mouse_cage=brain_mouse_info[2]
+            dead_mouse_lab_number=brain_mouse_info[3]
+            Action_Type_mouse_saced=4
+          
+            actions_dictionary={dead_mouse_cage:{Action_Type_mouse_saced:((dead_mouse_lab_number,),(),()), 
+                                       },
+                             }
+            self.databse_ref.add_multiple_actions(actions_dictionary)
+            
     
+            Brain_ID =self.max_current_brain_code+1
+            Exp_Mouse_ID=brain_mouse_info[0]
+            Fixation_date=corrected_date_performed
+            Perfusion_solution=values[i+1][2]
+            Postfixation_solution=values[i+1][3]
+            Postfixation_time=values[i+1][4]
+            Postfixation_temperature=values[i+1][5]
+            Prehistology_storage_date=corrected_date_performed+datetime.timedelta(days=1)
+            Prehistology_storage_solution=values[i+1][6]
+            Prehistology_storage_location=values[i+1][7]
+            Comments=values[i+1][8]
+    
+            query_add_brain_fixation=""" 
+                  INSERT INTO BrainProcessing_table( ID, 
+                                                    Exp_Mouse_ID,
+                                                    Fixation_date, 
+                                                    Perfusion_solution, 
+                                                    Postfixation_solution,
+                                                    Postfixation_time,
+                                                    Postfixation_temperature,
+                                                    Prehistology_storage_date,
+                                                    Prehistology_storage_solution,
+                                                    Prehistology_storage_location,
+                                                    Comments
+      
+                                                    )
+                  VALUES(?,?,date(?),?,?,?,?,date(?),?,?,?) 
+                """              
+            params=(Brain_ID, 
+                    Exp_Mouse_ID, 
+                    Fixation_date,
+                    Perfusion_solution,
+                    Postfixation_solution,
+                    Postfixation_time,
+                    Postfixation_temperature, 
+                    Prehistology_storage_date,
+                    Prehistology_storage_solution,
+                    Prehistology_storage_location,
+                    Comments)
+            
+            self.databse_ref.arbitrary_inserting_record(query_add_brain_fixation,params)
+    
+            
+            
+            query_update_exps_brain=""" 
+                 UPDATE  ExperimentalAnimals_table
+                 SET  Experimental_status=2, Experiment=6, BrainProcessingDate=?, BrainProcessingID=?
+                 WHERE ID=?
+                 """  
+            params=(Fixation_date, Brain_ID, Exp_Mouse_ID)
+            self.databse_ref.arbitrary_updating_record(query_update_exps_brain, params)
+       
+            query_update_mouse_dead="""
+                    UPDATE MICE_table
+                    SET  Cage=NULL, Alive=0, Experimental_Status=6, Room=1
+                    WHERE ID=?
+                    """       
+            params=(brain_mouse_info[1],)
+            self.databse_ref.arbitrary_updating_record(query_update_mouse_dead,params)
+            
+        self.databse_ref.independent_commit()    
