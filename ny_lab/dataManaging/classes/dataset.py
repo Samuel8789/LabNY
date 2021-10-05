@@ -90,7 +90,7 @@ class ImageSequenceDataset:
         
         self.read_projections()
         
-        all_projections= list(self.projection_paths_dic.values())[:-1]       
+        all_projections= list(self.projection_paths_dic.values())      
         
         if not all(os.path.isfile(x) for x in all_projections):
             
@@ -103,19 +103,32 @@ class ImageSequenceDataset:
             
             else:
                 rawmov=cm.load(self.path_to_project)
-
+    
             if not os.path.isfile(self.projection_paths_dic['average_projection_path']):
                 self.average_projection=rawmov.mean(axis=0)
-                save_imagej_hdf5(self.average_projection, os.path.splitext(self.path_to_project)[0]+'average_projection', '.tiff', )
-
+                save_imagej_hdf5(self.average_projection, os.path.splitext(self.path_to_project)[0]+'_average_projection', '.tiff', )
+            else:
+                os.remove(self.projection_paths_dic['average_projection_path'])
+                self.average_projection=rawmov.mean(axis=0)
+                save_imagej_hdf5(self.average_projection, os.path.splitext(self.path_to_project)[0]+'_average_projection', '.tiff', )
+                
+    
             if not os.path.isfile(self.projection_paths_dic['max_projection_path']):
                 self.max_projection=rawmov.max(axis=0)
-                save_imagej_hdf5(self.max_projection, os.path.splitext(self.path_to_project)[0]+'max_projection', '.tiff', )
-
+                save_imagej_hdf5(self.max_projection, os.path.splitext(self.path_to_project)[0]+'_max_projection', '.tiff', )
+            else:
+                os.remove(self.projection_paths_dic['max_projection_path'])
+                self.max_projection=rawmov.mean(axis=0)
+                save_imagej_hdf5(self.max_projection, os.path.splitext(self.path_to_project)[0]+'_max_projection', '.tiff', )
+    
             if not os.path.isfile(self.projection_paths_dic['std_projection_path']):
                 self.std_projection=rawmov.std(axis=0)
-                save_imagej_hdf5(self.std_projection, os.path.splitext(self.path_to_project)[0]+'std_projection', '.tiff', )
-
+                save_imagej_hdf5(self.std_projection, os.path.splitext(self.path_to_project)[0]+'_std_projection', '.tiff', )
+            else:
+                os.remove(self.projection_paths_dic['std_projection_path'])
+                self.std_projection=rawmov.mean(axis=0)
+                save_imagej_hdf5(self.std_projection, os.path.splitext(self.path_to_project)[0]+'_std_projection', '.tiff', )
+    
             # if not os.path.isfile(self.projection_paths_dic['local_correlations_path']):  
             #     self.local_correlations=rawmov.local_correlations()
             #     array_sum = np.sum(self.local_correlations)
@@ -130,9 +143,9 @@ class ImageSequenceDataset:
             
             
             
-        self.projection_paths_dic={'average_projection_path':os.path.splitext(self.path_to_project)[0]+'average_projection.tiff',
-                             'max_projection_path':os.path.splitext(self.path_to_project)[0]+'max_projection.tiff',
-                             'std_projection_path':os.path.splitext(self.path_to_project)[0]+'std_projection.tiff',
+        self.projection_paths_dic={'average_projection_path':os.path.splitext(self.path_to_project)[0]+'_average_projection.tiff',
+                             'max_projection_path':os.path.splitext(self.path_to_project)[0]+'_max_projection.tiff',
+                             'std_projection_path':os.path.splitext(self.path_to_project)[0]+'_std_projection.tiff',
                              # 'local_correlations_path':os.path.splitext(self.path_to_project)[0]+'local_correlations.tiff',
                              }
         # print('projecting' + self.path_to_project)

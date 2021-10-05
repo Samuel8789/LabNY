@@ -185,6 +185,7 @@ class DataProcessingTab(tk.Frame):
     # Make a gui to select mouse to process and datasets      
            
     def do_all_projections_button(self):     
+        print('Doing projections')
         for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
             mouse.get_all_mouse_acquisitions_datasets()
             mouse.get_all_mouse_FOVdata_datasets()
@@ -192,12 +193,12 @@ class DataProcessingTab(tk.Frame):
                 data_object.do_projections()
             for dataset, data_object in mouse.all_mouse_FOVdata_datasets.items():
                 data_object.do_projections()
+        print('pronjections done')
                 
     # this process al datasets selected to do kalman and motion corretciuoin
     # Make a gui to select mouse to process and datasets             
                 
     def motion_correct_kalman_button(self):
-    
         for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
             mouse.get_all_mouse_acquisitions_datasets()
             mouse.get_all_mouse_FOVdata_datasets()
@@ -222,7 +223,7 @@ class DataProcessingTab(tk.Frame):
                  for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
                      if not any(x in data_object.dataset_full_file_path for x in to_ignore):                   
                          data_object.create_mot_corrected_kalman_tiff(correct=True)                    
-                    
+         print('processing finished')           
     # this does caiman on a selected dataset            
                 
     def process_selected_acquisition(self):

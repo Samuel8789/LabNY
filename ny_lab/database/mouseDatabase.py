@@ -142,8 +142,6 @@ class MouseDatabase():
                 assert os.path.isfile(dst)
                 assert os.path.isfile(dst_F)
 
-
-
             copyfile(self.database_file_path, dst_dropbox)
             assert os.path.isfile(dst_dropbox)
             self.last_backup_date=datetime.datetime.now() 
