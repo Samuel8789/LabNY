@@ -15,7 +15,7 @@ import datetime
 import os
 from shutil import copyfile
 import glob
-
+from pathlib import Path
 
 from ..AllFunctions.select_values_gui import select_values_gui
 from .fun.guiFunctions.updateLitterInput import UpdateLitterInput
@@ -117,10 +117,16 @@ class MouseDatabase():
         
     def database_backup(self):
         backuppath=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\DatabaseBackups'
-        backuppath_dropbox=os.path.join(self.LabProjectObject.all_paths_for_this_system['Dropbox'],'LabNY\\DatabaseBackups')
+        backuppath_dropbox=os.path.join(self.LabProjectObject.all_paths_for_this_system['Dropbox'],Path('LabNY/DatabaseBackups'))
         backuppath_F=r'F:\Projects\LabNY\DatabaseBackups'
-        list_of_backups = glob.glob(backuppath+'\\*') # * means all if need specific format then *.csv
+        if self.LabProjectObject.platform=='win32':
+            list_of_backups = glob.glob(backuppath_dropbox+'\\*') # * means all if need specific format then *.csv
+        elif self.LabProjectObject.platform=='linux':
+            list_of_backups = glob.glob(backuppath_dropbox+'/*') # * means all if need specific format then *.csv
+
         latest_file = max(list_of_backups, key=os.path.getctime)
+        
+        
         self.last_backup_date=datetime.datetime.strptime(latest_file[-11:-3], '%Y%m%d')
 
         today_date=datetime.date.today().strftime("%Y%m%d")
@@ -130,12 +136,16 @@ class MouseDatabase():
             dst=os.path.join(backuppath, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
             dst_dropbox=os.path.join(backuppath_dropbox, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
             dst_F=os.path.join(backuppath_F, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
-            copyfile(self.database_file_path, dst)
+            if self.LabProjectObject.platform=='win32':
+                copyfile(self.database_file_path, dst)
+                copyfile(self.database_file_path, dst_F)
+                assert os.path.isfile(dst)
+                assert os.path.isfile(dst_F)
+
+
+
             copyfile(self.database_file_path, dst_dropbox)
-            copyfile(self.database_file_path, dst_F)
-            assert os.path.isfile(dst)
             assert os.path.isfile(dst_dropbox)
-            assert os.path.isfile(dst_F)
             self.last_backup_date=datetime.datetime.now() 
             print('Backup done')
         else:

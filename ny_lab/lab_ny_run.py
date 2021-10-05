@@ -20,7 +20,7 @@ from ny_lab.AllFunctions.select_values_gui import select_values_gui
 
 class RunNYLab(Project):    
     def __init__(self,  githubtoken_path, gui=False ):
-        Project.__init__(self,'LabNY', githubtoken_path)
+        Project.__init__(self,'LabNY', githubtoken_path, Project.computer, Project.platform)
         #loadmicedatabase     
         
         self.databasefile=os.path.join(Project.all_paths_for_this_system['Dropbox'],'LabNY', 'MouseDatabase.db')
@@ -42,7 +42,7 @@ class RunNYLab(Project):
 
         except KeyError:
             self.change_and_save_selected_paths_roots()
-            self.data_paths_project={name: os.paht.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}     
+            self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}     
             
             
             
