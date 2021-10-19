@@ -9,7 +9,7 @@ from caimanSorterYSResults import CaimanSorterYSResults
 from cRFsResults import CRFsResults
 from voltageSignalsExtractions import VoltageSignalsExtractions
 import matplotlib.pyplot as plt
-
+import os
 
 import numpy as np
 import matplotlib as mlp
@@ -95,28 +95,41 @@ class ResultsAnalysis():
 if __name__ == "__main__":
     # sorter results
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane1'
+    
+    linux_temp='/home/samuel/Desktop/SPJAFUllAllen/'
+    # windowstemp='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\'
+    plane1='Plane1'+os.sep
+    plane2='Plane2'+os.sep
+    plane3='Plane3'+os.sep
+    # temporary_path1=windowstemp+plane1
+    # temporary_path2=windowstemp+plane2
+    # temporary_path3=windowstemp+plane3
+    temporary_path1=linux_temp+plane1
+    temporary_path2=linux_temp+plane2
+    temporary_path3=linux_temp+plane3
 
-     temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\Plane1'
-     temporary_path2='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\Plane2'
-     temporary_path3='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\Plane3'
-     SPJA_0702_allen_plane1=CaimanSorterYSResults(temporary_path1+ r'\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
-     SPJA_0702_allen_plane2=CaimanSorterYSResults(temporary_path2+ r'\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
-     SPJA_0702_allen_plane3=CaimanSorterYSResults(temporary_path3+ r'\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
+    SPJA_0702_allen_plane1=CaimanSorterYSResults(temporary_path1+ '210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
+    SPJA_0702_allen_plane2=CaimanSorterYSResults(temporary_path2+ '210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
+    SPJA_0702_allen_plane3=CaimanSorterYSResults(temporary_path3+ '210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_64416_cnmf_results_sort.mat')
 #%% crf results
-     temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\SAMUEL_BIG_RUN_2Hz'
-     # this results are for the 2hz frequency only
-     SPJA_0702_allen_CRFS=CRFsResults(temporary_path+ r'\results.mat',
-                                      plane1_cell_number=SPJA_0702_allen_plane1.accepted_cells,
-                                      plane2_cell_number=SPJA_0702_allen_plane2.accepted_cells ,
-                                      plane3_cell_number=SPJA_0702_allen_plane3.accepted_cells
-                                      )
+
+    temporary_path=linux_temp +os.sep+'SAMUEL_BIG_RUN_2Hz'
+    # temporary_path=windowstemp +os.sep+'SAMUEL_BIG_RUN_2Hz'
+    # this results are for the 2hz frequency only
+    SPJA_0702_allen_CRFS=CRFsResults(temporary_path+ os.sep+'results.mat',
+                                     plane1_cell_number=SPJA_0702_allen_plane1.accepted_cells,
+                                     plane2_cell_number=SPJA_0702_allen_plane2.accepted_cells ,
+                                     plane3_cell_number=SPJA_0702_allen_plane3.accepted_cells
+                                     )
 
 
 #%% voltage signals
-     temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-     voltagesignals=VoltageSignalsExtractions(temporary_path1)
+     
+
+    temporary_path1=linux_temp +os.sep+'210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
+    voltagesignals=VoltageSignalsExtractions(temporary_path1)
 
 #%%
 
-     analysis=ResultsAnalysis(SPJA_0702_allen_plane1, SPJA_0702_allen_plane2, SPJA_0702_allen_plane3, SPJA_0702_allen_CRFS, voltagesignals)
-     analysis.plotting()
+    analysis=ResultsAnalysis(SPJA_0702_allen_plane1, SPJA_0702_allen_plane2, SPJA_0702_allen_plane3, SPJA_0702_allen_CRFS, voltagesignals)
+    analysis.plotting()
