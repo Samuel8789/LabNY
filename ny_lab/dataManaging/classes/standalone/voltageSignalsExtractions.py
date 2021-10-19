@@ -101,13 +101,13 @@ class VoltageSignalsExtractions():
 
         
     def slice_gratings_by_paradigm (self):   
-        self.first_drifting_set=self.rounded_vis_stim[self.first_drifitng_set_first:self.first_drifitng_set_last]
-        self.second_drifting_set=self.rounded_vis_stim[self.second_drifitng_set_first:self.second_drifitng_set_last]
-        self.third_drifting_set=self.rounded_vis_stim[self.third_drifitng_set_first:self.third_drifitng_set_last]
-        self.first_movie_set=self.rounded_vis_stim[self.first_movie_set_first:self.first_movie_set_last]
-        self.second_movie_set=self.rounded_vis_stim[self.second_movie_set_first:self.second_movie_set_last]
-        self.short_movie_set=self.rounded_vis_stim[self.short_movie_set_first:self.short_movie_set_last]      
-        self.spont=self.rounded_vis_stim[self.spont_first:self.spont_last]
+        self.first_drifting_set=self.rounded_vis_stim[:,self.first_drifitng_set_first:self.first_drifitng_set_last]
+        self.second_drifting_set=self.rounded_vis_stim[:,self.second_drifitng_set_first:self.second_drifitng_set_last]
+        self.third_drifting_set=self.rounded_vis_stim[:,self.third_drifitng_set_first:self.third_drifitng_set_last]
+        self.first_movie_set=self.rounded_vis_stim[:,self.first_movie_set_first:self.first_movie_set_last]
+        self.second_movie_set=self.rounded_vis_stim[:,self.second_movie_set_first:self.second_movie_set_last]
+        self.short_movie_set=self.rounded_vis_stim[:,self.short_movie_set_first:self.short_movie_set_last]      
+        self.spont=self.rounded_vis_stim[:,self.spont_first:self.spont_last]
 
 
     def plotting(self):   
@@ -153,9 +153,9 @@ class VoltageSignalsExtractions():
 
 if __name__ == "__main__":
     
-    temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
+    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
 
-
+    temporary_path1='/home/samuel/Desktop/SPJAFUllAllen/210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
     voltagesignals=VoltageSignalsExtractions(temporary_path1)
     # voltagesignals.plotting()
     
@@ -164,7 +164,7 @@ if __name__ == "__main__":
     fig, axs = plt.subplots(8)
     fig.suptitle('VisStim Paradigm Transitions')
     axs[0].plot(voltagesignals.first_drifting_set)
-    
+    plt.plot(voltagesignals.first_drifting_set)
     # axs[1].plot(voltagesignals.second_drifting_set)
     # axs[2].plot(voltagesignals.third_drifting_set)
     # axs[3].plot(voltagesignals.first_movie_set)
