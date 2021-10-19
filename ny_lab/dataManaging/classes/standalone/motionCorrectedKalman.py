@@ -281,7 +281,7 @@ if __name__ == "__main__":
     # dataset_full_file_mmap_path=os.path.join(temporary_path,filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
     
     filename=r'211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
-    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane1'
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane2'
     dataset_full_file_mmap_path=os.path.join(temporary_path, filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_64416_.mmap')
     
     
