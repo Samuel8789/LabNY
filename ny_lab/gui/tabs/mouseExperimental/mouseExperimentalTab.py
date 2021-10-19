@@ -105,6 +105,7 @@ class MouseExperimentalTab(tk.Frame):
 
 #%%TAB 3 'Mouse Experimental' 'Post-op'
         self.frame3= self.frames[self.frames_names[2]]  
+        today_date=datetime.date.today()
         self.frame3.buttons={}
         self.frame3.buttons_names=['Update Post-op',
                                    'Saced Exp Animal'
@@ -115,15 +116,16 @@ class MouseExperimentalTab(tk.Frame):
         for i in range(len(self.frame3.buttons_names)):
               self.frame3.buttons[self.frame3.buttons_names[i]]= ttk.Button(self.frame3 , text=self.frame3.buttons_names[i], command=self.frame3.buttons_commands[i])
 
-
-        self.saced_exp_codes=StringVar()    
+        self.frame3.saced_date_selection = Calendar(self.frame3, selectmode = 'day', year = today_date.year, month = today_date.month, day = today_date.day,  date_pattern ='ymmdd')
+        self.frame3.saced_date_selection.grid(column=3, row=1)
+        self.saced_exp_codes=StringVar()
         self.frame3.codes_lstbox =Listbox(self.frame3, listvariable=self.saced_exp_codes, selectmode=MULTIPLE, width=10, height=10)
         self.saced_exp_codes.set(self.gui_ref.MouseDat.Experimental_class.all_exp_animals_recovery['Code'].tolist())
         # self.saced_exp_codes.set(self.gui_ref.MouseDat.Experimental_class.all_mouse_planned_in_colony['Code'].tolist())
 
-        self.frame3.codes_lstbox.grid(column=0, row=1)
+        self.frame3.codes_lstbox.grid(column=1, row=1)
         self.frame3.buttons[self.frame3.buttons_names[0]].grid(column=0, row=0)
-        self.frame3.buttons[self.frame3.buttons_names[1]].grid(column=0, row=11)
+        self.frame3.buttons[self.frame3.buttons_names[1]].grid(column=1, row=2)
 #%%TAB 3 'Mouse Experimental'  'Brain_processing'
         self.frame_brain_processing= self.frames[self.frames_names[4]]  
         today_date=datetime.date.today()
@@ -258,14 +260,15 @@ class MouseExperimentalTab(tk.Frame):
         button_update_database(self.gui_ref)
 
     def saced_exp_animal_button(self):
+        date_entry=self.frame3.saced_date_selection.get_date()
         selected_codes = list()
         selection = self.frame3.codes_lstbox.curselection()
         for i in selection:
             code = self.frame3.codes_lstbox.get(i)
             selected_codes.append(code)
         for mouse_code in selected_codes:
-            self.gui_ref.MouseDat.Experimental_class.sac_experimental_mouse(mouse_code)     
-            
+            self.gui_ref.MouseDat.Experimental_class.sac_experimental_mouse(mouse_code, date_entry)     
+        print('All animlas saced')    
             
     def process_brain_button(self):    
         selected_mice=self.frame_brain_processing.selected_mice

@@ -11,18 +11,18 @@ import h5py
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
-from TestPLot import SnappingCursor
+# from TestPLot import SnappingCursor
 import mplcursors
 from numpy import exp, abs, angle
 from scipy import stats
 import scipy.io
 
 #%%
-dataset_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'   
+dataset_path='\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000'   
 file_paths=glob.glob(dataset_path+'\**\**.mat', recursive=True)
-plane1=h5py.File(file_paths[0], 'r')
-plane2=h5py.File(file_paths[1], 'r')
-plane3=h5py.File(file_paths[2], 'r')
+# plane1=h5py.File(file_paths[0], 'r')
+# plane2=h5py.File(file_paths[1], 'r')
+# plane3=h5py.File(file_paths[2], 'r')
 chand=h5py.File(file_paths[0], 'r')
 
 chandgoodcells=chand["proc"]['idx_components'][:,:]
@@ -34,80 +34,80 @@ scipy.io.savemat(file_path, {'allplanesC': chandC})
 file_path=dataset_path+"\\allchanddfdt.mat"
 scipy.io.savemat(file_path, {'alchandnedfdt': chanddfdt})
 
-plane1goodcells=plane1["proc"]['idx_components'][:,:]
-plane2goodcells=plane2["proc"]['idx_components'][:,:]
-plane3goodcells=plane3["proc"]['idx_components'][:,:]
-plane1goodcells.shape[0]
+# plane1goodcells=plane1["proc"]['idx_components'][:,:]
+# plane2goodcells=plane2["proc"]['idx_components'][:,:]
+# plane3goodcells=plane3["proc"]['idx_components'][:,:]
+# plane1goodcells.shape[0]
 
 
-plane1C=plane1['est']['C'][:,plane1goodcells]
-plane2C=plane2['est']['C'][:,plane2goodcells]
-plane3C=plane3['est']['C'][:,plane3goodcells]
-allplanesC=np.concatenate((plane1C,plane2C,plane3C), axis=1).T
-plt.imshow(allplanesC,vmin=0, vmax=1,aspect='auto',cmap='inferno')
-plt.colorbar()
+# plane1C=plane1['est']['C'][:,plane1goodcells]
+# plane2C=plane2['est']['C'][:,plane2goodcells]
+# plane3C=plane3['est']['C'][:,plane3goodcells]
+# allplanesC=np.concatenate((plane1C,plane2C,plane3C), axis=1).T
+# plt.imshow(allplanesC,vmin=0, vmax=1,aspect='auto',cmap='inferno')
+# plt.colorbar()
 
-file_path=dataset_path+"\\allplanesC.mat"
-scipy.io.savemat(file_path, {'allplanesC': allplanesC})
-
-
-
-plane1dfdt=plane1['proc']['deconv']['smooth_dfdt']['S'][:,plane1goodcells]
-plane2dfdt=plane2['proc']['deconv']['smooth_dfdt']['S'][:,plane2goodcells]
-plane3dfdt=plane3['proc']['deconv']['smooth_dfdt']['S'][:,plane3goodcells]
-allplanesdfdt=np.concatenate((plane1dfdt,plane2dfdt,plane3dfdt), axis=1).T
-plt.imshow(allplanesdfdt,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
-plt.colorbar()
-file_path=dataset_path+"\\allplanedfdt.mat"
-scipy.io.savemat(file_path, {'allplanedfdt': allplanesdfdt})
+# file_path=dataset_path+"\\allplanesC.mat"
+# scipy.io.savemat(file_path, {'allplanesC': allplanesC})
 
 
-plane1foopsi=plane1['proc']['deconv']['c_foopsi']['S'][:,plane1goodcells]
-plane1foopsigood=np.zeros((plane1goodcells.shape[0],plane1C.shape[0]))
-for i in range(plane1goodcells.shape[0]):
-    plane1foopsigood[i,:]=plane1[plane1foopsi[0,i]][:,:].T
 
-plane2foopsi=plane2['proc']['deconv']['c_foopsi']['S'][:,plane2goodcells]
-plane2foopsigood=np.zeros((plane2goodcells.shape[0],plane2C.shape[0]))
-for i in range(plane2goodcells.shape[0]):
-    plane2foopsigood[i,:]=plane2[plane2foopsi[0,i]][:,:].T
-    
-plane3foopsi=plane3['proc']['deconv']['c_foopsi']['S'][:,plane3goodcells]
-plane3foopsigood=np.zeros((plane3goodcells.shape[0],plane3C.shape[0]))
-for i in range(plane3goodcells.shape[0]):
-    if i!=31:
-        plane3foopsigood[i,:]=plane3[plane3foopsi[0,i]][:,:].T
-    
-allplanesfoopsi=np.concatenate((plane1foopsigood,plane2foopsigood,plane3foopsigood))
-plt.imshow(allplanesfoopsi,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
-plt.colorbar()   
-    
-file_path=dataset_path+"\\allplanefoopsi.mat"
-scipy.io.savemat(file_path, {'allplanefoopsi': allplanesfoopsi})
-    
-# plane1MCMC=plane1['proc']['deconv']['MCMC']['S'][:,plane1goodcells]
-# plane1MCMCgood=np.zeros((plane1goodcells.shape[0],plane1C.shape[0]))
+# plane1dfdt=plane1['proc']['deconv']['smooth_dfdt']['S'][:,plane1goodcells]
+# plane2dfdt=plane2['proc']['deconv']['smooth_dfdt']['S'][:,plane2goodcells]
+# plane3dfdt=plane3['proc']['deconv']['smooth_dfdt']['S'][:,plane3goodcells]
+# allplanesdfdt=np.concatenate((plane1dfdt,plane2dfdt,plane3dfdt), axis=1).T
+# plt.imshow(allplanesdfdt,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
+# plt.colorbar()
+# file_path=dataset_path+"\\allplanedfdt.mat"
+# scipy.io.savemat(file_path, {'allplanedfdt': allplanesdfdt})
+
+
+# plane1foopsi=plane1['proc']['deconv']['c_foopsi']['S'][:,plane1goodcells]
+# plane1foopsigood=np.zeros((plane1goodcells.shape[0],plane1C.shape[0]))
 # for i in range(plane1goodcells.shape[0]):
-#     plane1MCMCgood[i,:]=plane1[plane1MCMC[0,i]][:,:].T
-    
-# plane2MCMC=plane2['proc']['deconv']['MCMC']['S'][:,plane2goodcells]
-# plane2MCMCgood=np.zeros((plane2goodcells.shape[0],plane2C.shape[0]))
-# for i in range(plane2goodcells.shape[0]):
-#     if i not in [8,9,12,23,28,39,40,44,45]:
-#         plane2MCMCgood[i,:]=plane2[plane2MCMC[0,i]][:,:].T
-    
-# plane3MCMC=plane3['proc']['deconv']['MCMC']['S'][:,plane3goodcells]
-# plane3MCMCgood=np.zeros((plane3goodcells.shape[0],plane3C.shape[0]))
-# for i in range(plane3goodcells.shape[0]):
-#     plane3MCMCgood[i,:]=plane3[plane3MCMC[0,i]][:,:].T
+#     plane1foopsigood[i,:]=plane1[plane1foopsi[0,i]][:,:].T
 
-# allplanesMCMC=np.concatenate((plane1MCMCgood,plane2MCMCgood,plane2MCMCgood), axis=1).T
-# plt.imshow(allplanesMCMC,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
+# plane2foopsi=plane2['proc']['deconv']['c_foopsi']['S'][:,plane2goodcells]
+# plane2foopsigood=np.zeros((plane2goodcells.shape[0],plane2C.shape[0]))
+# for i in range(plane2goodcells.shape[0]):
+#     plane2foopsigood[i,:]=plane2[plane2foopsi[0,i]][:,:].T
+    
+# plane3foopsi=plane3['proc']['deconv']['c_foopsi']['S'][:,plane3goodcells]
+# plane3foopsigood=np.zeros((plane3goodcells.shape[0],plane3C.shape[0]))
+# for i in range(plane3goodcells.shape[0]):
+#     if i!=31:
+#         plane3foopsigood[i,:]=plane3[plane3foopsi[0,i]][:,:].T
+    
+# allplanesfoopsi=np.concatenate((plane1foopsigood,plane2foopsigood,plane3foopsigood))
+# plt.imshow(allplanesfoopsi,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
 # plt.colorbar()   
     
-allplanesfoopsi=np.concatenate((plane1foopsigood,plane2foopsigood,plane3foopsigood))
-plt.imshow(allplanesfoopsi,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
-plt.colorbar()   
+# file_path=dataset_path+"\\allplanefoopsi.mat"
+# scipy.io.savemat(file_path, {'allplanefoopsi': allplanesfoopsi})
+    
+# # plane1MCMC=plane1['proc']['deconv']['MCMC']['S'][:,plane1goodcells]
+# # plane1MCMCgood=np.zeros((plane1goodcells.shape[0],plane1C.shape[0]))
+# # for i in range(plane1goodcells.shape[0]):
+# #     plane1MCMCgood[i,:]=plane1[plane1MCMC[0,i]][:,:].T
+    
+# # plane2MCMC=plane2['proc']['deconv']['MCMC']['S'][:,plane2goodcells]
+# # plane2MCMCgood=np.zeros((plane2goodcells.shape[0],plane2C.shape[0]))
+# # for i in range(plane2goodcells.shape[0]):
+# #     if i not in [8,9,12,23,28,39,40,44,45]:
+# #         plane2MCMCgood[i,:]=plane2[plane2MCMC[0,i]][:,:].T
+    
+# # plane3MCMC=plane3['proc']['deconv']['MCMC']['S'][:,plane3goodcells]
+# # plane3MCMCgood=np.zeros((plane3goodcells.shape[0],plane3C.shape[0]))
+# # for i in range(plane3goodcells.shape[0]):
+# #     plane3MCMCgood[i,:]=plane3[plane3MCMC[0,i]][:,:].T
+
+# # allplanesMCMC=np.concatenate((plane1MCMCgood,plane2MCMCgood,plane2MCMCgood), axis=1).T
+# # plt.imshow(allplanesMCMC,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
+# # plt.colorbar()   
+    
+# allplanesfoopsi=np.concatenate((plane1foopsigood,plane2foopsigood,plane3foopsigood))
+# plt.imshow(allplanesfoopsi,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
+# plt.colorbar()   
     
 fig, axs = plt.subplots(2)
 fig.suptitle('Locomotion')

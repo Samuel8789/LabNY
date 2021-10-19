@@ -66,7 +66,7 @@ class VoltageSignalsExtractions():
         self.second_drifitng_set_first=self.end_transitions[5]+1
         self.second_drifitng_set_last= self.start_transitions[8]+1
         self.third_drifitng_set_first=self.end_transitions[8]+1
-        self.third_drifitng_set_last=self.all_down_transition+2
+        self.third_drifitng_set_last=self.last_down_transition+2
         
         self.first_movie_set_first=self.end_transitions[2]+1
         self.first_movie_set_last= self.start_transitions[4]+1
@@ -82,10 +82,6 @@ class VoltageSignalsExtractions():
         
         fig, axs = plt.subplots(8)
         fig.suptitle('VisStim Paradigm Transitions')
-        self.rounded_vis_stim
-        axs[0].plot(self.rounded_vis_stim)
-        
-        axs[0].plot(self.rounded_vis_stim,)
         axs[0].plot(self.rounded_vis_stim,)
         
         axs[0].plot(self.rounded_vis_stim[self.first_drifitng_set_first],'x', 'r')

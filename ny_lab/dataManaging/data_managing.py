@@ -14,7 +14,7 @@ from distutils.dir_util import copy_tree
 import logging 
 logger = logging.getLogger(__name__)
 
-from .functions import select_face_camera
+from .functions.select_face_camera import select_face_camera
 from .functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
 from .classes.mouse import Mouse
 from .classes.prairieImagingSession  import PrairieImagingSession
@@ -841,10 +841,18 @@ class DataManaging():
                             if not UnprocessedVisStimnames:
                                 UnprocessedVisStimnames=['None']
                             
-                            root = Tkinter.Tk()
-                            app = select_face_camera(root, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], UnprocessedFaceCamerasnames, UnprocessedVisStimnames)
-                            root.mainloop()
-                            get_values=app.values
+                            # root = Tkinter.Tk()
+                            # app = select_face_camera(root, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], UnprocessedFaceCamerasnames, UnprocessedVisStimnames)
+                            # root.mainloop()
+                            # get_values=app.values
+
+                            
+                            self.select_face_camera_window=select_face_camera(self.LabProjectObject.gui, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], UnprocessedFaceCamerasnames, UnprocessedVisStimnames)
+                            self.select_face_camera_window.wait_window()
+                            get_values= self.select_face_camera_window.values
+                            
+                            
+                            
                             if get_values[1][1]:
                                 facecameradir=os.path.join(aq, 'FaceCamera')   
                                 # unprocessedfacecameraname= os.path.split(os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0])[1]
@@ -869,16 +877,16 @@ class DataManaging():
                            
                            
    
-                UnprocessedFaceCameraspaths=glob.glob(UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-                UnprocessedFaceCamerasnames=[os.path.split(UnprocessedFaceCameraspath)[1] for UnprocessedFaceCameraspath in UnprocessedFaceCameraspaths]
-                UnprocessedVisStimpaths=glob.glob(UnprocessedVisStim +'\\**.mat', recursive=False)
-                UnprocessedVisStimnames=[os.path.split(UnprocessedVisStimpaths)[1] for UnprocessedVisStimpaths in UnprocessedVisStimpaths]   
-                if not UnprocessedFaceCameraspaths:
-                    if os.path.isdir(UnprocessedFaceCameras):
-                        recursively_eliminate_empty_folders(UnprocessedFaceCameras)
-                if not UnprocessedVisStimpaths:
-                    if os.path.isdir(UnprocessedVisStim):
-                        recursively_eliminate_empty_folders(UnprocessedVisStim)    
+            UnprocessedFaceCameraspaths=glob.glob(UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
+            UnprocessedFaceCamerasnames=[os.path.split(UnprocessedFaceCameraspath)[1] for UnprocessedFaceCameraspath in UnprocessedFaceCameraspaths]
+            UnprocessedVisStimpaths=glob.glob(UnprocessedVisStim +'\\**.mat', recursive=False)
+            UnprocessedVisStimnames=[os.path.split(UnprocessedVisStimpaths)[1] for UnprocessedVisStimpaths in UnprocessedVisStimpaths]   
+            if not UnprocessedFaceCameraspaths:
+                if os.path.isdir(UnprocessedFaceCameras):
+                    recursively_eliminate_empty_folders(UnprocessedFaceCameras)
+            if not UnprocessedVisStimpaths:
+                if os.path.isdir(UnprocessedVisStim):
+                    recursively_eliminate_empty_folders(UnprocessedVisStim)    
                         
     
             allaq=glob.glob(generic_aq_folder +'\\Aq_**', recursive=False) 

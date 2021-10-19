@@ -26,34 +26,27 @@ class update_injection_params(tk.Toplevel):
         self.date_performed =date_performed
         self.database_connection=database_object.database_connection
         self.database_object=database_object
-        query_check_injeciton_info="SELECT Code, EarMark, Injections_table.* FROM Injections_table LEFT JOIN ExperimentalAnimals_table ON ExperimentalAnimals_table.Injection1ID=Injections_table.ID WHERE Injections_table.ID=? OR Injections_table.ID=? OR Injections_table.ID=? OR Injections_table.ID=? OR Injections_table.ID=?"
-        
-        injection_id_list=list(injection_id)
-        if len(injection_id_list)<5:
-            dif=5-len(injection_id_list)
-            for i in range(dif):
-                injection_id_list.append(injection_id_list[-1])
-        
-        mice_exp = pd.read_sql_query(query_check_injeciton_info, self.database_connection,params=tuple(injection_id_list,)).values.tolist()          
-
- 
+        query_check_injeciton_info="""SELECT Code,
+                                        EarMark,
+                                        Injections_table.* 
+                                        FROM Injections_table 
+                                        LEFT JOIN ExperimentalAnimals_table ON ExperimentalAnimals_table.Injection1ID=Injections_table.ID
+                                        WHERE Injections_table.ID IN(%s)""" % ','.join('?' for i in injection_id)       
+        params=injection_id
+        mice_exp = pd.read_sql_query(query_check_injeciton_info, self.database_connection,params=params).values.tolist()          
         virus_comb=[i[5] for i in mice_exp]
-        if len(virus_comb)<5:
-           dif=5-len(virus_comb)
-           for i in range(dif):
-               virus_comb.append(virus_comb[-1])
-        
-        
-        query_check_virus_from_virus_comb="SELECT Combination, Virus1_table.VirusCode, Virus2_table.VirusCode, Virus3_table.VirusCode FROM VirusCombinations_table LEFT JOIN Virus_table AS Virus1_table  ON  Virus1_table.ID = VirusCombinations_table.Virus1 LEFT JOIN Virus_table AS Virus2_table  ON  Virus2_table.ID = VirusCombinations_table.Virus2 LEFT JOIN Virus_table AS Virus3_table  ON  Virus3_table.ID = VirusCombinations_table.Virus3 WHERE VirusCombinations_table.ID=? OR  VirusCombinations_table.ID=? OR  VirusCombinations_table.ID=? OR  VirusCombinations_table.ID=? OR  VirusCombinations_table.ID=? "
+        query_check_virus_from_virus_comb="""SELECT
+                                                Combination, 
+                                                Virus1_table.VirusCode, 
+                                                Virus2_table.VirusCode,
+                                                Virus3_table.VirusCode 
+                                                FROM VirusCombinations_table 
+                                                LEFT JOIN Virus_table AS Virus1_table  ON  Virus1_table.ID = VirusCombinations_table.Virus1 
+                                                LEFT JOIN Virus_table AS Virus2_table  ON  Virus2_table.ID = VirusCombinations_table.Virus2 
+                                                LEFT JOIN Virus_table AS Virus3_table  ON  Virus3_table.ID = VirusCombinations_table.Virus3 
+                                                WHERE VirusCombinations_table.ID IN(%s)""" % ','.join('?' for i in virus_comb)
         viruses = pd.read_sql_query(query_check_virus_from_virus_comb, self.database_connection,params=tuple(virus_comb,)).values.tolist()          
-        """
-        to add comboboxes for:
-            Labels
-            CorticalArea
-            Injection1Coordinates
-            Injection2Coordinates
-
-        """
+   
         query_brain_areas_info="""SELECT * FROM Brain_Areas_table"""    
         query_coordinates_info="""SELECT * FROM Sterocoordinates_table"""  
         query_labels_info="""SELECT * FROM Labels_table"""  
@@ -133,17 +126,17 @@ class update_injection_params(tk.Toplevel):
                     
                 elif j==1:
                     self.b[i].append(ttk.Combobox( self, values= self.good_labels, width=15) ) # b[i][j]
-                    self.b[i][j].current(exp[1]-1)
+                    self.b[i][j].current(mice_exp[i-1][1]-1)
                 elif j==9:
                     self.b[i].append(ttk.Combobox( self, values= self.good_brain_areas, width=20) ) # b[i][j]
-                    self.b[i][j].current(exp[9]-1)
+                    self.b[i][j].current(mice_exp[i-1][9]-1)
 
                 elif j in [11,18]:
                     self.b[i].append(ttk.Combobox( self, values=self.good_coordinates,  width=25) ) # b[i][j]
                     if j==11:
-                        self.b[i][j].current(exp[11]-1)
+                        self.b[i][j].current(mice_exp[i-1][11]-1)
                     elif j==18:
-                        self.b[i][j].current(exp[18]-1)
+                        self.b[i][j].current(mice_exp[i-1][18]-1)
 
                 else:
                     self.b[i].append(Entry(self, text="", width=5)) # b[i][j]

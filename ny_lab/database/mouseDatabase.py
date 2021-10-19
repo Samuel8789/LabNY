@@ -923,7 +923,7 @@ class MouseDatabase():
         print('Litter Updated')
     def add_new_litters(self,gui, new_litter_number):
         
-        self.update_litter_window = UpdateLitterInput(gui, new_litter_number)  
+        self.update_litter_window = UpdateLitterInput(gui, self, new_litter_number)  
         self.update_litter_window.wait_window()
         new_litters=self.update_litter_window.values
    

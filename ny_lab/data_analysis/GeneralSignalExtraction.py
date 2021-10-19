@@ -10,7 +10,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import mplcursors
 import matplotlib
-from TestPLot import SnappingCursor
 %matplotlib qt
 ## load full csv signals
 temp_folder='\\\\?\\'+ r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000'

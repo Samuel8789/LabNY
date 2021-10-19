@@ -127,7 +127,7 @@ class modify_injection_params(tk.Toplevel):
 
     def retrieve_input(self):
         for i in range(1,self.total_rows+1): #Rows
-            for j in range(len(self.col_labels)+1): #Columns            
+            for j in range(len(self.col_labels)): #Columns            
                 if j in [16,23,24]:
                     self.values[i][j]=self.b[i][j].get("1.0",END)
                 else :             

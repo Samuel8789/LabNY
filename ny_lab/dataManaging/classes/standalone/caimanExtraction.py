@@ -1,76 +1,77 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Apr  2 14:18:55 2021
+Created on Mon Oct 11 14:21:42 2021
 
 @author: sp3660
 """
 
 import numpy as np
-# import shutil
 import os
 
-from ..AllFunctions.OnACID_YS import run_on_acid
-from .correct_bidi_movie import correct_bidi_movie
-
-
+from OnACID import run_on_acid
+from metadata import Metadata
+from motionCorrectedKalman import MotionCorrectedKalman
+from summaryImages import SummaryImages
 
 class CaimanExtraction():
     
-    def __init__(self, dataset_object):
+    def __init__(self, bidishifted_movie_path, metdata_file_path, temporary_path=None):
+        
+        self.temporary_path=temporary_path
+        self.bidishifted_movie_path=bidishifted_movie_path
+        self.eliminate_caiman_extra_from_mmap()
         
         
-        self.dataset_object=dataset_object
-        self.dataset_mouse_path=self.dataset_object.dataset_full_file_path
-        self.filename=os.path.split(self.dataset_mouse_path)[1]
-        if os.path.isfile(self.dataset_mouse_path[0:-5] + 'cnmf_results.hdf5'):
+        if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5'):
             print('Already done')
-            print(self.dataset_mouse_path)
-            print(self.dataset_mouse_path[0:-5] + 'cnmf_results.hdf5')
+            print(self.bidishifted_movie_path)
+            print(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5')
         else:            
             
-            self.temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp', self.filename)           
-            good_filename=self.filename[:self.filename.find('_d1_')]
-            self.temporarypath=os.path.join('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp', good_filename)
-            caiman_extra=self.filename[self.filename.find('_d1_'):self.filename.find('_mmap')-4]
-
-            temporary_bidi_path, self.bidiphases=correct_bidi_movie(self.dataset_mouse_path, self.temporarypath, caiman_extra)    
-            list_of_files = os.listdir('\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp')
-            full_path = ['\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp\{0}'.format(x) for x in list_of_files]
-            oldest_file = min(full_path, key=os.path.getctime)
-            if len(list_of_files)>5 and oldest_file !=  self.temporarypath:
-                    os.remove(oldest_file)
-            
-            query="""
-                SELECT *
-                FROM Imaging_table
-                WHERE ImagingFilename=?
-            """
-            params=(dataset_object.associated_aquisiton.aquisition_name,)
-            
-            datasetmeta=dataset_object.associated_aquisiton.mouse_object.Database_ref.arbitrary_query_to_df(query, params)
-            if datasetmeta.Objective[0]=='MBL Olympus 20x':
+            self.metadata=Metadata(aq_metadataPath=metadata_file_path)
+            datasetmeta=self.metadata.imaging_metadata
+            objective=self.metadata.imaging_metadata[0]['Objective']
+            if objective=='MBL Olympus 20x':
                 self.halfsize=2.5
-            elif datasetmeta.Objective[0]=='Olympus fat 25xb':
+            elif objective=='Olympus fat 25xb':
                self.halfsize=5
-    
+           
+               if '20x' in self.bidishifted_movie_path:
+                    self.halfsize=2.5
     
     
        #%% 
             
-            # self.framePeriod=float(datasetmeta.FramePeriod)
-            # self.etl_frame_period=float(datasetmeta.InterFramePeriod)
-            # self.rastersPerFrame=int(datasetmeta.FrameAveraging)
-            # self.plane_period=float(self.framePeriod*self.rastersPerFrame)
-            # self.number_planes=self.dataset_metadata[1]['Plane Number']
-            # if self.number_planes=='Single':
-            #     self.number_planes=1
-          
-            self.volume_period=datasetmeta.FinalVolumePeriod[0]
+            self.framePeriod=float(datasetmeta[0]['framePeriod'])
+            self.rastersPerFrame=int(datasetmeta[0]['RasterAveraging'])
+            self.number_planes=datasetmeta[1]['PlaneNumber']
+            if self.number_planes=='Single':
+                self.number_planes=1
+                self.volume_period=1/(self.framePeriod*self.rastersPerFrame)
+            
+            if self.number_planes==3:
+                self.etl_frame_period=float(datasetmeta[2][0]['TopPlane']['framePeriod'])
+                self.plane_period=float(self.framePeriod*self.rastersPerFrame)
+                self.volume_period=1/(self.etl_frame_period*self.number_planes)
+            
+                        
+           
             
             
     #%%
             self.set_caiman_parameters()
+            self.apply_caiman()
             
+            
+            
+    def eliminate_caiman_extra_from_mmap(self) :   
+
+          self.mmap_directory, caiman_filename=os.path.split(self.bidishifted_movie_path) 
+          if caiman_filename.find('_d1_')!=-1:
+              self.good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
+              self.caiman_extra=caiman_filename[caiman_filename.find('_d1_'):caiman_filename.find('_mmap')-4]   
+          else:
+              self.good_filename=os.path.splitext(caiman_filename)[0]        
 
     # %%   Set up some parameters
     def set_caiman_parameters(self):
@@ -84,7 +85,7 @@ class CaimanExtraction():
         gnb = 2  # number of background components
         gSig = tuple(np.ceil(np.array(gSig) / ds_factor).astype('int')) # recompute gSig if downsampling is involved
         mot_corr = True  # flag for online motion correction
-        pw_rigid = True  # flag for pw-rigid motion correction (slower but potentially more accurate)
+        pw_rigid = False  # flag for pw-rigid motion correction (slower but potentially more accurate)
         max_shifts_online = 10  # maximum allowed shift during motion correction
         sniper_mode = True  # use a CNN to detect new neurons (o/w space correlation)
         rval_thr = 0.8  # soace correlation threshold for candidate components
@@ -92,7 +93,7 @@ class CaimanExtraction():
         # (these are default values but can change depending on dataset properties)
         init_batch = 1000  # number of frames for initialization (presumably from the first file)
         K = 2  # initial number of components
-        epochs = 3 # number of passes over the data
+        epochs = 5 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8
         use_cnn = True  # use the CNN classifier
@@ -101,7 +102,7 @@ class CaimanExtraction():
 
         
         
-        self.dataset_caiman_parameters = {'fnames': self.temporarypath,
+        self.dataset_caiman_parameters = {'fnames': self.bidishifted_movie_path,
                                            'fr': fr,
                                            'decay_time': decay_time,
                                            'gSig': gSig,
@@ -132,16 +133,23 @@ class CaimanExtraction():
   
         
     def apply_caiman(self):
-        if os.path.isfile(self.dataset_mouse_path[0:-5] + 'cnmf_results.hdf5'):
+        if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0] + 'cnmf_results.hdf5'):
             return
         else:  
-         run_on_acid(self,  self.dataset_caiman_parameters, self.dataset_object)
+         self.cnm_object=run_on_acid(self,  self.dataset_caiman_parameters)
          
-         # os.remove(self.temporarypath)
         
         
 
-
+if __name__ == "__main__":
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane3'
+    dump='\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp'
+    # image_sequence_path=os.path.join(temporary_path,'210930_SPKI_2mintestvideo_920_50024_narrow_without-000_Shifted_Movie_MC_kalman.tiff')
+    metadata_file_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000.xml')
+    dataset_full_file_mmap_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
+    
+    CaimanExtr = CaimanExtraction(dataset_full_file_mmap_path, metadata_file_path, temporary_path=temporary_path)
+    cnm=CaimanExtr.cnm_object
 
 
 

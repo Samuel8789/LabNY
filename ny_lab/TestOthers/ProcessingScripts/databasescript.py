@@ -124,8 +124,8 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
-DELETE FROM Injections_table
-WHERE  ID IN (206,207,208)
+DELETE FROM BrainProcessing_table
+WHERE  ID IN (15)
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)

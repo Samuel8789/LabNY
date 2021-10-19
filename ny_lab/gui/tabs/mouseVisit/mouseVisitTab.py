@@ -306,7 +306,6 @@ class MouseVisitTab(tk.Frame):
     def mouse_previsit_button(self) :
          self.gui_ref.MouseDat.mouse_previsit()
          print('previsit printed')
-
     def mouse_postvisit_button(self) :
         date_performed= self.frame1.entries[self.frame1.entries_names[0]].get()
         self.gui_ref.MouseDat.mouse_postvisit(date_performed=date_performed)

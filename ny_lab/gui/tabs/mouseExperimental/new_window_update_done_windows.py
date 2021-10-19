@@ -11,11 +11,10 @@ from tkinter import *
 import tkinter as Tkinter
 import datetime
 
-
 from ....database.fun.guiFunctions.update_window_params import update_window_params
 
 
-class new_window_update_done_windows( tk.Toplevel):
+class new_window_update_done_windows(tk.Toplevel):
     def __init__(self, app):
         tk.Toplevel.__init__(self) #instead of super
 
@@ -63,12 +62,15 @@ class new_window_update_done_windows( tk.Toplevel):
             self.select()
             
             self.destroy()
-            update_window_params(self.gui, self.window_cage.get(), self.selected_mice, self.window_date.get(), database_object=self.gui.MouseDat)
-           
+            updte_window=update_window_params(self.gui, self.window_cage.get(), self.selected_mice, self.window_date.get(), database_object=self.gui.MouseDat)
+            updte_window.wait_window()
+            print('windows updated')
+
             if self.selected_dead_mice:
                 print('ss')
                 for code in self.selected_dead_mice:
-                  self.gui.MouseDat.Experimental_class.mouse_dead_during_surgery(code)
+                    #here add the surgery date
+                  self.gui.MouseDat.Experimental_class.mouse_dead_during_surgery(code, updte_window.date_performed)
         
     def update(self, *a):
         cage=self.window_cage.get()

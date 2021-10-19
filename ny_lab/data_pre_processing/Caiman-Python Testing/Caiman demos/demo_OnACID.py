@@ -97,7 +97,7 @@ def main():
         cnm.estimates.plot_contours(img=Cn, idx=cnm.estimates.idx_components)
 # %% plot results
     cnm.estimates.view_components(img=Cn, idx=cnm.estimates.idx_components)
-
+    cnm.save(fname[0][:-5]+'_init.hdf5')
 # %%
 # This is to mask the differences between running this demo in Spyder
 # versus from the CLI

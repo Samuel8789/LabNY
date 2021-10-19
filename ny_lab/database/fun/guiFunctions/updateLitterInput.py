@@ -11,12 +11,17 @@ import pandas as pd
 import tkinter as tk
 
 class UpdateLitterInput(tk.Toplevel):
-    def __init__(self, app, mousedat):       
+    def __init__(self, app, mousedat=False, litter_number=False):       
         tk.Toplevel.__init__(self, app)
         self.gui=app
-        self.mousedat=mousedat     
-        rows= len(self.mousedat.current_litters.index)
-        litter_df= self.mousedat.current_litters
+        self.mousedat=mousedat
+        litter_df=pd.DataFrame()
+        if not litter_number:
+            rows= len(self.mousedat.current_litters.index) 
+            litter_df=self.mousedat.current_litters
+        else:
+            rows=litter_number
+        
         
         if litter_df.empty:
             rsliced=litter_df
@@ -34,7 +39,7 @@ class UpdateLitterInput(tk.Toplevel):
            self.b[0][j].grid(row=1, column=j)
            self.values[0].append(col_labels[j])
            
-        for i in range(1,rows+1,1): #Rows
+        for i in range(1,rows+1): #Rows
             self.b.append(list())  
             self.values.append(list())
             for j in range(len(col_labels)): #Columns

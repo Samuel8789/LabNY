@@ -584,9 +584,9 @@ class ExperimentalDatabase():
             
         self.databse_ref.independent_commit()    
 
-    def update_performed_injections(self, all_inject_params, cage, selected_codes, date_performed):
+    def update_performed_injections(self, all_inject_params, cage, selected_codes, raw_date_performed):
         
-        date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')
+        date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
       
               
         query_mice_exp_info="SELECT ExperimentalAnimals_table.ID, MICE_table.ID, Lab_number,Code,Label,Room,ExperimentalAnimals_table.Experimental_status, MICE_table.Experimental_status, Experiment,Injection1ID FROM ExperimentalAnimals_table LEFT JOIN MICE_table ON MICE_table.ID = ExperimentalAnimals_table.Mouse_ID WHERE Cage=?"
@@ -637,13 +637,13 @@ class ExperimentalDatabase():
             """
         query_update_exps=""" 
              UPDATE  ExperimentalAnimals_table
-             SET EarMark=?, Experimental_status=2 ,Experiment=2 , NumberOfInjections=1 , Injection1Date=?
+             SET EarMark=?, Experimental_status=2 ,Experiment=2 , NumberOfInjections=1 , Injection1Date=date(?)
              WHERE ID=?
              """
         query_update_injections=""" 
                  UPDATE  Injections_table
                  SET 
-                     InjDate=date(date(?)),
+                     InjDate=date(?),
                      VirusCombination=?,
                      DilutionSensor1=?,
                      DilutionSensor2=?,
@@ -692,6 +692,7 @@ class ExperimentalDatabase():
             else:
                 viruscomb=[[28]]
             list_for_update=[all_inject_params[i+1][2],viruscomb[0][0]]+all_inject_params[i+1][6:]  
+            list_for_update[0]=date_performed
             if not noinjection:
                 list_for_update_integercorrected=[ int(float(j))  if i in [5,6,7,14] else j for i,j in enumerate(list_for_update)]
             else:
@@ -770,9 +771,9 @@ class ExperimentalDatabase():
         self.databse_ref.independent_commit()        
     
                        
-    def update_performed_window(self,all_inject_params, cage, animals_selected, date_performed=False):   
+    def update_performed_window(self,all_inject_params, cage, animals_selected, raw_date_performed=False):   
         # cage=cage[0]
-        date_performed=datetime.datetime.strptime(date_performed, '%Y%m%d')
+        date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
 
     
         query_mice_exp_info="""
@@ -864,6 +865,7 @@ class ExperimentalDatabase():
         # update injection
         
             list_for_update=[updated_window_values[i+1][1]]+updated_window_values[i+1][3:] 
+            list_for_update[0]=date_performed
 
             list_for_update_integercorrected=[ int(j)  if i in list(range(1,8)) else j for i,j in enumerate(list_for_update)]
             
@@ -891,7 +893,9 @@ class ExperimentalDatabase():
                 mouse_info=self.all_mouse_to_do_postop_injection[self.all_mouse_to_do_postop_injection['Code']==mouse].values.tolist()[0]
                 daysfromwindows=mouse_info[-1]
                 daysfrominjection=mouse_info[-2]
-                if daysfromwindows:
+                if not daysfromwindows:
+                    daysfromwindows=np.nan
+                if not math.isnan(daysfromwindows):
                    if daysfromwindows==1:
                        query_update_postop=""" 
                             UPDATE  Windows_table
@@ -927,7 +931,7 @@ class ExperimentalDatabase():
                 
             self.databse_ref.independent_commit()    
 
-    def mouse_dead_during_surgery(self, mouse_code): 
+    def mouse_dead_during_surgery(self, mouse_code, date=False): 
         Action_Type_mouse_dead=19
         query_mouse_dead_info="SELECT Mouse_ID, Cage, Lab_number FROM ExperimentalAnimals_table LEFT JOIN MICE_table a ON a.ID=ExperimentalAnimals_table.Mouse_ID  WHERE Code=?"      
         params=(mouse_code,)
@@ -937,8 +941,8 @@ class ExperimentalDatabase():
         dead_mouse_ID=dead_mouse_info[0]
         dead_mouse_cage=dead_mouse_info[1]
         dead_mouse_lab_number=dead_mouse_info[2]
-        
-        actions_dictionary={dead_mouse_cage:{Action_Type_mouse_dead:((dead_mouse_lab_number,),(),()), 
+        # add date here
+        actions_dictionary={dead_mouse_cage:{Action_Type_mouse_dead:((dead_mouse_lab_number,),(),(date)), 
                                   },
                         }
         self.databse_ref.add_multiple_actions(actions_dictionary)
@@ -993,7 +997,12 @@ class ExperimentalDatabase():
             
         
         
-    def sac_experimental_mouse(self, mouse_code): 
+    def sac_experimental_mouse(self, mouse_code, date=False):
+         if date:
+            corrected_date_performed=datetime.datetime.strptime(date, '%Y%m%d')               
+         else:     
+            corrected_date_performed=datetime.date.today()
+        
          Action_Type_mouse_saced=4
          query_mouse_saced_info="SELECT Mouse_ID, Cage, Lab_number FROM ExperimentalAnimals_table LEFT JOIN MICE_table a ON a.ID=ExperimentalAnimals_table.Mouse_ID  WHERE Code=?"      
          params=(mouse_code,)
@@ -1004,7 +1013,7 @@ class ExperimentalDatabase():
          dead_mouse_cage=dead_mouse_info[1]
          dead_mouse_lab_number=dead_mouse_info[2]
          
-         actions_dictionary={dead_mouse_cage:{Action_Type_mouse_saced:((dead_mouse_lab_number,),(),()), 
+         actions_dictionary={dead_mouse_cage:{Action_Type_mouse_saced:((dead_mouse_lab_number,),(),(corrected_date_performed)), 
                                    },
                          }
          self.databse_ref.add_multiple_actions(actions_dictionary)

@@ -14,6 +14,10 @@ from tkinter import  Label, RAISED, Button, Entry, Text, WORD, END
 class update_window_params(Tkinter.Toplevel):
     def __init__(self,  gui, cage, codes_selected, date_performed, database_object=None):
         Tkinter.Toplevel.__init__(self, gui)
+        self.database_object=database_object
+        self.date_performed=date_performed
+        self.selected_codes=codes_selected
+        self.cage=cage
         self.gui=gui
         query_mice_exp_info="""
         SELECT 
@@ -164,7 +168,7 @@ class update_window_params(Tkinter.Toplevel):
 
                 self.b[i][j].grid(row=j, column=i+1)
                 
-                if j not in [2,3,4,5,6,7,8]:
+                if j not in [2,3,4,5,6,7,8,10,11]:
                     self.b[i][j].insert(0, row_defaults[j])
                 
                 if j in [10,11]:
@@ -173,12 +177,11 @@ class update_window_params(Tkinter.Toplevel):
                      self.values[i].append(self.b[i][j].get())  
 
         enter_button = Button(self, text="Enter", command=self.retrieve_input)
-        enter_button.grid(row=1,column=26)
+        enter_button.grid(row=1,column=4)
         
     def retrieve_input(self):
         for i in range(1,self.total_rows+1): #Rows
-            for j in range(len(self.col_labels)+1): #Columns            
-                
+            for j in range(len(self.col_labels)): #Columns                            
                 if j in [10,11]:
                     self.values[i][j]=self.b[i][j].get("1.0",END)
                 else :             

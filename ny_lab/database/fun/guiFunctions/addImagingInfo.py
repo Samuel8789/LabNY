@@ -77,22 +77,17 @@ class AddImagingInfo(tk.Toplevel):
                         self.b[i][j].current(1)     
                         self.values[i].append(self.b[i][j].get())  
                         
-                        
-    
-
-        def retrieve_input():
-            for i in range(1,self.total_rows,1): #Rows
-                if i not in [1,2,3,4]:
-                    self.values[i][1]=self.b[i][j].get("1.0",END)
-                elif i in [1,2,3,4]:
-                    self.values[i][1]=self.b[i][j].get()
-            self.destroy()
-            self.update()           
-
-            
-            
-        enter_button = Button(self, text="Enter", command=retrieve_input)
+        enter_button = Button(self, text="Enter", command=self.retrieve_input)
         enter_button.grid(row=1,column=26)
+
+    def retrieve_input(self):
+        for i in range(1,self.total_rows,1): #Rows
+                if i not in [1,2,3,4]:
+                    self.values[i][1]=self.b[i][1].get("1.0",END)
+                elif i in [1,2,3,4]:
+                    self.values[i][1]=self.b[i][1].get()
+        self.destroy()
+        self.update() 
 
 if __name__ == "__main__":
     

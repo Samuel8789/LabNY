@@ -111,10 +111,10 @@ class MouseImagingTab(tk.Frame):
         
         
     def check_all_mouse_imaging_info_button(self):  
-        imaging_filer=[('Code',self.frame1.entries[self.frame1.entries_names[1]].get())]        
+        imaging_filer=[('Code',self.frame1.entries[self.frame1.entries_names[0]].get())]        
         mouse_df=self.gui_ref.MouseDat.remove_unnecesary_genes_from_df(self.gui_ref.MouseDat.remove_unnecesary_virusinfo_from_df(self.gui_ref.MouseDat.ImagingDatabase_class.get_filtered_df(self.gui_ref.MouseDat.ImagingDatabase_class.all_acquisitons_full_info, imaging_filer)))
         window_title="Mouse Imaging Info"       
-        df_dictionary={self.frame1.entries[self.frame1.entries_names[1]].get(): mouse_df }    
+        df_dictionary={self.frame1.entries[self.frame1.entries_names[0]].get(): mouse_df }    
         open_multiple_df_in_new_tkinter_window(self, window_title, df_dictionary)
         
         

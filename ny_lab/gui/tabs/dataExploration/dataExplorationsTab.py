@@ -65,10 +65,10 @@ class DataExplorationsTab(tk.Frame):
         self.mouse_session_select_2_widefield_frame.ax=self.mouse_session_select_2_widefield_frame.fig.add_axes([0.1,0.1,0.8,0.8])
         self.mouse_session_select_2_widefield_frame.canvas = FigureCanvasTkAgg(self.mouse_session_select_2_widefield_frame.fig, master=self.mouse_session_select_2_widefield_frame)  # A tk.DrawingArea.
         self.mouse_session_select_2_widefield_frame.canvas.draw()
-        self.mouse_session_select_2_widefield_frame.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)        
+        self.mouse_session_select_2_widefield_frame.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)   
+
         self.mouse_session_select_2_widefield_frame.toolbar = NavigationToolbar2Tk(self.mouse_session_select_2_widefield_frame.canvas, self.mouse_session_select_2_widefield_frame)
         self.mouse_session_select_2_widefield_frame.toolbar.update()
-        self.mouse_session_select_2_widefield_frame.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
         
     def get_info_1(self, *a):
         self.mouse_session_select_1.selected_mouse=self.mouse_session_select_1.session_select_widget.selected_mouse.get()

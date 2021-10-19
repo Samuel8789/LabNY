@@ -10,6 +10,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.image as mpimg
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
+from matplotlib.backend_bases import key_press_handler
+from matplotlib.figure import Figure
 
 from ....database import MouseDatabase
 
@@ -59,11 +62,20 @@ class MainGuiTab(tk.Frame):
         
         file_path=r'C:\Users\sp3660\Desktop\mouse_maps.jpg'
         self.img = mpimg.imread(file_path)
-        self.fig, self.ax = plt.subplots()
-        self.ax.imshow(self.img)
 
-        self.chart_type = FigureCanvasTkAgg(self.fig, master=self.frame2)
-        self.chart_type._tkcanvas.pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+        self.frame2.fig = Figure(figsize=(5, 5), dpi=100)
+        self.frame2.ax=self.frame2.fig.add_axes([0.1,0.1,0.8,0.8])
+        self.frame2.canvas = FigureCanvasTkAgg(self.frame2.fig, master=self.frame2)  # A tk.DrawingArea.
+        self.frame2.canvas.draw()
+        self.frame2.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)        
+        self.frame2.ax.clear()
+        self.frame2.ax.imshow( self.img)
+        self.frame2.canvas.draw()
+
+
+
+
+
 
 
 #%%
