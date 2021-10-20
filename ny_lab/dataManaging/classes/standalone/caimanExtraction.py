@@ -33,7 +33,7 @@ class CaimanExtraction():
             objective=self.metadata.imaging_metadata[0]['Objective']
             if objective=='MBL Olympus 20x':
                 self.halfsize=2.5
-            elif objective=='Olympus fat 25xb':
+            elif '25' in objective:
                self.halfsize=5
            
                if '20x' in self.bidishifted_movie_path:
@@ -142,12 +142,19 @@ class CaimanExtraction():
         
 
 if __name__ == "__main__":
-    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane3'
-    dump='\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp'
-    # image_sequence_path=os.path.join(temporary_path,'210930_SPKI_2mintestvideo_920_50024_narrow_without-000_Shifted_Movie_MC_kalman.tiff')
-    metadata_file_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000.xml')
-    dataset_full_file_mmap_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
+    # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane3'
+    # # image_sequence_path=os.path.join(temporary_path,'210930_SPKI_2mintestvideo_920_50024_narrow_without-000_Shifted_Movie_MC_kalman.tiff')
+    # metadata_file_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000.xml')
+    # dataset_full_file_mmap_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
     
+    filename=r'211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane2'
+    metadata_file_path=os.path.join(temporary_path,filename+'.xml')
+    dataset_full_file_mmap_path=os.path.join(temporary_path, filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_64416_.mmap')
+    
+    
+    
+    dump='\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp'
     CaimanExtr = CaimanExtraction(dataset_full_file_mmap_path, metadata_file_path, temporary_path=temporary_path)
     cnm=CaimanExtr.cnm_object
 
