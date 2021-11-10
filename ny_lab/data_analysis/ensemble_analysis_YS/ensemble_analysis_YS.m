@@ -3,20 +3,20 @@
 
 clear;
 close all;
-directs='C:\\Users\\sp3660\\Desktop\\TemporaryProcessing';
+directs='C:\\Users\\sp3660\\Desktop\\TemporaryProcessing\\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000';
 dfdtmatrix='\\allplanedfdt.mat';
 foopsimatrix='\\allplanefoopsi.mat';
 foopsigratingmatrix='\\allplanefoopsigrating.mat';
 Cmatrix='\\allplanesC.mat';
-laod1 = load(append(directs,dfdtmatrix));
-firing_rate = laod1.allplanedfdt(:,3150:62166);
+laod1 = load(append(directs,foopsigratingmatrix));
+firing_rate = laod1.allplanefoopsigrating';
 frame_rate = 16;
 
 addpath([pwd '\functions\'])
 %% input parameters for cross validation estimation of smooth window and number of correlated components / ensembles
 % **params** are best params
 
-estimate_params = 1;    % do estimation?
+estimate_params = 0;    % do estimation?
 include_shuff_version = 1;
 est_params.ensamble_method = 'svd';              % options: svd, nmf, ica                % SVD is most optimal for encoding, NMF rotates components into something that is real and interpretable
 est_params.normalize = 'norm_mean_std'; % **'norm_mean_std'**, 'norm_mean' 'none'   % either way, need to normalize the power of signal in each cell, otherwise dimred will pull out individual cells
@@ -50,7 +50,7 @@ ens_params.hcluster_method = 'average';  % ward(inner square), **average**, sing
 ens_params.hcluster_distance_metric = 'cosine';  % none, euclidean, squaredeuclidean, **cosine**, hammilarity, rbf% for low component number better euclidean, otherwise use cosine
 ens_params.corr_cell_thresh_percent = 95;   % to remove cells with no significant correlations
 % --- other
-ens_params.plot_stuff = 0;
+ens_params.plot_stuff = 1;
 
 ens_params.vol_period = 1/frame_rate*1000;
 
@@ -62,6 +62,7 @@ firing_rate(~active_cells,:) = [];
 num_cells = size(firing_rate,1);
 
 firing_rate = firing_rate(randperm(num_cells),:);
+
 
 % shuffle
 firing_rate_s = f_shuffle_data(firing_rate);

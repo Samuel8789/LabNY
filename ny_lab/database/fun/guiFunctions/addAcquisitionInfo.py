@@ -6,7 +6,7 @@ Created on Sat Sep 25 11:02:44 2021
 """
 
 import tkinter as tk
-from tkinter import END, Label, RAISED, Text, WORD, Button
+from tkinter import END, Label, RAISED, Text, WORD, Button, ttk
 
 class AddAcquisitionInfo(tk.Toplevel):
     def __init__(self,  gui, acquisiton_path):
@@ -16,7 +16,7 @@ class AddAcquisitionInfo(tk.Toplevel):
         self.geometry("+2555+0")
 
         
-        row_labels=['Comments']
+        row_labels=['Comments', 'IsGoodName']
         self.total_rows=len(row_labels)+1
         self.values=list()
         self.b = list()
@@ -39,14 +39,26 @@ class AddAcquisitionInfo(tk.Toplevel):
                     self.values[i].append(texts)                     
                     
                 elif j>0:
-                    self.b[i].append(Text(self, height=5, width=150, wrap=WORD)) # b[i][j]
-                    self.b[i][j].grid(row=i+1, column=j)                              
-                    self.values[i].append(self.b[i][j].get("1.0",END))   
+                    if i==1:
+                        self.b[i].append(Text(self, height=5, width=150, wrap=WORD)) # b[i][j]
+                        self.b[i][j].grid(row=i+1, column=j)                              
+                        self.values[i].append(self.b[i][j].get("1.0",END))   
+                    elif i==2:
+                        values=['Yes','No'] 
+                        self.b[i].append(ttk.Combobox(self, values=values, width=30)) # b[i][j]
+                        self.b[i][j].grid(row=i+1, column=j)   
+                        self.b[i][j].current(0)     
+                        self.values[i].append(self.b[i][j].get())  
                         
 
         def retrieve_input():
             for i in range(1,self.total_rows,1): #Rows
-                    self.values[i][1]=self.b[i][j].get("1.0",END)
+                    if i==1:
+                        self.values[i][1]=self.b[i][j].get("1.0",END)
+                        while  self.values[i][1].endswith('\n'):
+                            self.values[i][1]=self.values[i][1][:-1]
+                    elif i==2:
+                        self.values[i][1]=self.b[i][1].get()
 
             self.destroy()
             self.update()           

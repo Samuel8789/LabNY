@@ -81,6 +81,8 @@ class AddFacecameraInfo(tk.Toplevel):
             for i in range(1,self.total_rows,1): #Rows
                 if i not in [1,2,3,4,5]:
                     self.values[i][1]=self.b[i][j].get("1.0",END)
+                    while  self.values[i][1].endswith('\n'):
+                        self.values[i][1]=self.values[i][1][:-1]
                 elif i in [1,2,3,4,5]:
                     self.values[i][1]=self.b[i][j].get()
             self.destroy()

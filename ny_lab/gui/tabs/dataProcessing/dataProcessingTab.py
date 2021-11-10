@@ -143,11 +143,8 @@ class DataProcessingTab(tk.Frame):
 
 
 
-
-        
         
 # #%% frame 2 image plotting
-
 
 
 

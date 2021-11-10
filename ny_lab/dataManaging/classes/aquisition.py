@@ -13,7 +13,6 @@ import pandas as pd
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .dataset import ImageSequenceDataset
 from .eyeVideo import EyeVideo
-from ...data_pre_processing.voltageSignalsExtractions import VoltageSignalsExtractions
 
 
 
@@ -379,8 +378,6 @@ class Aquisition:
             pass
             # print('No Processed Face Camera')
             
-    def run_voltage_processing(self):
-        self.voltage_analysis=VoltageSignalsExtractions(self)
-        
+  
             
             

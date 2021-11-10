@@ -909,7 +909,7 @@ class ExperimentalDatabase():
                             WHERE  ExpID=?                              
                            """       
                 elif not math.isnan(daysfrominjection):                     
-                    if daysfrominjection==1:
+                    if daysfrominjection  in [0,1]:
                         query_update_postop=""" 
                             UPDATE  Injections_table
                             SET  PostInjection1=date(?)

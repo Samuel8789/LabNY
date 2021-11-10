@@ -5,7 +5,7 @@ Created on Fri Sep 24 17:49:31 2021
 @author: sp3660
 """
 import tkinter as tk
-from tkinter import END, Label, RAISED, Text, WORD, StringVar, Button
+from tkinter import END, Label, RAISED, Text, WORD, StringVar, Button, ttk
 
 
 
@@ -22,7 +22,7 @@ class AddSessionInfo(tk.Toplevel):
         self.b.append(list())  
         self.values.append(list())     
 
-        col_labels=['Info',session_date]
+        col_labels=['Info',session_date.strftime('%Y%m%d')]
     
         for j in range(len(col_labels)): #Columns
            self.b[0].append( Label( self, text =col_labels[j], relief=RAISED)) # b[i][j]
@@ -46,28 +46,29 @@ class AddSessionInfo(tk.Toplevel):
                         
                     elif i==1:
                         values=['Prairie1',"Hakim's",'Prairie2'] 
-                        self.b[i].append(tk.ttk.Combobox(self, values=values)) # b[i][j]
+                        self.b[i].append(ttk.Combobox(self, values=values)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)   
                         self.b[i][j].current(0)     
                         self.values[i].append(self.b[i][j].get())   
-    
 
-        def retrieve_input():
-            for i in range(1,self.total_rows,1): #Rows
-                if i !=1:
-                    self.values[i][1]=self.b[i][j].get("1.0",END)
-                elif i==1:
-                    self.values[i][1]=self.b[i][j].get()
-            self.destroy()            
-            self.update()           
-            
- 
-        enter_button = Button(self, text="Enter", command=retrieve_input)
+        enter_button = Button(self, text="Enter", command=self.retrieve_input)
         enter_button.grid(row=1,column=26)
-
+        
+    def retrieve_input(self):
+        for i in range(1,self.total_rows,1): #Rows
+            if i !=1:
+                self.values[i][1]=self.b[i][1].get("1.0",END)
+                while  self.values[i][1].endswith('\n'):
+                    self.values[i][1]=self.values[i][1][:-1]
+                    
+            elif i==1:
+                self.values[i][1]=self.b[i][1].get()
+        self.destroy()            
+        self.update()           
+           
 if __name__ == "__main__":
     
     root = tk.Tk()
-    # app = add_session_info(root, '20210527', 6, MouseDat )
+    app = AddSessionInfo(root, '20210527')
     root.mainloop()
-    # get_values=app.values
+    get_values=app.values

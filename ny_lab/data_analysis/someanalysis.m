@@ -1,4 +1,4 @@
-
+load('allplanedfdt.mat')
 x=allplanedfdt(:,60:62800);
 imagesc(allplanedfdt);
 
@@ -32,8 +32,6 @@ signalsfile='C:\\Users\\sp3660\\Desktop\\TemporaryProcessing\\210702_SPJA_FOV1_3
 
 % load(vistimfile)
 T = readtable(signalsfile);
-
-%%
 
 vistim=T.('VisStim');
 LED=T.('LED');

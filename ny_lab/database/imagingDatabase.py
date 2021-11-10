@@ -626,37 +626,38 @@ class ImagingDatabase():
   
 
 #%% ADDING FUNCTIOSN        
-    def add_new_session_to_database(self,gui, session_path):
-        self.update_variables()
+    def add_new_session_to_database(self, gui, session_path):
+        
+        
+        self.update_variables() #
         session_ID=self.max_imagingsession_id+1
-        ImagingDate=datetime.datetime.strptime(os.path.split(session_path)[1],'%Y%m%d')
+        UnFormatttedSessionDate=os.path.split(session_path)[1]
+        ImagingDate=datetime.datetime.strptime(UnFormatttedSessionDate,'%Y%m%d')
         
         SessionMiceRawPath=os.path.join(session_path,'Mice')
         imagedmicepaths=glob.glob( SessionMiceRawPath+'\\SP**', recursive=False)
         
+        # add all mouse here
         for mouse_path in imagedmicepaths:         
-            self.add_new_imaged_mice(gui, session_ID, mouse_path)
+            self.add_new_imaged_mice(gui, session_ID, mouse_path, UnFormatttedSessionDate)
         
         ImagingSessionRawPath=session_path
         CalibrationsRawPath=os.path.join(session_path,'Calibrations')
         PowerCalPath=os.path.join(CalibrationsRawPath,'Power')
-        MecahincalZStackPath=os.path.join(CalibrationsRawPath,'MecahincalZ')
+        MechanicalZStackPath=os.path.join(CalibrationsRawPath,'MechanicalZ')
         ETLCalibrationsPath=os.path.join(CalibrationsRawPath,'ETL')
         AlignmentCalibrationsPath=os.path.join(CalibrationsRawPath,'Alignment')
         MiceRawPath=os.path.join(session_path,'Mice')
         
- 
-        # root = Tkinter.Tk()
-        # app = add_session_info(root, ImagingDate)
-        # root.mainloop()
-        self.add_session_info_window=AddSessionInfo(gui,ImagingDate)
+        # add session gui here
+        self.add_session_info_window=AddSessionInfo(gui, ImagingDate)
         self.add_session_info_window.wait_window()
         get_values= self.add_session_info_window.values
         
         query_microscopes="""SELECT* FROM Microscopes_table WHERE Microscope=?"""
         params=(get_values[1][1],)
         Microscope=int(self.databse_ref.arbitrary_query_to_df(query_microscopes, params).ID.iloc[0])
-        if get_values[2][1]:
+        if len(get_values[2][1])>2:
             StartTime=format(datetime.datetime.strptime(get_values[2][1], "%H:%M\n"),"%H:%M")
         else:
             StartTime=''
@@ -675,7 +676,7 @@ class ImagingDatabase():
                     ImagingSessionRawPath,
                     CalibrationsRawPath,
                     PowerCalPath,
-                    MecahincalZStackPath,
+                    MechanicalZStackPath,
                     ETLCalibrationsPath,
                     AlignmentCalibrationsPath,
                     MiceRawPath,
@@ -693,7 +694,7 @@ class ImagingDatabase():
                 ImagingSessionRawPath,
                 CalibrationsRawPath,
                 PowerCalPath,
-                MecahincalZStackPath,
+                MechanicalZStackPath,
                 ETLCalibrationsPath,
                 AlignmentCalibrationsPath,
                 MiceRawPath,
@@ -704,13 +705,13 @@ class ImagingDatabase():
           
         self.databse_ref.arbitrary_inserting_record(query_add_session, params, commit=True)  
         
-    def add_new_imaged_mice(self, gui, session_ID, mice_code_path):
+    def add_new_imaged_mice(self, gui, session_ID, mice_code_path,UnFormatttedSessionDate ):
         self.update_variables()
         imaged_mice_id=self.max_imagedmice_id+1
         
-        SessionDate=os.path.split(os.path.split(os.path.split(mice_code_path)[0])[0])[1]
+        SessionDate = UnFormatttedSessionDate
         
-        Mouse_Code=mice_code_path[-4:] 
+        Mouse_Code=os.path.split(mice_code_path)[1] 
          
         query_get_exp_id= """
             SELECT ID, SlowStoragePath, WorkingStoragePath
@@ -727,14 +728,12 @@ class ImagingDatabase():
         WideFieldPath=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)[0]
         WideFieldID=np.nan
     
-        
-        
+
         all_aq_folder=glob.glob( mice_code_path +'\\**\\**Aq_**', recursive=True)
         true_aq_folders=[aq for aq in all_aq_folder if aq[-1]!='_']
-        
-        
-        slowstoragepath= os.path.join(self.databse_ref.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['SlowStoragePath'],'imaging', SessionDate.replace('-', ''))
-        workingstoragepath= os.path.join(self.databse_ref.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['WorkingStoragePath'],'imaging', SessionDate.replace('-', ''))
+
+        slowstoragepath= os.path.join(self.databse_ref.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['SlowStoragePath'],'imaging', SessionDate)
+        workingstoragepath= os.path.join(self.databse_ref.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['WorkingStoragePath'],'imaging', SessionDate)
         
         
         for aq in true_aq_folders:
@@ -743,17 +742,10 @@ class ImagingDatabase():
         if WideFieldPath:
             IsWideFIeld=1
             WideFieldID=self.add_new_widefield(gui,imaged_mice_id, WideFieldPath,slowstoragepath, workingstoragepath)
-        
-        
-        
-        
+
         self.add_imaged_mouse_info_window=AddImagedmouseInfo(gui, SessionDate, Mouse_Code)
         self.add_imaged_mouse_info_window.wait_window()
         get_values= self.add_imaged_mouse_info_window.values
-        # root = Tkinter.Tk()
-        # app = add_imagedmouse_info(root, SessionDate, Mouse_Code)
-        # root.mainloop()
-        # get_values=app.values
 
         TimeSetOnWheel=get_values[1][1]
         EyesComments=get_values[2][1]
@@ -887,7 +879,7 @@ class ImagingDatabase():
             ImagedMouseID=imaged_mice_ID   
             
         AcquisitonRawPath=acquisition_path
-        AcquisitionNumber=int(AcquisitonRawPath[-1])
+        AcquisitionNumber=int(os.path.split(AcquisitonRawPath)[1][os.path.split(AcquisitonRawPath)[1].find('_')+1:])
         IsCalibration=0
         IsTestAcquisition=0
         IsNonImagingAcquisition=0   
@@ -906,20 +898,20 @@ class ImagingDatabase():
         IsAtlasPreview=0
         IsAtlasOverview=0
         IsAtlasVolume=0
+        IsGoodName=1
+        IsTomatoRef=0   
+        IsMultiplanetomatoref=0   
+        Ishighrestomatostack=0  
+        Ishighresgreenstack=0      
+        Isotherfovaq=0   
       
         self.add_acquisition_info_window=AddAcquisitionInfo(gui, AcquisitonRawPath)
         self.add_acquisition_info_window.wait_window()
         get_values= self.add_acquisition_info_window.values
-        # root = Tkinter.Tk()
-        # app = add_acquisition_info(root, AcquisitonRawPath)
-        # root.mainloop()
-        # get_values=app.values
         Comments=get_values[1][1]
-        
-        
-        
-                          
-    
+        IsGoodName=get_values[2][1]
+
+
         imaging_metadat_file=False
         
         if glob.glob( acquisition_path+'\\**\\**.env', recursive=False) :
@@ -946,17 +938,18 @@ class ImagingDatabase():
                 imaging_aq_time=metadata.imaging_metadata[0]['ImagingTime']
 
         if voltage_files :       
-            voltage_aq_time=metadata.voltage_recording_metadata[0]
-            recorded_signals=metadata.voltage_recording_metadata[1:]
+            voltage_aq_time=metadata.voltage_aq_time
+            recorded_signals=[metadata.recorded_signals, metadata.recorded_signals_csv]
+
 
             if 'Locomotion' in list(set(recorded_signals[0]) & set(recorded_signals[1])):
                 IsLocomotion=1
-            if 'PhotoDiode' in list(set(recorded_signals[0]) & set(recorded_signals[1])):
+            if 'PhotoDiode' or 'Photo Diode' in list(set(recorded_signals[0]) & set(recorded_signals[1])):
                 IsPhotodiode=1
             if 'VisStim' in list(set(recorded_signals[0]) & set(recorded_signals[1])):
                 IsVisStimSignal=1   
                 
-                
+  #%% defining which kind of acquisition is              
         if 'NonImagingAcquisitions' in acquisition_path:
             IsNonImagingAcquisition=1  
             IsImaging=0
@@ -985,13 +978,10 @@ class ImagingDatabase():
                 IsAtlasPreview=1   
                 slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'Preview',Prairieimagingname)   
                 workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'Preview',Prairieimagingname)     
-            elif 'Volumes' in acquisition_path:
+            elif 'Volume' in acquisition_path:
                 IsAtlasVolume=1   
                 slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'AtlasVolume',Prairieimagingname)   
                 workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'AtlasVolume',Prairieimagingname)     
-
-
-
 
         # OptogeneticsID=''
         if 'Calibrations' in acquisition_path:
@@ -1038,7 +1028,7 @@ class ImagingDatabase():
                 Isotherfovaq=1   
                 slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'OtherAcq',Prairieimagingname)   
                 workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'OtherAcq',Prairieimagingname)         
-               
+ #%%              
         FaceCameraID=np.nan 
         if glob.glob( acquisition_path+'\\**\\DisplaySettings.json', recursive=False) :
            IsFaceCamera=1
@@ -1084,6 +1074,16 @@ class ImagingDatabase():
                         IsNonImagingAcquisition,
                         Is0CoordinateAcquisiton,
                         IsFOVAcquisition,
+                        IsSurfaceImage,
+                        IsTomatoRef,
+                        IsMultiplanetomatoref,
+                        Ishighrestomatostack,
+                        Ishighresgreenstack,
+                        Isotherfovaq,
+                        IsAtlas,
+                        IsAtlasPreview,
+                        IsAtlasOverview,
+                        IsAtlasVolume,                      
                         AcquisitonNumber,
                         AqTime,
                         IsImaging,
@@ -1098,18 +1098,14 @@ class ImagingDatabase():
                         VisStimulationID,
                         FaceCameraID, 
                         Comments,
-                        IsSurfaceImage,
-                        IsSlowDisk,
+                        IsSlowDisk,                       
+                        IsWorkingDisk,
                         SlowDiskPath,
-                        IsWOrkingDisk,
                         WorkingDiskPath,
-                        IsAtlas,
-                        IsAtlasPreview,
-                        IsAtlasOverview,
-                        IsAtlasVolume
+                        IsGoodName
                         
                         )
-                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                    VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """    
         params=(acquisition_id,
                 IsMouse,
@@ -1120,6 +1116,16 @@ class ImagingDatabase():
                 IsNonImagingAcquisition,
                 Is0CoordinateAcquisiton,
                 IsFOVAcquisition,
+                IsSurfaceImage,
+                IsTomatoRef,
+                IsMultiplanetomatoref,
+                Ishighrestomatostack,
+                Ishighresgreenstack,
+                Isotherfovaq,
+                IsAtlas,
+                IsAtlasPreview,
+                IsAtlasOverview,
+                IsAtlasVolume,
                 AcquisitionNumber,
                 AqTime,
                 IsImaging,
@@ -1134,15 +1140,11 @@ class ImagingDatabase():
                 VisStimulationID,
                 FaceCameraID,
                 Comments,
-                IsSurfaceImage,
+                0,
                 0,
                 slowstoragepath,
-                0,
                 workingstoragepath,
-                IsAtlas,
-                IsAtlasPreview,
-                IsAtlasOverview,
-                IsAtlasVolume
+                IsGoodName
                 )
 
 
@@ -1196,15 +1198,31 @@ class ImagingDatabase():
         OverlapPercentageMetadata=np.nan
         AtlasDirection=np.nan
         AtlasZStructure=np.nan
-
+        AtlasGridSize=np.nan
+        IsGoodObjective=1
+        correctedObjectivePositions=np.nan
+        correctedETLPositions=np.nan
+        
+        
+      
+       
         if not locomotion_only:
             PowerSetting=metadata.imaging_metadata[1]['Planepowers']    
             Objective=metadata.imaging_metadata[0]['Objective']       
-            PMT1GainRed=metadata.imaging_metadata[0]['PMTGainRed']
-            PMT2GainGreen=metadata.imaging_metadata[0]['PMTGainGreen']
+            PMT1GainRed=metadata.imaging_metadata[1]['pmtGains_Red']
+            PMT2GainGreen=metadata.imaging_metadata[1]['pmtGains_Green']
             FrameAveraging=metadata.imaging_metadata[0]['RasterAveraging']   
             ObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
             ETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
+            Xpositions=metadata.imaging_metadata[1]['XPositions'] 
+            Ypositions=metadata.imaging_metadata[1]['YPositions'] 
+            ImagingTime=metadata.imaging_metadata[0]['ImagingTime'] 
+            MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX'] 
+            MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY'] 
+            Zoom=metadata.imaging_metadata[0]['OpticalZoom'] 
+            correctedObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
+            correctedETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
+
 
             if metadata.imaging_metadata[1]['PlaneNumber']=='Single':
                     IsETLStack=0
@@ -1222,7 +1240,11 @@ class ImagingDatabase():
                 PlaneNumber=metadata.imaging_metadata[1]['PlaneNumber']
                
                 InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']
-                FinalVolumePeriod=metadata.imaging_metadata[2][0]['TopPlane']['framePeriod']*PlaneNumber
+                if not isinstance(metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod'], str):
+                    FinalVolumePeriod=metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod']*PlaneNumber
+                else:
+                    FinalVolumePeriod= metadata.imaging_metadata[0]['framePeriod']*PlaneNumber
+                    
                 FinalFrequency=1/FinalVolumePeriod
                 TotalFrames=TotalVolumes*PlaneNumber
                 PowerSetting=str(PowerSetting)
@@ -1246,24 +1268,44 @@ class ImagingDatabase():
             # app = add_imaging_info(root, ImagingFilename)
             # root.mainloop()
             # get_values=app.values
-	
             RedFilter=get_values[2][1]
             GreenFilter=get_values[1][1]
             DichroicBeamsplitter=get_values[3][1]
             filtervalues=[RedFilter,GreenFilter,DichroicBeamsplitter]
             filtercodes=transform_filterinfo_to_codes(filtervalues, self.databse_ref)
-            
-            
+
             IsBlockingDichroic=0   
             if 'Yes' in get_values[4][1]:
                 IsBlockingDichroic=1
                 
-            ExcitationWavelength=get_values[5][1]
-            CoherentPower=get_values[6][1]
+            IsGoodObjective=1
+            if 'No' in get_values[5][1]:
+                IsGoodObjective=1
+
+            ExcitationWavelength=get_values[6][1]
+            CoherentPower=get_values[7][1]
             CalculatedPower=np.nan
-            Comments=get_values[7][1]
-           
+            Comments=get_values[8][1]
             
+            Xpositions=metadata.imaging_metadata[1]['XPositions']
+            Ypositions=metadata.imaging_metadata[1]['YPositions']
+            ImagingTime=metadata.imaging_metadata[0]['ImagingTime']
+            MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX']
+            MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY']
+            Zoom=metadata.imaging_metadata[0]['OpticalZoom']
+            
+            
+            if 'Atlas' in  metadata.imaging_metadata[1]['MultiplanePrompt']:
+                OverlapPercentage=get_values[9][1]
+                AtlasZStructure=get_values[10][1]
+                AtlasDirection=get_values[11][1]
+                AtlasOverlap=str((metadata.imaging_metadata[1]['StageGridXOverlap'],  metadata.imaging_metadata[1]['StageGridYOverlap'] ))
+                OverlapPercentageMetadata= metadata.imaging_metadata[1]['StageGridOverlapPercentage']
+                AtlasGridSize=str((metadata.imaging_metadata[1]['StageGridNumXPositions'],  metadata.imaging_metadata[1]['StageGridNumYPositions']))
+                Xpositions=str(tuple(Xpositions))
+                Ypositions=str(tuple(Ypositions))
+               
+
             IsChannel1Red=0
             IsChannel2Green=0
     
@@ -1276,23 +1318,24 @@ class ImagingDatabase():
             if 'Resonant' in  metadata.imaging_metadata[0]['ScanMode']:
                  IsResonant=1
                  IsGalvo=0
+                 Multisampling=metadata.imaging_metadata[0]['ResonantSampling']
             
             Resolution=str(metadata.imaging_metadata[0]['LinesPerFrame'])+'x'+ str(metadata.imaging_metadata[0]['PixelsPerLine'])
             DwellTime=metadata.imaging_metadata[0]['dwellTime']
-            Multisampling=metadata.imaging_metadata[0]['ResonantSampling']
+            
             BitDepth=metadata.imaging_metadata[0]['BitDepth']
                 
             LinePeriod=metadata.imaging_metadata[0]['ScanLinePeriod']
             FramePeriod=metadata.imaging_metadata[0]['framePeriod']
             FullAcquisitionTime=metadata.imaging_metadata[1]['FullAcquisitionTime']
 
-
+   
         IsVoltageRecording=0
         VoltageRecordingChannels=np.nan
         VoltageRecordingFrequency=np.nan
-        if hasattr(metadata_object, 'voltage_recording_metadata'):
+        if hasattr(metadata, 'full_voltage_recording_metadata'):
             IsVoltageRecording=1
-            VoltageRecordingChannels=str((metadata_object.voltage_recording_metadata[1] and metadata_object.voltage_recording_metadata[2]))
+            VoltageRecordingChannels=str((metadata.recorded_signals and metadata_object.recorded_signals_csv))
             VoltageRecordingFrequency=1000
 
     
@@ -1348,11 +1391,19 @@ class ImagingDatabase():
                     AtlasOverlap,
                     OverlapPercentageMetadata,
                     AtlasDirection,
-                    AtlasZStructure
+                    AtlasZStructure,
+                    AtlasGridSize,
+                    Xpositions,
+                    Ypositions,
+                    ImagingTime,
+                    MicronsPerPixelX,
+                    MicronsPerPixelY,
+                    Zoom,
+                    IsGoodObjective
                     )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """    
-        params=( ImagingID,
+        params=(ImagingID,
                 AcquisitionID,
                 ImagingFullFilePath,
                 ImagingFilename,
@@ -1365,8 +1416,8 @@ class ImagingDatabase():
                 IsObjectiveStack,
                 PlaneNumber,
                 Objective,
-                str(ObjectivePositions),
-                str(ETLPositions),
+                str(correctedObjectivePositions),
+                str(correctedETLPositions),
                 PMT1GainRed,
                 PMT2GainGreen,
                 IsChannel1Red,
@@ -1402,7 +1453,16 @@ class ImagingDatabase():
                 AtlasOverlap,
                 OverlapPercentageMetadata,
                 AtlasDirection,
-                AtlasZStructure)
+                AtlasZStructure,
+                AtlasGridSize,
+                Xpositions,
+                Ypositions,
+                ImagingTime,
+                MicronsPerPixelX,
+                MicronsPerPixelY,
+                Zoom,
+                IsGoodObjective
+                )
         self.databse_ref.arbitrary_inserting_record(query_add_imaging, params )   
         return ImagingID
     
@@ -1411,7 +1471,7 @@ class ImagingDatabase():
         FaceCameraID= self.max_facecamera_id+1
         AcquisitionID=acquisition_ID
         VideoPath=face_camera_path
-        acq_name=os.path.split(aqslowstoragepath)
+        acq_name=os.path.split(aqslowstoragepath)[1]
         EyeCameraFilename_processed=acq_name+'_full_face_camera.tiff'          
         # EyeCameraFilename= os.path.split(glob.glob( VideoPath+'\\**.tif', recursive=False)[0])[1]
         slowstoragepath=os.path.join(aqslowstoragepath,'eye camera', EyeCameraFilename_processed)   

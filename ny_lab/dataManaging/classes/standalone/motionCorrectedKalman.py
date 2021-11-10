@@ -14,6 +14,8 @@ from PIL import Image
 import matplotlib.pyplot as plt
 import tifffile
 
+from caiman.motion_correction import apply_shift_online
+
 from kalman_stack_filter import kalman_stack_filter
 from save_imagej_hdf5_tiff import save_imagej_hdf5
 from bidiShiftManager import BidiShiftManager
@@ -138,14 +140,24 @@ class MotionCorrectedKalman:
                 
             self.image_sequence_motion_correction=cm.motion_correction.MotionCorrect(self.file_path_to_correct, max_deviation_rigid=10)
             print('doing motion correction')
-            if self.MC_template.any():
+            if self.MC_template.any() and not self.MC_shifts:
+                print('using template')
                 self.image_sequence_motion_correction.motion_correct(template=self.MC_template, save_movie=False)
-            else:
-                self.image_sequence_motion_correction.motion_correct(save_movie=False)
+                self.MC_shifts=self.image_sequence_motion_correction.shifts_rig
+                self.MC_corrected=self.image_sequence_motion_correction.apply_shifts_movie(self.file_path_to_correct)
+                # this has to be tested
+            elif self.MC_shifts:
+                print('using shifts')
+                self.MC_corrected=apply_shift_online(self.image_sequence, self.MC_shifts)
                 
-            self.MC_template=self.image_sequence_motion_correction.total_template_rig
-            self.MC_shifts=self.image_sequence_motion_correction.shifts_rig
-            self.MC_corrected=self.image_sequence_motion_correction.apply_shifts_movie(self.file_path_to_correct)
+                # self.image_sequence_motion_correction=cm.motion_correction.MotionCorrect(self.file_path_to_correct, max_deviation_rigid=10)
+                # self.MC_corrected=self.image_sequence_motion_correction.apply_shifts_movie(self.file_path_to_correct)
+            else:
+                print('from scratch')
+                self.image_sequence_motion_correction.motion_correct(save_movie=False)
+                self.MC_template=self.image_sequence_motion_correction.total_template_rig
+                self.MC_shifts=self.image_sequence_motion_correction.shifts_rig
+                self.MC_corrected=self.image_sequence_motion_correction.apply_shifts_movie(self.file_path_to_correct)
         
             
             
@@ -281,12 +293,20 @@ if __name__ == "__main__":
     # dataset_full_file_mmap_path=os.path.join(temporary_path,filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
     
     filename=r'211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
+    filename=r'211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
+
     temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane2'
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000\Plane1'
+    
+
     dataset_full_file_mmap_path=os.path.join(temporary_path, filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_64416_.mmap')
+    dataset_full_file_mmap_path=os.path.join(temporary_path, filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_226002_.mmap')
+
     
     
     dump='\\\\?\\'+r'C:\Users\sp3660\Desktop\CaimanTemp'
     MotCorr = MotionCorrectedKalman(shifted_mmap_path=dataset_full_file_mmap_path, dump_temp_path=dump, keep_registered=True )
     
+
 
    

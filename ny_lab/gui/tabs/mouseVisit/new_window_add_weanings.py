@@ -96,7 +96,7 @@ class new_window_add_weanings:
     
     def button_accept_weanings(self):
         for i in range(self.number_of_weanings):    
-            self.gui.MouseDat.Add_Weaning(int(self.sep_boxes[i].get()),  
+            self.gui.MouseDat.Add_Weaning(self.gui, int(self.sep_boxes[i].get()),  
                                       int(self.sep_male_number_entries[i].get()), 
                                       int(self.sep_female_number_entries[i].get()), 
                                       int(self.sep_male_cage_entries[i].get()),   

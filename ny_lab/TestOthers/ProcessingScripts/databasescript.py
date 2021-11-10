@@ -95,9 +95,9 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE Breedings_table
-                SET Male=2877, Female1=2879, Female2=2881
-                WHERE ID IN (183)
+                UPDATE Injections_table
+                SET VirusCombination=29
+                WHERE ID IN (174,175)
             """        
 params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
@@ -124,8 +124,8 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
-DELETE FROM BrainProcessing_table
-WHERE  ID IN (15)
+DELETE FROM MICE_table
+WHERE  ID IN (2956,2957,2958,2959,2960,2961,2962,2963,2964,2965,2966,2967,2968,2969,2970,2971,2972,2973)
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)

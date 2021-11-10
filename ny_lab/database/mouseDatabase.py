@@ -20,6 +20,7 @@ from pathlib import Path
 from ..AllFunctions.select_values_gui import select_values_gui
 from .fun.guiFunctions.updateLitterInput import UpdateLitterInput
 from .fun.guiFunctions.input_genotypes import input_genotypes
+from ..gui.tabs.mouseVisit.new_window_multilitter import new_window_multilitter
 
 from .experimentalDatabase import ExperimentalDatabase
 from .imagingDatabase import ImagingDatabase
@@ -703,7 +704,7 @@ class MouseDatabase():
         params=(breeding_info[4],)
         self.arbitrary_updating_record(query_update_breeding, params, commit=True)
         
-    def Add_Weaning(self, LitterCode, MaleNumber=0, FemaleNumber=0, MaleCage=None, FemaleCage=None, MiceSaced=0 ):      
+    def Add_Weaning(self, gui, LitterCode, MaleNumber=0, FemaleNumber=0, MaleCage=None, FemaleCage=None, MiceSaced=0 ):      
 
         MiceAlive=MaleNumber+FemaleNumber+MiceSaced
             
@@ -760,8 +761,13 @@ class MouseDatabase():
             self.arbitrary_updating_record(query_update_litter, params) 
                 
         elif MultipleLitter:
-            Combining=select_values_gui(["Combined","NotCombined"], 'CombineLitter')
-            if Combining=="Combined":
+            # self.Combining_window=select_values_gui(["Combined","NotCombined"], 'CombineLitter')
+            self.Combining_window=new_window_multilitter(gui, ["Combined","NotCombined"], 'CombineLitter') 
+            self.Combining_window.wait_window()
+            Combining_window=self.Combining_window.values
+
+            
+            if  Combining_window=="Combined":
                 DOB=max(all_breeding_litters_info.loc[0,'DOB'], all_breeding_litters_info.loc[1,'DOB'])
                 Idx=(int(all_breeding_litters_info.loc[0,'ID']), int(all_breeding_litters_info.loc[1,'ID']))
                 
@@ -773,7 +779,7 @@ class MouseDatabase():
                 params=(MiceAlive, Idx[0],Idx[1])
                 self.arbitrary_updating_record(query_update_litter_multple, params) 
                 
-            elif Combining=="NotCombined":
+            elif  Combining_window=="NotCombined":
                 DOB=litter_info.loc[0,'DOB']
                 query_update_litter="""
                 UPDATE Litters_table

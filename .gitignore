@@ -5,6 +5,7 @@
 ### MATLAB ###
 # Windows default autosave extension
 *.asv
+*.pdf
 nATURALmOVIE1.mat
 naturalmovie3.mat
 mov.mat

@@ -1,0 +1,13 @@
+# matlab files
+*.mat
+*.asv
+*.fig
+
+# data files
+*.csv
+#*.xlxs
+
+# image files
+*.png
+*.tif
+*.tiff

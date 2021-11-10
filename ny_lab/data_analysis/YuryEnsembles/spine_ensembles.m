@@ -1,11 +1,11 @@
 % clear;
 close all;
 % clear all
-addpath('C:\Users\sp3660\Documents\GitHub\YuryEnsembles')
-caima
+addpath('C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_analysis\YuryEnsembles')
+
 %%
 
-directs='C:\\Users\\sp3660\\Desktop\\TemporaryProcessing';
+directs='C:\\Users\\sp3660\\Desktop\\TemporaryProcessing\\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000';;
 dfdtmatrix='\\allplanedfdt.mat';
 foopsimatrix='\\allplanefoopsi.mat';
 foopsigratingmatrix='\\allplanefoopsigrating.mat';
@@ -13,11 +13,11 @@ Cmatrix='\\allplanesC.mat';
 
 dfdtmatrixchand='\\allchanddfdt.mat';
 
-laod1 = load(append(directs,dfdtmatrixchand));
-firing_rate = laod1.alchandnedfdt;
+laod1 = load(append(directs,dfdtmatrix));
+firing_rate = laod1.allplanedfdt;
 
-SpeedToPlot4=abs(diff(Locomotion))';
-SpeedToPlot4(0:62:(length(vistim)-1))
+% SpeedToPlot4=abs(diff(Locomotion))';
+% SpeedToPlot4(0:62:(length(vistim)-1))
 
 
 

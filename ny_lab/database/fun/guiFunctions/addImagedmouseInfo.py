@@ -85,6 +85,8 @@ class AddImagedmouseInfo(tk.Toplevel):
             for i in range(1,self.total_rows,1): #Rows      
                 if i in [1,2,3,4,5,8,10,11,12,13]:
                     self.values[i][1]=self.b[i][j].get("1.0",END)
+                    while  self.values[i][1].endswith('\n'):
+                        self.values[i][1]=self.values[i][1][:-1]
                 elif i in [6,7,9]:
                     self.values[i][1]=self.b[i][j].get()
                     

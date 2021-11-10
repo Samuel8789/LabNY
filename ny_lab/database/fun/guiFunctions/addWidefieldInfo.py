@@ -48,6 +48,8 @@ class AddWidefieldInfo(tk.Toplevel):
             for i in range(1,self.total_rows,1): #Rows
                 if i ==1:
                     self.values[i][1]=self.b[i][j].get("1.0",END)
+                    while  self.values[i][1].endswith('\n'):
+                        self.values[i][1]=self.values[i][1][:-1]
 
             self.destroy()
             self.update()           
