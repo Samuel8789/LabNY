@@ -258,7 +258,7 @@ class DataManaging():
                  
         mice_codes=self.LabProjectObject.database.arbitrary_query_to_df(query_new_codes).values.tolist()
         mice_codes=[mouse[0] for mouse in mice_codes]
-        self.new_working_directories=self.create_pre_process_slow_data_structure(self.data_paths_data['Pre_proccessed_slow'], mice_codes)
+        self.new_working_directories=self.create_pre_process_slow_data_structure(mice_codes)
         
         if update:
             query_all_codes="""

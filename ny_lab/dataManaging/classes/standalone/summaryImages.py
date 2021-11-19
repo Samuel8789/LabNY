@@ -24,7 +24,7 @@ class SummaryImages:
         self.eliminate_caiman_extra_from_mmap()          
         self.do_projections()
         self.save_projections()
-        self.plotting()
+        # self.plotting()
         
     def eliminate_caiman_extra_from_mmap(self) :   
 

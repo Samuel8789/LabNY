@@ -56,7 +56,7 @@ def recursively_delete_back_directories(directory):
 
     if len(os.listdir(directory))== 0:
          os.rmdir(directory) 
-         recursively_delete_back_directories(os.path.split(directory[0])) 
+         recursively_delete_back_directories(os.path.split(directory)[0]) 
              
 def short_metadata_type_check(aq_path):
     # print('Fast checking metadata')

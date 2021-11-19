@@ -15,11 +15,13 @@ from summaryImages import SummaryImages
 
 class CaimanExtraction():
     
-    def __init__(self, bidishifted_movie_path, metdata_file_path, temporary_path=None):
+    def __init__(self, bidishifted_movie_path, metadata_file_path, temporary_path=None, first_pass_mot_correct=False, save_mot_correct=False):
         
         self.temporary_path=temporary_path
         self.bidishifted_movie_path=bidishifted_movie_path
+        self.metadata_file_path=metadata_file_path
         self.eliminate_caiman_extra_from_mmap()
+        self.save_mot_correct=save_mot_correct
         
         
         if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5'):
@@ -27,8 +29,8 @@ class CaimanExtraction():
             print(self.bidishifted_movie_path)
             print(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5')
         else:            
-            
-            self.metadata=Metadata(aq_metadataPath=metadata_file_path)
+
+            self.metadata=Metadata(aq_metadataPath=self.metadata_file_path)
             datasetmeta=self.metadata.imaging_metadata
             objective=self.metadata.imaging_metadata[0]['Objective']
             if objective=='MBL Olympus 20x':
@@ -49,17 +51,23 @@ class CaimanExtraction():
                 self.number_planes=1
                 self.volume_period=1/(self.framePeriod*self.rastersPerFrame)
             
-            if self.number_planes==3:
-                self.etl_frame_period=float(datasetmeta[2][0]['TopPlane']['framePeriod'])
+            if self.number_planes>1:
+                self.etl_frame_period=float(datasetmeta[2][0][0]['framePeriod'])
                 self.plane_period=float(self.framePeriod*self.rastersPerFrame)
                 self.volume_period=1/(self.etl_frame_period*self.number_planes)
             
-                        
+                # 1/(float(datasetmeta[2][1][0]['absoluteTime'])-float(datasetmeta[2][0][0]['absoluteTime']))
+
            
             
             
     #%%
             self.set_caiman_parameters()
+            
+            if first_pass_mot_correct:
+                self.dataset_caiman_parameters['epochs']=1
+                self.save_mot_correct=True
+
             self.apply_caiman()
             
             
@@ -136,7 +144,7 @@ class CaimanExtraction():
         if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0] + 'cnmf_results.hdf5'):
             return
         else:  
-         self.cnm_object=run_on_acid(self,  self.dataset_caiman_parameters)
+          self.cnm_object=run_on_acid(self,  self.dataset_caiman_parameters, save_mot_correct=self.save_mot_correct)
          
         
         

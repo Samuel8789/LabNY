@@ -498,7 +498,7 @@ class ExperimentalDatabase():
         virus_tuple=res[0]
         viruscomb=get_combination_from_virus(virus_tuple, self)
         
-        if 'SP' not in animals_selected[0]:
+        if isinstance(animals_selected[0], int):
             mice_exp=self.add_new_planned_experimental_cage(cage) 
             seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[1] in animals_selected]
             selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]

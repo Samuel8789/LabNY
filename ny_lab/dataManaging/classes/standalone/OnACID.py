@@ -28,10 +28,12 @@ except NameError:
 import caiman as cm
 from caiman.source_extraction import cnmf as cnmf
 import time
+import pickle
+
 
 
 # %%
-def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False ):
+def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, mot_corretc=False, save_mot_correct=False ):
     pass # For compatibility between running under Spyder and the CLI
 
 #%%
@@ -54,15 +56,23 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False )
     images = cm.load(fnamestemp)
     print('calculating dff')
     cnm.estimates.detrend_df_f()
-    
-    
+
     mmap_directory, caiman_filename=os.path.split(fnamestemp)
     good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
-    shifts = cnm.estimates.shifts[-cnm.estimates.C.shape[-1]:]   
-    MC_kalman_file_path='_'.join([os.path.join(mmap_directory,good_filename),'MC_OnACID'])       
-    MC_movie_to_save= cm.motion_correction.apply_shift_online(images, shifts,
-                                                    save_base_name=MC_kalman_file_path)
-    MC_movie = cm.movie(cm.motion_correction.apply_shift_online(images, shifts))   
+    MC_onacid_file_path='_'.join([os.path.join(mmap_directory, good_filename),'MC_OnACID'])
+    if mot_corretc:
+        shifts = cnm.estimates.shifts[-cnm.estimates.C.shape[-1]:]   
+        MC_movie = cm.movie(cm.motion_correction.apply_shift_online(images, shifts)) 
+        if save_mot_correct:
+            MC_movie_to_save= cm.motion_correction.apply_shift_online(images, shifts,
+                                                            save_base_name=MC_onacid_file_path)
+            MC_onacid_shifts_file_path='.'.join( ['_'.join([os.path.join(mmap_directory, good_filename),'MC_OnACID_shifts']),'txt'])
+            # cnm.estimates.total_template_rig
+            with open(MC_onacid_shifts_file_path, "wb") as fp:   #Pickling
+                pickle.dump(shifts, fp)
+    else:    
+        MC_movie = images  
+
     Cn = MC_movie.local_correlations(swap_dim=False, frames_per_chunk=500)
 
     cnm.mmap_file = fnamestemp
@@ -71,7 +81,7 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False )
     images = np.reshape(Yr.T, [T] + list(dims), order='F')
     cnm.estimates.evaluate_components(images, cnm.params, dview=None)
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    caiman_results_path='_'.join([MC_kalman_file_path, timestr,'cnmf_results.hdf5'])  
+    caiman_results_path='_'.join([MC_onacid_file_path, timestr,'cnmf_results.hdf5'])  
 
     cnm.estimates.Cn = Cn
     #%%

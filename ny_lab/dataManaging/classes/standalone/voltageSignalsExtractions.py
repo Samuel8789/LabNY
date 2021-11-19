@@ -10,10 +10,11 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-
+import glob
 import mplcursors
 import pickle
 import math
+import shutil
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
 
@@ -21,44 +22,53 @@ mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"])
 
 class VoltageSignalsExtractions():
     
-    def __init__(self, voltage_excel_path):
+    def __init__(self, voltage_excel_path=False, temporary_path=False, just_copy=False, acquisition_directory_raw=False):
         print('Processing Voltage Signals')
-
         self.voltage_excel_path=voltage_excel_path
-        self.voltage_signals_raw = pd.read_csv(self.voltage_excel_path)    
-        self.voltage_signals={signal:self.voltage_signals_raw[signal].to_frame() for signal in self.voltage_signals_raw.columns.tolist()[1:]}
-        
-        self.transitions_dictionary={}
-        [path, file_name]=os.path.split(self.voltage_excel_path)
-        transition_index_file_name=os.path.splitext(file_name)[0]+'_transitions_indexes.pkl'
-        self.transition_index_to_save_path= os.path.join(path,transition_index_file_name)
-        self.correct_signals_names()
+        self.temporary_path=temporary_path
+        self.acquisition_directory_raw=acquisition_directory_raw
+        self.check_csv_in_folder()
 
-        locomotion_df=self.voltage_signals['Locomotion'].T
-        self.locomotion_aray=locomotion_df.to_numpy()
-        visualstim_df=self.voltage_signals['VisStim'].T
-        self.visualstim_array=visualstim_df.to_numpy().squeeze()
-        self.voltage_rate=1000;
-        self.milisecondscale=np.arange(1,locomotion_df.size+1)
-        self.second_scale=self.milisecondscale/self.voltage_rate
-        self.minutes_scale=self.second_scale/60
-        self.process_allenA_signals()
-        
-        if os.path.isfile(self.transition_index_to_save_path):
-            self.load_indexes_from_file()
-
-        if not self.transitions_dictionary:       
-            self.get_paradign_indexes()
-            self.save_transition_indexes()
+        if just_copy:
+    
+            shutil.copy(self.voltage_excel_path, self.temporary_path)
             
-        self.slice_gratings_by_paradigm()
-        self.get_drifting_gratings_indexes()
-        self.process_locomotion()
-        self.slice_locomotion_by_paradigm()
-        
-        
-        self.plotting_paradigm_transitions()
-        self.plotting_grating_transitions()
+  
+        else:
+            self.voltage_signals_raw = pd.read_csv(self.voltage_excel_path)    
+            self.voltage_signals={signal:self.voltage_signals_raw[signal].to_frame() for signal in self.voltage_signals_raw.columns.tolist()[1:]}
+            
+            self.transitions_dictionary={}
+            [path, file_name]=os.path.split(self.voltage_excel_path)
+            transition_index_file_name=os.path.splitext(file_name)[0]+'_transitions_indexes.pkl'
+            self.transition_index_to_save_path= os.path.join(path,transition_index_file_name)
+            self.correct_signals_names()
+    
+            locomotion_df=self.voltage_signals['Locomotion'].T
+            self.locomotion_aray=locomotion_df.to_numpy()
+            visualstim_df=self.voltage_signals['VisStim'].T
+            self.visualstim_array=visualstim_df.to_numpy().squeeze()
+            self.voltage_rate=1000;
+            self.milisecondscale=np.arange(1,locomotion_df.size+1)
+            self.second_scale=self.milisecondscale/self.voltage_rate
+            self.minutes_scale=self.second_scale/60
+            self.process_allenA_signals()
+            
+            if os.path.isfile(self.transition_index_to_save_path):
+                self.load_indexes_from_file()
+    
+            # if not self.transitions_dictionary:       
+                # self.get_paradign_indexes()
+                # self.save_transition_indexes()
+                
+            # self.slice_gratings_by_paradigm()
+            # self.get_drifting_gratings_indexes()
+            self.process_locomotion()
+            # self.slice_locomotion_by_paradigm()
+            
+            
+            # self.plotting_paradigm_transitions()
+            # self.plotting_grating_transitions()
         
     def correct_signals_names(self):       
         signals=list(self.voltage_signals.keys())
@@ -280,7 +290,13 @@ class VoltageSignalsExtractions():
         # confirm length of ranges
         
         
- 
+    def check_csv_in_folder(self):
+     if self.acquisition_directory_raw:
+            csvfiles=glob.glob(self.acquisition_directory_raw+'\\**.csv')
+            for csv in csvfiles:
+                if 'VoltageRecording'  in csv:
+                    self.voltage_excel_path=csv
+     
 
 
     def habituation_analysis(self):
@@ -484,10 +500,10 @@ class VoltageSignalsExtractions():
 if __name__ == "__main__":
     
     # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-
+    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
+    temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000\Plane1\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
     # temporary_path1='/home/samuel/Desktop/SPJAFUllAllen/210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-
+    
     voltagesignals=VoltageSignalsExtractions(temporary_path1)
 
-    
+    plt.plot(voltagesignals.rectified_speed_array)

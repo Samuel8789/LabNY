@@ -73,8 +73,8 @@ class Metadata():
         if self.temporary_path: 
             self.transfer_metadata()   
             
-        # if self.video_params:    
-        #     self.plotting()    
+        if self.video_params:    
+            self.plotting()    
             
     def process_voltage_recording(self):
         tree = ET.parse(self.voltage_file)
@@ -92,12 +92,13 @@ class Metadata():
 
         recorded_channels2=[chan[chan.find(')')-1] if chan else '' for chan in recorded_channels ]
         self.recorded_signals=[elem['Childs']['Name']['Description'] for elem in ExperimentInfo['Childs']["SignalList"].values() if elem['Childs']['Channel']['Description'] in recorded_channels2]
-
+        self.recorded_signals_csv=[]
         pth=((os.path.splitext(self.voltage_file)[0])+'.csv')
-        voltage_rec_csv= pd.read_csv(pth,header=0)
-        recorded_signals_csv=list(voltage_rec_csv.columns)
-        recorded_signals_csv.pop(0)
-        self.recorded_signals_csv=[i.strip() for i in recorded_signals_csv]
+        if os.path.isfile(pth):
+            voltage_rec_csv= pd.read_csv(pth,header=0)
+            recorded_signals_csv=list(voltage_rec_csv.columns)
+            recorded_signals_csv.pop(0)
+            self.recorded_signals_csv=[i.strip() for i in recorded_signals_csv]
 
     def process_metadata(self):
 
@@ -733,7 +734,9 @@ class Metadata():
         for file in self.metadata_raw_files_full_path:
             shutil.copy(file, self.temporary_path)
             self.transfered_metadata_paths.append(os.path.join(self.temporary_path, file))
-            
+      
+
+      
     def check_metadata_in_folder(self):
      if self.acquisition_directory_raw:
             xmlfiles=glob.glob(self.acquisition_directory_raw+'\\**.xml')
@@ -759,19 +762,19 @@ if __name__ == "__main__":
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIFFrameNumberK3planeallen\Plane3'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211007\Mice\SPIK\FOV_1\Aq_1\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000'   
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane3'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKG\FOV_1\Aq_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
+    path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKG\FOV_1\Aq_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
     temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210917\Mice\SPGT\Atlas_1\Volumes\Aq_1\20210917_SPGT_Atlas_1050_50024_607_without_105_135z_5z_1ol-005'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210930\Mice\SPKI\FOV_1\Aq_1\210930_SPKI_FOV1_AllenA_920_50024_narrow_without-000'
-    path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211022\Mice\SPKS\FOV_1\Aq_1\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
+    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211022\Mice\SPKS\FOV_1\Aq_1\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
 
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210929\Mice\SPIC\TestAcquisitions\Aq_1\210929_SPIC_TestVideo5min_920_50024_narrow_without-000'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210916\Mice\SPGT\Atlas_1\Preview\Aq_1\20210916_SPGT_Atlas_920_50024_607_without-Preview-000'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210914\Mice\SPGT\Atlas_1\Overview\Aq_1\20210914_SPGT_AtlasOverview_930_50024_607_without-Overview-000'
     # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000'
-    temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
-    temporary_path1='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKJ\FOV_1\1050_3PlaneTomato\Aq_1\211015_SPKJ_FOV1_1050tomato3plane_990_50024_narrow_without-000'
-
+    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
+    # temporary_path1='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKJ\FOV_1\1050_3PlaneTomato\Aq_1\211015_SPKJ_FOV1_1050tomato3plane_990_50024_narrow_without-000'
+    temporary_path1=path
 
 
     

@@ -108,7 +108,7 @@ class MotionCorrectedKalman:
         self.do_kalman_filter()
         self.save_MC_kalman_movie()
         self.save_MC_movie()
-        self.remove_some_files_form_temp()
+        # self.remove_some_files_form_temp()
 
     def load_dataset_from_image_sequence(self):
         image_sequence_files=os.listdir(self.dataset_image_sequence_path)
