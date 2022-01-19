@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Mar  9 21:18:52 2021
-
 @author: sp3660
 """
 import logging 
-logger = logging.getLogger(__name__)
+module_logger = logging.getLogger(__name__)
 import os
+import gc
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .mouseImagingSession import MouseImagingSession
 
@@ -27,8 +27,12 @@ class Mouse:
                     }
       
     def __init__(self, Mouse_Name, LabNY_object, data_managing_object=False, mouse_info=None):
+        # module_logger.info('Instantiating ' +__name__)
+
         
         self.mouse_name=Mouse_Name
+        module_logger.info('Loading Mouse ' +self.mouse_name)
+
         self.LabNY_object=LabNY_object
         self.data_managing_object=data_managing_object
         # self.primary_data_directory=self.data_managing_object.primary_data_directory
@@ -54,18 +58,33 @@ class Mouse:
                             """
         params=(self.mouse_name,)
         self.imaging_sessions_database=self.Database_ref.arbitrary_query_to_df(quey_imaging_session, params)        
-        self.load_all_imaging_sessions()
-        
+        self.load_all_imaging_sessions_from_database()
+        self.get_all_mouse_acquisitions(self.imaging_sessions_objects)
  
-    def load_all_imaging_sessions(self):
+    
+    def read_processed_imaging_session_not_in_database(self, session_name):
+         module_logger.info('Reading '+ self.mouse_name)
+         self.imaging_sessions_not_yet_database_objects={}
+         self.imaging_sessions_not_yet_database_objects[session_name]=MouseImagingSession(session_name, mouse_object=self, adding_to_database=True)
+         self.get_all_mouse_acquisitions(self.imaging_sessions_not_yet_database_objects)
+
+     
+    def load_processed_imaging_session_not_in_database(self, session_name):
+      
+        for acq in  self.all_mouse_acquisitions.values():
+            acq.load_all()
+
+    
+    def load_all_imaging_sessions_from_database(self):
         
         self.imaging_sessions_objects={session[0].replace('-', ''):MouseImagingSession(session[0].replace('-', ''), imaging_session_ID=session[1], mouse_object=self)  for idx, session in self.imaging_sessions_database.iterrows()}       
     
     def add_prairie_session(self, raw_imaging_session_path, session_name):
-        print('Processing '+self.mouse_name)
-        # print('Adding prairie sessions')
+        module_logger.info('Processing '+ self.mouse_name)
+        # module_logger.info('Adding prairie sessions')
         self.raw_imaging_sessions_objects={}
         self.raw_imaging_sessions_objects[session_name]=MouseImagingSession(session_name, raw_imaging_session_path=raw_imaging_session_path, mouse_object=self)
+        self.unload_full_imaging_session(session_name)
         # self.load_all_imaging_sessions()
        
     def get_all_mouse_FOVdata_datasets(self):
@@ -77,11 +96,56 @@ class Mouse:
                 for name3, aquisition in FOV.all_aquisitions.items():
                     for name4, dataset in aquisition.all_datasets.items():
                         self.all_mouse_FOVdata_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
-            
+                        
+    def unload_full_imaging_session(self, session_name):
+        module_logger.info('Unloading  '+ session_name)
+
+        if self.raw_imaging_sessions_objects:
+            del self.raw_imaging_sessions_objects
+            gc.collect()
+        
        
-    def get_all_mouse_acquisitions_datasets(self):  
+        
+       
+        
+    def get_all_mouse_acquisitions(self, session_list):  
+       self.all_mouse_acquisitions={}
+       for name1, imaging_session in session_list.items():
+                  
+           for name2, aquisition in imaging_session.all_nonimaging_Aquisitions.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2]=aquisition
+                       
+           for name2, aquisition in imaging_session.all_Test_Aquisitions.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2]=aquisition 
+                       
+           for name2, aquisition in imaging_session.all_0coordinate_Aquisitions.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2]=aquisition  
+                       
+           for name2, FOV in imaging_session.all_FOVs.items():
+               for name3, aquisition in FOV.all_aquisitions.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition
+        
+               for name3, aquisition in FOV.all_existing_1050tomato.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition    
+                       
+               for name3, aquisition in FOV.all_existing_10503planetomato.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition 
+                       
+               for name3, aquisition in FOV.all_existing_1050HighResStackTomato.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition  
+                       
+               for name3, aquisition in FOV.all_existing_HighResStackGreen.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition 
+                       
+               for name3, aquisition in FOV.all_existing_OtherAcq.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition 
+                       
+               for name3, aquisition in FOV.all_existing_SurfaceImage.items():
+                       self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition
+           
+    def get_all_mouse_acquisitions_datasets(self, session_list):  
        self.all_mouse_acquisitions_datasets={}
-       for name1, imaging_session in self.imaging_sessions_objects.items():
+       for name1, imaging_session in session_list.items():
                   
            for name2, aquisition in imaging_session.all_nonimaging_Aquisitions.items():
                for name3, dataset in aquisition.all_datasets.items():
@@ -111,5 +175,3 @@ class Mouse:
                for name3, aquisition in FOV.all_existing_SurfaceImage.items():
                    for name4, dataset in aquisition.all_datasets.items():
                        self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
-           
-

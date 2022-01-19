@@ -96,7 +96,7 @@ class AddFacecameraInfo(tk.Toplevel):
 if __name__ == "__main__":
     
     root = tk.Tk()
-    # app = add_facecamera_info(root, 'Test')
+    app = AddFacecameraInfo(root, 'Test')
 
     root.mainloop()
     # get_values=app.values

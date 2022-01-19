@@ -83,7 +83,7 @@ class new_window_update_done_injections(tk.Toplevel):
                 for code in self.selected_dead_mice:
                   self.gui.MouseDat.Experimental_class.mouse_dead_during_surgery(code)
                   
-            self.plan_window_parameters_window=plan_window_parameters(self.gui, self.selected_mice)
+            self.plan_window_parameters_window=plan_window_parameters(self.gui, mice_codes=self.selected_mice)
             self.plan_window_parameters_window.wait_window()
             print('windows planned')
             

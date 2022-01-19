@@ -13,7 +13,8 @@ import scipy as sp
 import pandas as pd
 import shutil
 import matplotlib.pyplot as plt
-
+import logging 
+module_logger = logging.getLogger(__name__)
 from .recursively_read_metadata import recursively_read_metadata
 
 from ...AllFunctions.select_values_gui import select_values_gui
@@ -30,7 +31,7 @@ class Metadata():
                  imaging_database_row=None,
                  temporary_path=None,
                  acquisition_directory_raw=None):
-        print('Processing Metadata')
+        module_logger.info('Processing Metadata')
         
         self.temporary_path=temporary_path
 
@@ -52,7 +53,7 @@ class Metadata():
         
         if  self.imaging_metadata_file:     
             if os.path.isfile(self.imaging_metadata_file):
-                    # print('getting metadata')
+                    # module_logger.info('getting metadata')
                     self.process_metadata()
         if self.voltage_file:
             if os.path.isfile(self.voltage_file):        
@@ -561,7 +562,7 @@ class Metadata():
 
 #%% manual and photostim metadata
     def add_metadata_manually(self):   
-        # print('getting manual meta1data')
+        # module_logger.info('getting manual meta1data')
         
         self.imaging_metadata=[{},{},[]]
         aquisition_to_process=os.path.split(self.imaging_metadata_file)[0]
@@ -746,7 +747,7 @@ class Metadata():
                     self.voltage_output=xml 
 
     def read_metadata_from_database(self):
-        print('TO DO')
+        module_logger.info('TO DO')
     
     
     

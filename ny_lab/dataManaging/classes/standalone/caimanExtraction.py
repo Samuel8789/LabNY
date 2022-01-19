@@ -7,31 +7,107 @@ Created on Mon Oct 11 14:21:42 2021
 
 import numpy as np
 import os
+import glob
+import gc
+import sys
 
-from OnACID import run_on_acid
-from metadata import Metadata
-from motionCorrectedKalman import MotionCorrectedKalman
-from summaryImages import SummaryImages
+# from OnACID import run_on_acid
+# from metadata import Metadata
+# from motionCorrectedKalman import MotionCorrectedKalman
+# from summaryImages import SummaryImages
+# import caiman as cm
+from .OnACID import run_on_acid
+from .metadata import Metadata
+# from .motionCorrectedKalman import MotionCorrectedKalman
+# from .summaryImages import SummaryImages
+import logging 
+module_logger = logging.getLogger(__name__)
+from caiman.source_extraction import cnmf as cnmf
+
 
 class CaimanExtraction():
     
-    def __init__(self, bidishifted_movie_path, metadata_file_path, temporary_path=None, first_pass_mot_correct=False, save_mot_correct=False):
-        
+    def __init__(self, bidishifted_movie_path=None, metadata_file_path=None, temporary_path=None, first_pass_mot_correct=False, 
+                 save_mot_correct=False, metadata_object=None, force_run=False, dataset_object=None, deep=False):
+        module_logger.info('Instantiating ' +__name__)
+        self.dataset_object=dataset_object
+        self.deep=deep
+        self.metadata_object=metadata_object
         self.temporary_path=temporary_path
         self.bidishifted_movie_path=bidishifted_movie_path
         self.metadata_file_path=metadata_file_path
-        self.eliminate_caiman_extra_from_mmap()
         self.save_mot_correct=save_mot_correct
-        
-        
-        if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5'):
-            print('Already done')
-            print(self.bidishifted_movie_path)
-            print(os.path.splitext(self.bidishifted_movie_path)[0]+ 'cnmf_results.hdf5')
-        else:            
+        self.force_run=force_run
+        self.first_pass_mot_correct=first_pass_mot_correct
+        self.check_caiman_files()
+        self.check_motion_corrected_on_acid()
+        self.eliminate_caiman_extra_from_mmap()
 
+     
+  
+#%%
+        if self.bidishifted_movie_path:
+            self.get_info_from_metadata()
+            self.set_caiman_parameters()
+
+            if first_pass_mot_correct:
+                
+                self.dataset_caiman_parameters['epochs']=1
+                self.save_mot_correct=True
+                self.dataset_caiman_parameters['use_cnn']=False
+            else:
+                self.dataset_caiman_parameters['mot_corr']=False
+    
+    
+            self.apply_caiman()
+            self.check_motion_corrected_on_acid()
+            self.check_caiman_files()
+            self.check_shifts_files()
+            self.remove_unclipped_issue_shifted_movies()
+            
+            
+        elif self.temporary_path:
+            self.check_motion_corrected_on_acid()
+            self.check_caiman_files()
+            self.check_shifts_files()
+            # self.load_cnmf_object()
+            
+        # self.unload_cnmf_object()
+            
+            
+    def eliminate_caiman_extra_from_mmap(self) :   
+        caiman_filename=None
+        if self.bidishifted_movie_path:
+            self.mmap_directory, caiman_filename=os.path.split(self.bidishifted_movie_path) 
+
+        elif self.mc_onacid_path:
+            self.mmap_directory, caiman_filename=os.path.split(self.mc_onacid_path) 
+         
+        if caiman_filename:
+            if caiman_filename.find('_d1_')!=-1:
+                self.good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
+                self.caiman_extra=caiman_filename[caiman_filename.find('_d1_'):caiman_filename.find('_mmap')-4]   
+            else:
+                self.good_filename=os.path.splitext(caiman_filename)[0]  
+             
+
+
+    # %%   Set up some parameters
+    
+    
+    def get_info_from_metadata(self):
+
+        if (not self.metadata_object) and self.metadata_file_path :
             self.metadata=Metadata(aq_metadataPath=self.metadata_file_path)
+        elif self.metadata_object:
+            self.metadata=self.metadata_object
+        elif  self.dataset_object :
+            self.metadata=  self.dataset_object.metadata
+        try:    
+            module_logger.info('checking metadata for caiman ' + self.bidishifted_movie_path )
+
             datasetmeta=self.metadata.imaging_metadata
+                     
             objective=self.metadata.imaging_metadata[0]['Objective']
             if objective=='MBL Olympus 20x':
                 self.halfsize=2.5
@@ -40,10 +116,9 @@ class CaimanExtraction():
            
                if '20x' in self.bidishifted_movie_path:
                     self.halfsize=2.5
-    
-    
-       #%% 
             
+            #%% 
+             
             self.framePeriod=float(datasetmeta[0]['framePeriod'])
             self.rastersPerFrame=int(datasetmeta[0]['RasterAveraging'])
             self.number_planes=datasetmeta[1]['PlaneNumber']
@@ -55,33 +130,10 @@ class CaimanExtraction():
                 self.etl_frame_period=float(datasetmeta[2][0][0]['framePeriod'])
                 self.plane_period=float(self.framePeriod*self.rastersPerFrame)
                 self.volume_period=1/(self.etl_frame_period*self.number_planes)
-            
+        except:
+            module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
+
                 # 1/(float(datasetmeta[2][1][0]['absoluteTime'])-float(datasetmeta[2][0][0]['absoluteTime']))
-
-           
-            
-            
-    #%%
-            self.set_caiman_parameters()
-            
-            if first_pass_mot_correct:
-                self.dataset_caiman_parameters['epochs']=1
-                self.save_mot_correct=True
-
-            self.apply_caiman()
-            
-            
-            
-    def eliminate_caiman_extra_from_mmap(self) :   
-
-          self.mmap_directory, caiman_filename=os.path.split(self.bidishifted_movie_path) 
-          if caiman_filename.find('_d1_')!=-1:
-              self.good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
-              self.caiman_extra=caiman_filename[caiman_filename.find('_d1_'):caiman_filename.find('_mmap')-4]   
-          else:
-              self.good_filename=os.path.splitext(caiman_filename)[0]        
-
-    # %%   Set up some parameters
     def set_caiman_parameters(self):
   
         fr = 1/self.volume_period  # frame rate (Hz) 3pl + 4ms = 15.5455
@@ -99,7 +151,7 @@ class CaimanExtraction():
         rval_thr = 0.8  # soace correlation threshold for candidate components
         # set up some additional supporting parameters needed for the algorithm
         # (these are default values but can change depending on dataset properties)
-        init_batch = 1000  # number of frames for initialization (presumably from the first file)
+        init_batch = 100 # number of frames for initialization (presumably from the first file)
         K = 2  # initial number of components
         epochs = 5 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
@@ -138,15 +190,148 @@ class CaimanExtraction():
                                             }
         
         
-  
-        
+
     def apply_caiman(self):
-        if os.path.isfile(os.path.splitext(self.bidishifted_movie_path)[0] + 'cnmf_results.hdf5'):
-            return
-        else:  
-          self.cnm_object=run_on_acid(self,  self.dataset_caiman_parameters, save_mot_correct=self.save_mot_correct)
-         
         
+        if self.caiman_path and self.mc_onacid_path:
+            
+                if not self.force_run:
+                    module_logger.info('Caiman not run, files already there ' + self.bidishifted_movie_path )
+                    self.load_cnmf_object()
+
+                elif self.force_run and self.caiman_path==self.caiman_custom_path and self.mc_onacid_path==self.mc_onacid_custom_path :
+                    module_logger.info('Caiman not run, files already there with custom file' + self.bidishifted_movie_path )
+                    self.load_cnmf_object()
+                
+                elif self.force_run and self.caiman_path==self.caiman_full_path and self.mc_onacid_path==self.mc_onacid_full_path :
+                    module_logger.info('Rerunning caiman with custom length movie ' + self.bidishifted_movie_path )
+        
+                    try:
+                        self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+                        # self.remove_unclipped_issue_shifted_movies()
+                    except:
+                            module_logger.exception('Something wrong with On Acid processing ' + self.bidishifted_movie_path )
+
+                elif self.force_run and self.deep:
+                    module_logger.info('Running deep caiman ' + self.bidishifted_movie_path )
+                    self.dataset_caiman_parameters['fnames']=self.mc_onacid_path
+        
+                    try:
+                        self.cnm_object_deep=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+                        # self.remove_unclipped_issue_shifted_movies()
+                    except:
+                            module_logger.exception('Something wrong with deep On Acid ' + self.bidishifted_movie_path )
+                    
+        else:  
+            try:
+                self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+            except:
+                    module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
+
+
+    def load_cnmf_object(self):
+        try:
+            if self.caiman_path:
+                if os.path.isfile(self.caiman_path):
+                    self.cnm_object=cnmf.cnmf.load_CNMF(self.caiman_path)
+        except:
+            module_logger.exception('Could not load cnmf object' + self.temporary_path )
+
+
+    def unload_cnmf_object(self):
+             
+        if self.cnm_object:
+            del self.cnm_object
+            gc.collect()
+            # sys.stdout.flush()
+            self.cnm_object=None
+     
+        
+        
+
+    def check_motion_corrected_on_acid(self):
+          self.mc_onacid_custom_pats=[]
+          self.mc_onacid_full_paths=[]
+          self.mc_onacid_custom_path=None
+          self.mc_onacid_full_path=None
+          self.mc_onacid_path=None
+          
+          self.mc_onacid_full_paths=glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_d1**.mmap')
+          self.mc_onacid_custom_paths=glob.glob(self.temporary_path+'\\**end_MC_OnACID_d1**.mmap')
+
+          if self.mc_onacid_full_paths:
+              self.mc_onacid_full_path= self.mc_onacid_full_paths[0]
+          if self.mc_onacid_custom_paths:
+              self.mc_onacid_custom_path= self.mc_onacid_custom_paths[0]
+          
+          if self.mc_onacid_custom_path:  
+              self.mc_onacid_path=self.mc_onacid_custom_path
+          elif self.mc_onacid_full_path:
+              self.mc_onacid_path=self.mc_onacid_full_path
+
+
+    def check_caiman_files(self):
+
+        self.caiman_custom_pats=[]
+        self.caiman_full_paths=[]
+        self.caiman_custom_path=None
+        self.caiman_full_path=None
+        self.caiman_path=None
+        
+        self.caiman_full_paths=sorted(glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
+        self.caiman_custom_paths=sorted(glob.glob(self.temporary_path+'\\**end_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
+   
+        if  self.first_pass_mot_correct:
+            indxx=0
+        elif not self.first_pass_mot_correct:
+            indxx=-1
+
+        if self.caiman_full_paths:
+            self.caiman_full_path= self.caiman_full_paths[indxx]
+        if self.caiman_custom_paths:
+            self.caiman_custom_path= self.caiman_custom_paths[indxx]
+            
+        if self.caiman_custom_path:  
+            self.caiman_path=self.caiman_custom_path
+        elif self.caiman_full_path:
+            self.caiman_path=self.caiman_full_path    
+            
+    def check_shifts_files(self):
+    
+         self.caiman_shifts_custom_pats=[]
+         self.caiman_shifts_full_paths=[]
+         self.caiman_shifts_custom_path=None
+         self.caiman_shifts_full_path=None
+         self.caiman_shifts_path=None
+         
+         self.caiman_shifts_full_paths=glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_shifts**.pkl') 
+         self.caiman_shifts_custom_paths=glob.glob(self.temporary_path+'\\**end_MC_OnACID_shifts**.pkl') 
+
+         if self.caiman_shifts_full_paths:
+             self.caiman_shifts_full_path= self.caiman_shifts_full_paths[0]
+         if self.caiman_shifts_custom_paths:
+             self.caiman_shifts_custom_path= self.caiman_shifts_custom_paths[0]
+         
+         if self.caiman_shifts_custom_path:  
+             self.caiman_shifts_path=self.caiman_shifts_custom_path
+         elif self.caiman_shifts_full_path:
+             self.caiman_shifts_path=self.caiman_shifts_full_path            
+            
+          
+    def remove_unclipped_issue_shifted_movies(self):
+        module_logger.info('removing unclipped ')
+
+        if self.caiman_custom_path and  self.caiman_full_path :
+            if os.path.isfile(self.caiman_full_path):
+                os.remove(self.caiman_full_path)
+        if self.mc_onacid_custom_path and  self.mc_onacid_full_path :
+            if os.path.isfile(self.mc_onacid_full_path):
+                os.remove(self.mc_onacid_full_path)
+                
+        if self.caiman_shifts_custom_path and  self.caiman_shifts_full_path :
+            if os.path.isfile(self.caiman_shifts_full_path):
+                os.remove(self.caiman_shifts_full_path)
+
         
 
 if __name__ == "__main__":

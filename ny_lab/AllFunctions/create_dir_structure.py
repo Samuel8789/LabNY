@@ -31,11 +31,13 @@ def create_dir_structure(directory, structure):
    
       for struc_element in structure:
           if not struc_element in structure_names:
-              os.mkdir(os.path.join(directory,struc_element))
+              if not os.path.isdir(os.path.join(directory,struc_element)):
+                  os.mkdir(os.path.join(directory,struc_element))
               
     elif not os.path.isdir(directory):
         for struc_element in structure:
-              os.makedirs(os.path.join(directory,struc_element))
+              if not os.path.isdir(os.path.join(directory,struc_element)):
+                  os.makedirs(os.path.join(directory,struc_element))
 
     
     

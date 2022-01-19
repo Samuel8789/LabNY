@@ -13,13 +13,19 @@ import scipy as sp
 import pandas as pd
 import shutil
 import matplotlib.pyplot as plt
+import logging 
+import json
 
-from recursively_read_metadata import recursively_read_metadata
+module_logger = logging.getLogger(__name__)
+# from recursively_read_metadata import recursively_read_metadata
+# from select_values_gui import select_values_gui
+# from manually_get_some_metadata import manually_get_some_metadata
 
 
+from .recursively_read_metadata import recursively_read_metadata
+from .select_values_gui import select_values_gui
+from .manually_get_some_metadata import manually_get_some_metadata
 
-from select_values_gui import select_values_gui
-from manually_get_some_metadata import manually_get_some_metadata
 
 
 #%%
@@ -32,14 +38,17 @@ class Metadata():
                  voltageoutput_metadataPath=False, 
                  imaging_database_row=None,
                  temporary_path=None,
-                 acquisition_directory_raw=None):
-        print('Processing Metadata')
+                 acquisition_directory_raw=None, aquisition_object=None):
+        module_logger.info('Processing Metadata')
         
         self.temporary_path=temporary_path
+        self.aquisition_object=aquisition_object
+       
 
         
+        
         self.acquisition_directory_raw=acquisition_directory_raw
-
+        self.full_voltage_recording_metadata=None
         self.all_frames=[]
         self.all_volumes=[]
         self.video_params=[]
@@ -49,15 +58,22 @@ class Metadata():
         self.voltage_file=voltagerec_metadataPath
         self.voltage_output=voltageoutput_metadataPath
         self.check_metadata_in_folder()
+        self.full_metadata=None
+        self.full_voltage_recording_metadata=None
 
+        if self.aquisition_object:
+            self.read_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'imaging_metadata.json')
+            self.read_voltage_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'voltage_metadata.json')
+            module_logger.info('readig metdata from json')
+
+            self.read_json_metadata() 
         
-        
-        
-        if  self.imaging_metadata_file:     
+               
+        if self.imaging_metadata_file:     
             if os.path.isfile(self.imaging_metadata_file):
-                    # print('getting metadata')
+                    # module_logger.info('getting metadata')
                     self.process_metadata()
-        if self.voltage_file:
+        if self.voltage_file :
             if os.path.isfile(self.voltage_file):        
                     self.process_voltage_recording()
    
@@ -71,18 +87,23 @@ class Metadata():
         #             self.photostim_metadata['PhotoStimSeriesArtifact']=self.photostim_extra_metadata
 
         if self.temporary_path: 
-            self.transfer_metadata()   
-            
-        if self.video_params:    
-            self.plotting()    
-            
+            self.transfer_metadata()  
+        if self.aquisition_object:
+            self.save_metadata_as_json()           
+    
+        # if self.video_params:    
+        #     self.plotting()    
+        module_logger.info('Finished  Metadata')
+ 
     def process_voltage_recording(self):
-        tree = ET.parse(self.voltage_file)
-        root = tree.getroot()
-        self.full_voltage_recording_metadata=recursively_read_metadata(root)  
+       
+        if not self.full_voltage_recording_metadata:
+            tree = ET.parse(self.voltage_file)
+            root = tree.getroot()
+            self.full_voltage_recording_metadata=recursively_read_metadata(root)  
 
-        
-        voltage_aq_time=root[3].text[root[3].text.find('T')+1:]
+        voltage_aq_time=self.full_voltage_recording_metadata['DateTime']['Description'][self.full_voltage_recording_metadata['DateTime']['Description'].find('T')+1:]
+        # voltage_aq_time=root[3].text[root[3].text.find('T')+1:]
         voltage_aq_time=time.strptime(voltage_aq_time[:-9], '%X.%f')
         self.voltage_aq_time=time.strftime('%H:%M:%S', voltage_aq_time)
         
@@ -102,9 +123,10 @@ class Metadata():
 
     def process_metadata(self):
 
-        tree = ET.parse( self.imaging_metadata_file)       
-        root = tree.getroot()
-        self.full_metadata=recursively_read_metadata(root)  
+        if not self.full_metadata:            
+            tree = ET.parse( self.imaging_metadata_file)       
+            root = tree.getroot()
+            self.full_metadata=recursively_read_metadata(root)  
         if not self.full_metadata:
             return []
         else:
@@ -208,10 +230,15 @@ class Metadata():
             # MultiPlane=0
             SingleChannel=0
  #%% here to create the full frame by frame volume by volume 
-            if len(list(root))>3 and (self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume"):
-                FirstVolumeMetadat=root[2]
+            if len(list(self.full_metadata))>6 and (self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume"):
+                # FirstVolumeMetadat=root[2]
+                FirstVolumeMetadat=  self.full_metadata['Sequence']
+
                 del self.video_params['FrameNumber']
-                self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+        
+                # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+                self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
+
                 # MultiPlane=1
                 self.all_volumes=[]            
                 volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
@@ -293,10 +320,14 @@ class Metadata():
                     self.all_volumes.pop(-1)
                     self.video_params['VolumeNumber']=self.video_params['VolumeNumber']-1
 
-            elif len(list(root))<=3 and self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" :
-                FirstVolumeMetadat=root[2]
+            elif len(list(self.full_metadata))<=5 and self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" :
+                # FirstVolumeMetadat=root[2]
+                FirstVolumeMetadat=  self.full_metadata['Sequence']
+
                 del self.video_params['FrameNumber']
-                self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+                # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+                self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
+
                 # MultiPlane=1
                 self.all_volumes=[]            
                 volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
@@ -474,7 +505,11 @@ class Metadata():
             if self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume": 
                      
                 self.video_params['FullAcquisitionTime']=self.all_volumes[-1][list(self.all_volumes[-1].keys())[-1]]['relativeTime']  
-                self.video_params['PlaneNumber']=len(list(FirstVolumeMetadat.findall('Frame')))                           
+                # self.video_params['PlaneNumber']=len(list(FirstVolumeMetadat.findall('Frame')))  
+                self.video_params['PlaneNumber']= len([key for key in FirstVolumeMetadat['Childs'].keys() if 'Frame' in key])
+
+
+                         
                 self.video_params['PlanePositionsOBJ']=[self.all_volumes[0][key]['ObjectiveZ'] for key in self.all_volumes[0].keys()]
                 self.video_params['PlanePositionsETL']=[self.all_volumes[0][key]['ETLZ'] for key in self.all_volumes[0].keys()]
                 self.video_params['Planepowers']= [self.all_volumes[0][key]['ImagingSlider'] for key in self.all_volumes[0].keys()]
@@ -566,7 +601,7 @@ class Metadata():
 
 #%% manual and photostim metadata
     def add_metadata_manually(self):   
-        # print('getting manual meta1data')
+        # module_logger.info('getting manual meta1data')
         
         self.imaging_metadata=[{},{},[]]
         aquisition_to_process=os.path.split(self.imaging_metadata_file)[0]
@@ -732,11 +767,10 @@ class Metadata():
         self.metadata_raw_files_full_path=[file for file in glob.glob(self.acquisition_directory_raw+'\\**', recursive=False) if '.xml' in file  ]
         self.transfered_metadata_paths=[]
         for file in self.metadata_raw_files_full_path:
-            shutil.copy(file, self.temporary_path)
-            self.transfered_metadata_paths.append(os.path.join(self.temporary_path, file))
-      
-
-      
+            if not os.path.isfile(os.path.join(self.temporary_path, os.path.split(file)[1])):
+                shutil.copy(file, self.temporary_path)
+                self.transfered_metadata_paths.append(os.path.join(self.temporary_path, file))
+  
     def check_metadata_in_folder(self):
      if self.acquisition_directory_raw:
             xmlfiles=glob.glob(self.acquisition_directory_raw+'\\**.xml')
@@ -753,10 +787,30 @@ class Metadata():
                     self.voltage_output=xml 
 
     def read_metadata_from_database(self):
-        print('TO DO')
+        module_logger.info('TO DO')
     
-    
-    
+    def save_metadata_as_json(self):
+        if not os.path.isfile(self.read_voltage_metadata_path):
+            if self.full_voltage_recording_metadata:
+                with open(self.read_voltage_metadata_path, 'w') as fout:
+                    json.dump(self.full_voltage_recording_metadata , fout)
+                
+        if not os.path.isfile(self.read_metadata_path):          
+            with open(self.read_metadata_path, 'w') as fout:
+                json.dump(self.full_metadata , fout)
+            
+    def read_json_metadata(self):
+       if os.path.isfile(self.read_metadata_path):
+        with open(self.read_metadata_path) as json_file:
+            self.full_metadata = json.load(json_file)
+            
+       if os.path.isfile(self.read_voltage_metadata_path):
+            
+            with open(self.read_voltage_metadata_path) as json_file:
+                self.full_voltage_recording_metadata = json.load(json_file)
+
+        
+          
 #%%    
 if __name__ == "__main__":
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIFFrameNumberK3planeallen\Plane3'

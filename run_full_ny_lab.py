@@ -5,8 +5,8 @@ Created on Wed Sep  8 17:57:08 2021
 @author: sp3660
 """
 
-import logging 
-logger = logging.getLogger(__name__)
+
+
 
 
 import sys

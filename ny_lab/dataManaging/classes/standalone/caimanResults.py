@@ -42,13 +42,20 @@ class CaimanResults():
             
 if __name__ == "__main__":
     
-    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane1'
-    hdf5path=temporary_path+ r'\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_MC_OnACID_cnmf_results.hdf5'
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211118_SPKA_FOVGood_optotest2cells_25x_920_50024_narrow_with_cell1_2_210_1-000\Plane1'
+    hdf5path=temporary_path+ r'\211118_SPKA_FOVGood_optotest2cells_25x_920_50024_narrow_with_cell1_2_210_1-000_Shifted_Movie_MC_OnACID_20211204-125615_cnmf_results.hdf5'
     movie_path=temporary_path+ r'\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_MC_kalman.tiff'
-    movie_path2=temporary_path+ r'\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap'
+    movie_path2=temporary_path+ r'\211118_SPKA_FOVGood_optotest2cells_25x_920_50024_narrow_with_cell1_2_210_1-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_33901_.mmap'
     
-    
+    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211117_SPKA_Cell1Opto_25x_920_50024_narrow_with_10x_10_ms_16sp_21la_0.6di-000\Plane1'
+    hdf5path=temporary_path+ r'\211117_SPKA_Cell1Opto_25x_920_50024_narrow_with_10x_10_ms_16sp_21la_0.6di-000_Shifted_Movie_MC_OnACID_20211204-103542_cnmf_results.hdf5'
+    movie_path=temporary_path+ r'\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_MC_kalman.tiff'
+    movie_path2=temporary_path+ r'\211117_SPKA_Cell1Opto_25x_920_50024_narrow_with_10x_10_ms_16sp_21la_0.6di-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_1413_.mmap'
+    %matplotlib qt
     results=CaimanResults(hdf5path, movie_path2)
-    cnm=results.cnm
+    cnmest=results.cnm.estimates
+    cnmest.plot_contours()
+    activity=cnmest.C
+    cnmest.view_components()
    
 

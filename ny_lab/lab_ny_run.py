@@ -4,8 +4,8 @@ Created on Thu Apr  1 08:33:15 2021
 
 @author: sp3660
 """
-import logging 
-logger = logging.getLogger(__name__)
+
+
 import os 
 import sys
 
@@ -15,7 +15,8 @@ from .database import MouseDatabase
 from .dataManaging.data_managing import DataManaging
 from .gui.gui import Gui
 from ny_lab.AllFunctions.select_values_gui import select_values_gui
-
+import logging 
+module_logger = logging.getLogger(__name__)
 
 
 class RunNYLab(Project):    
@@ -26,7 +27,7 @@ class RunNYLab(Project):
         self.databasefile=os.path.join(Project.all_paths_for_this_system['Dropbox'],'LabNY', 'MouseDatabase.db')
         self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
 
-        print('Loading Mouse Database')
+        module_logger.info('Loading Mouse Database')
         self.database=MouseDatabase(self.databasefile, self)   
         #load all mice info       
         self.all_mouse_info=self.database.allEXPERIMENTAL
@@ -46,10 +47,10 @@ class RunNYLab(Project):
             
             
             
-        print('Starting Data Managing')
+        module_logger.info('Starting Data Managing')
         self.datamanaging=DataManaging(self)
         
-    
+        self.gui=[]
         if gui:
             self.gui = Gui(self)
             self.gui.mainloop()

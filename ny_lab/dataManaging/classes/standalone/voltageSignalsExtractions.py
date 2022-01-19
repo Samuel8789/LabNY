@@ -15,26 +15,34 @@ import mplcursors
 import pickle
 import math
 import shutil
+import gc
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
-
+import logging 
+module_logger = logging.getLogger(__name__)
 
 
 class VoltageSignalsExtractions():
     
-    def __init__(self, voltage_excel_path=False, temporary_path=False, just_copy=False, acquisition_directory_raw=False):
-        print('Processing Voltage Signals')
+    def __init__(self, voltage_excel_path=False, temporary_path=False, just_copy=False, acquisition_directory_raw=False, voltage_signals_object=None):
+        module_logger.info('Processing Voltage Signals')
         self.voltage_excel_path=voltage_excel_path
         self.temporary_path=temporary_path
         self.acquisition_directory_raw=acquisition_directory_raw
-        self.check_csv_in_folder()
+        self.voltage_signals_object=voltage_signals_object
 
-        if just_copy:
+
+            
+        if just_copy and self.voltage_excel_path:
+            self.check_csv_in_folder()
+
     
             shutil.copy(self.voltage_excel_path, self.temporary_path)
             
   
-        else:
+        elif not just_copy:
+            self.check_csv_in_folder()
+
             self.voltage_signals_raw = pd.read_csv(self.voltage_excel_path)    
             self.voltage_signals={signal:self.voltage_signals_raw[signal].to_frame() for signal in self.voltage_signals_raw.columns.tolist()[1:]}
             
@@ -70,6 +78,12 @@ class VoltageSignalsExtractions():
             # self.plotting_paradigm_transitions()
             # self.plotting_grating_transitions()
         
+        
+        
+#%% methods
+
+
+
     def correct_signals_names(self):       
         signals=list(self.voltage_signals.keys())
         for signal in signals:
@@ -100,7 +114,7 @@ class VoltageSignalsExtractions():
         self.acceleration_array=np.insert(self.acceleration_array,0,0) 
         
     def process_allenA_signals(self):   
-        print('Analysing AllenA Gratings')
+        module_logger.info('Analysing AllenA Gratings')
         
         # fist get transitions between stimulaton paradigms
         self.rounded_vis_stim=np.around(self.visualstim_array, 1)
@@ -285,7 +299,7 @@ class VoltageSignalsExtractions():
 #%%
     def confirm_grating_indexes(self):
         
-        print('todo')
+        module_logger.info('todo')
         # confirm number of trial
         # confirm length of ranges
         
@@ -389,7 +403,7 @@ class VoltageSignalsExtractions():
         # tuning_stim_off_index_full_recording = stim_off_indexes_tuning_period + (first_grating_indx)
 
         #
-        print('todo')
+        module_logger.info('todo')
 
 
     def save_transition_indexes(self):

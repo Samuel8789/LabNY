@@ -708,7 +708,25 @@ class ExperimentalDatabase():
 
     def plan_new_window(self, all_winodws_parameters, lab_number_selected=False, codes_selected=False, ):
         
+        if lab_number_selected:
+            params=tuple(lab_number_selected)    
+            query_mice_cage='SELECT Cage FROM MICE_table WHERE Lab_Number IN (%s)' % ','.join('?' for i in params)   
+            mice_cages = self.databse_ref.arbitrary_query_to_df(query_mice_cage, params).values.tolist()
+            
+            codes_selected=[]
+            for cage in mice_cages:
+                mice_exp=self.add_new_planned_experimental_cage(cage[0])
+                seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if str(mouse_exp[1]) in lab_number_selected]
+                selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
+                params=tuple(selected_mouse_IDs)    
+                query_mice_exp_info='SELECT Code FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)   
+                mice_experiments_codes = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()[0]
+                codes_selected.append(mice_experiments_codes)
+            codes_selected = [item for sublist in codes_selected for item in sublist]
+
     
+    
+            
         params=tuple(codes_selected)
         # query_check_exp_info="SELECT * FROM ExperimentalAnimals_table  WHERE Code=?"
         query_check_exp_info='SELECT * FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in codes_selected)    

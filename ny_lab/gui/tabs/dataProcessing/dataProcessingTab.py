@@ -14,7 +14,7 @@ import os
 
 from ...utils import button_update_database  
 from .widgetSelectAcquisition import WidgetSelectAcquisition
-from ....data_pre_processing.caimanExtraction import CaimanExtraction
+# from ....data_pre_processing.caimanExtraction import CaimanExtraction
 
 class DataProcessingTab(tk.Frame):
     def __init__(self, gui_object, gui_tab_control):
@@ -46,17 +46,11 @@ class DataProcessingTab(tk.Frame):
         self.frame1.buttons={}
         self.frame1.buttons_names=['Clean Up Session Folders',
                                    'Add Imaging Session To Database',
-                                   'Convert All To Mmap',
-                                   'Do all motioncorrect/kalman(only fovs, not red)',
-                                   'Do all projections' ,
-                                   'Correct al MCKalmans'
+
                                      ]
         self.frame1.buttons_commands=[self.clean_up_raw_imaging_folders_button, 
                                       self.add_new_imaging_session_button,
-                                      self.convert_all_to_mmap_button,
-                                      self.motion_correct_kalman_button,
-                                      self.do_all_projections_button,
-                                      self.motion_correct_kalman_button_correct
+            
                                            ]
         for i in range(len( self.frame1.buttons_names)):
               self.frame1.buttons[ self.frame1.buttons_names[i]]= ttk.Button( self.frame1 , text= self.frame1.buttons_names[i], command= self.frame1.buttons_commands[i])
@@ -78,11 +72,7 @@ class DataProcessingTab(tk.Frame):
                 
         self.frame1.buttons[ self.frame1.buttons_names[0]].grid(column=2, row=0)
         self.frame1.buttons[ self.frame1.buttons_names[1]].grid(column=3, row=0)
-        self.frame1.buttons[ self.frame1.buttons_names[2]].grid(column=0, row=1)
-
-        self.frame1.buttons[ self.frame1.buttons_names[3]].grid(column=0, row=2)
-        self.frame1.buttons[ self.frame1.buttons_names[4]].grid(column=0, row=3)
-        self.frame1.buttons[ self.frame1.buttons_names[5]].grid(column=0, row=4)
+    
 
 
 
@@ -112,15 +102,15 @@ class DataProcessingTab(tk.Frame):
         self.frame2.buttons_names=['Processed Selected Acqusition',
                                    'Process All Acqusisitons',
                                         ]
-        self.frame2.buttons_commands=[self.process_selected_acquisition, 
-                                      self.process_all_acquisition_from_mouse,
-                                        ]
-        for i in range(len( self.frame2.buttons_names)):
-              self.frame2.buttons[ self.frame2.buttons_names[i]]= ttk.Button( self.frame2 , text= self.frame2.buttons_names[i], command= self.frame2.buttons_commands[i])
+        # self.frame2.buttons_commands=[self.process_selected_acquisition, 
+        #                               self.process_all_acquisition_from_mouse,
+        #                                 ]
+        # for i in range(len( self.frame2.buttons_names)):
+        #       self.frame2.buttons[ self.frame2.buttons_names[i]]= ttk.Button( self.frame2 , text= self.frame2.buttons_names[i], command= self.frame2.buttons_commands[i])
         
         
-        self.frame2.buttons[ self.frame2.buttons_names[0]].grid(column=0, row=1)
-        self.frame2.buttons[ self.frame2.buttons_names[1]].grid(column=0, row=2)
+        # self.frame2.buttons[ self.frame2.buttons_names[0]].grid(column=0, row=1)
+        # self.frame2.buttons[ self.frame2.buttons_names[1]].grid(column=0, row=2)
         
       
         
@@ -164,75 +154,77 @@ class DataProcessingTab(tk.Frame):
         session=self.session_to_process.get()
         self.gui_ref.MouseDat.ImagingDatabase_class.add_new_session_to_database( self.gui_ref, session)
         button_update_database(self.gui_ref)
+        self.gui_ref.datamanaging.all_existing_sessions_not_database_objects[session].load_all_yet_to_database_mice()
+        # mouse_codes=datamanaging.all_existing_sessions_not_database_objects[session_name].session_imaged_mice_codes
+        # widef=fullalen.FOV_object.mouse_imaging_session_object.widefield_image[list(fullalen.FOV_object.mouse_imaging_session_object.widefield_image.keys())[0]]
+        # widef.plot_image()
+        
+        
 
     def clean_up_raw_imaging_folders_button(self):
         session=self.session_to_process.get()
-        self.gui_ref.lab.datamanaging.cleaning_up_raw_acquisitions(session)
-        self.gui_ref.lab.datamanaging.cleaning_up_calibrations(session)
+        sess=self.gui_ref.lab.datamanaging.load_raw_session(session)
+        sess.cleaning_up_raw_mouse_acquisitions()
+        # sess.cleaning_up_calibrations(session)
         button_update_database(self.gui_ref)
 
     # this gos over all prairire imaging session and read all datasets an creates mmap in slow directory folder 
     # Make a gui to select session
     
-    def convert_all_to_mmap_button(self):     
-        for k,v in self.gui_ref.lab.datamanaging.all_existing_sessions_database_objects.items():
-            self.gui_ref.lab.datamanaging.all_existing_sessions_database_objects[k].load_all_imaged_mice()
+
            
-    # this gets all datasets and do the projection 
-    # Make a gui to select mouse to process and datasets      
-           
-    def do_all_projections_button(self):     
-        print('Doing projections')
-        for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
-            mouse.get_all_mouse_acquisitions_datasets()
-            mouse.get_all_mouse_FOVdata_datasets()
-            for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
-                data_object.do_projections()
-            for dataset, data_object in mouse.all_mouse_FOVdata_datasets.items():
-                data_object.do_projections()
-        print('pronjections done')
+    # def do_all_projections_button(self):     
+    #     print('Doing projections')
+    #     for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
+    #         mouse.get_all_mouse_acquisitions_datasets()
+    #         mouse.get_all_mouse_FOVdata_datasets()
+    #         for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
+    #             data_object.do_projections()
+    #         for dataset, data_object in mouse.all_mouse_FOVdata_datasets.items():
+    #             data_object.do_projections()
+    #     print('pronjections done')
                 
     # this process al datasets selected to do kalman and motion corretciuoin
     # Make a gui to select mouse to process and datasets             
                 
-    def motion_correct_kalman_button(self):
-        for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
-            mouse.get_all_mouse_acquisitions_datasets()
-            mouse.get_all_mouse_FOVdata_datasets()
-            to_ignore=['SurfaceImage','0Coordinate', 'nonimaging','etl','MaxResMech','Tomato','1050', '\Red']               
-            for dataset, data_object in   mouse.all_mouse_FOVdata_datasets.items():                     
-                    data_object.create_mot_corrected_kalman_tiff()                   
-            for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
-                if not any(x in data_object.dataset_full_file_path for x in to_ignore):                   
-                    data_object.create_mot_corrected_kalman_tiff()
+    # def motion_correct_kalman_button(self):
+    #     for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
+    #         mouse.get_all_mouse_acquisitions_datasets()
+    #         mouse.get_all_mouse_FOVdata_datasets()
+    #         to_ignore=['SurfaceImage','0Coordinate', 'nonimaging','etl','MaxResMech','Tomato','1050', '\Red']               
+    #         for dataset, data_object in   mouse.all_mouse_FOVdata_datasets.items():                     
+    #                 data_object.create_mot_corrected_kalman_tiff()                   
+    #         for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
+    #             if not any(x in data_object.dataset_full_file_path for x in to_ignore):                   
+    #                 data_object.create_mot_corrected_kalman_tiff()
                     
-    def motion_correct_kalman_button_correct(self):
+    # def motion_correct_kalman_button_correct(self):
  
-         for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
-             # to_ignore_mouse=['SPJO','SPJP','SPGV','SPGW','SPGX', 'SPIB','SPIL']
-             # if key not in to_ignore_mouse:
-                 mouse.get_all_mouse_acquisitions_datasets()
-                 mouse.get_all_mouse_FOVdata_datasets()
-                 to_ignore=['SurfaceImage','0Coordinate', 'nonimaging','etl','MaxResMech','Tomato','1050', '\Red']       
-                 for dataset, data_object in   mouse.all_mouse_FOVdata_datasets.items():  
-                     # if dataset not in ['20210525_FOV_1_210525_SPIN_920_50024_SinglePLane10min-000_Plane1_Green_210525_SPIN_920_50024_SinglePLane10min-000_d1_256_d2_256_d3_1_order_F_frames_10015_.mmap','20210618_FOV_1_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_Plane1_Green_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_16951_.mmap', '20210618_FOV_1_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_Plane1_Red_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_16951_.mmap']:
-                         data_object.create_mot_corrected_kalman_tiff(correct=True)                   
-                 for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
-                     if not any(x in data_object.dataset_full_file_path for x in to_ignore):                   
-                         data_object.create_mot_corrected_kalman_tiff(correct=True)                    
-         print('processing finished')           
-    # this does caiman on a selected dataset            
+    #      for key, mouse in self.gui_ref.lab.datamanaging.all_experimetal_mice_objects.items():
+    #          # to_ignore_mouse=['SPJO','SPJP','SPGV','SPGW','SPGX', 'SPIB','SPIL']
+    #          # if key not in to_ignore_mouse:
+    #              mouse.get_all_mouse_acquisitions_datasets()
+    #              mouse.get_all_mouse_FOVdata_datasets()
+    #              to_ignore=['SurfaceImage','0Coordinate', 'nonimaging','etl','MaxResMech','Tomato','1050', '\Red']       
+    #              for dataset, data_object in   mouse.all_mouse_FOVdata_datasets.items():  
+    #                  # if dataset not in ['20210525_FOV_1_210525_SPIN_920_50024_SinglePLane10min-000_Plane1_Green_210525_SPIN_920_50024_SinglePLane10min-000_d1_256_d2_256_d3_1_order_F_frames_10015_.mmap','20210618_FOV_1_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_Plane1_Green_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_16951_.mmap', '20210618_FOV_1_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_Plane1_Red_210618_SPIN_FOV1_10minspont_920_50024_narrow_without-000_d1_256_d2_256_d3_1_order_F_frames_16951_.mmap']:
+    #                      data_object.create_mot_corrected_kalman_tiff(correct=True)                   
+    #              for dataset, data_object in mouse.all_mouse_acquisitions_datasets.items():
+    #                  if not any(x in data_object.dataset_full_file_path for x in to_ignore):                   
+    #                      data_object.create_mot_corrected_kalman_tiff(correct=True)                    
+    #      print('processing finished')           
+    # # this does caiman on a selected dataset            
                 
-    def process_selected_acquisition(self):
-        dataset=self.frame2.selected_aquisition_frame_widget.selected_dataset.get()
-        data_object=self.frame2.selected_aquisition_frame_widget.mouse_all_fovs_datasets_dic[dataset]
-        caim=CaimanExtraction(data_object)
-        caim.apply_caiman()
+    # def process_selected_acquisition(self):
+    #     dataset=self.frame2.selected_aquisition_frame_widget.selected_dataset.get()
+    #     data_object=self.frame2.selected_aquisition_frame_widget.mouse_all_fovs_datasets_dic[dataset]
+    #     caim=CaimanExtraction(data_object)
+    #     caim.apply_caiman()
 
-    # this does caiman on all datasets of mouse    
+    # # this does caiman on all datasets of mouse    
 
-    def process_all_acquisition_from_mouse(self): 
-        mouse_datasets=self.frame2.selected_aquisition_frame_widget.mouse_all_fovs_datasets_dic                         
-        for dataset, data_object in mouse_datasets.items():
-                caim=CaimanExtraction(data_object)
-                caim.apply_caiman()
+    # def process_all_acquisition_from_mouse(self): 
+    #     mouse_datasets=self.frame2.selected_aquisition_frame_widget.mouse_all_fovs_datasets_dic                         
+    #     for dataset, data_object in mouse_datasets.items():
+    #             caim=CaimanExtraction(data_object)
+    #             caim.apply_caiman()

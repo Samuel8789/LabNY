@@ -23,12 +23,16 @@ import tkinter as tk
 from tkinter import  Label, RAISED, Button, Entry
 
 class plan_window_parameters(tk.Toplevel):
-    def __init__(self,  gui, mice_codes):
+    def __init__(self,  gui, mice_codes=None, number=None):
         tk.Toplevel.__init__(self, gui)
 
         self.selected_codes=mice_codes
+        self.number=number
+        if not self.selected_codes and number:
+            mice_codes=[''] * int(number)
+   
+        self.total_rows=len(mice_codes)            
         self.gui=gui
-        self.total_rows=len(mice_codes)
 
         injection_params={'Mouse_Code':'',
                           'Date':'TODO',
@@ -136,7 +140,12 @@ class plan_window_parameters(tk.Toplevel):
 
         self.destroy()
         self.update()
-        self.gui.MouseDat.Experimental_class.plan_new_window(self.values, codes_selected=self.selected_codes)
+        if not self.number:
+            self.gui.MouseDat.Experimental_class.plan_new_window(self.values, codes_selected=self.selected_codes)
+        else:
+            self.gui.MouseDat.Experimental_class.plan_new_window(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
+           
+
 
 
 if __name__ == "__main__":

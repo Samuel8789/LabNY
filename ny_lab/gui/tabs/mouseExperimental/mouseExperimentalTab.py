@@ -16,6 +16,8 @@ from .new_window_plan_injections import  new_window_plan_injections
 from .new_window_update_done_injections import  new_window_update_done_injections
 from .new_window_update_done_windows import  new_window_update_done_windows
 from .new_window_post_op_injections import  new_window_post_op_injections
+from ....database.fun.guiFunctions.plan_window_parameters import plan_window_parameters
+
 
 from ..mouseVisit.widgetSelectStockCageMice import WidgetSelectStockCageMice
 from .processBrainWindow import ProcessBrain
@@ -90,6 +92,19 @@ class MouseExperimentalTab(tk.Frame):
                                       ]
         for i in range(len(self.frame2.buttons_names)):
               self.frame2.buttons[self.frame2.buttons_names[i]]= ttk.Button(self.frame2 , text=self.frame2.buttons_names[i], command=self.frame2.buttons_commands[i])
+              
+        self.frame2.entries={}
+        self.frame2.entries_names=[ '# New Windows'
+                                   ]
+        for i in range(len(self.frame2.entries_names)):
+            self.frame2.entries[self.frame2.entries_names[i]]=ttk.Entry(self.frame2 , text='', width=9)
+      
+        self.frame2.labels={}
+        self.frame2.labels_names=['# of windows to plan' 
+                                   ]
+        for i in range(len(self.frame2.labels_names)):
+            self.frame2.labels[self.frame2.labels_names[i]]=ttk.Label(self.frame2, text=self.frame2.labels_names[i], width=20)
+       
 
         self.frame2.buttons[self.frame2.buttons_names[0]].grid(column=0, row=0)
         
@@ -103,6 +118,12 @@ class MouseExperimentalTab(tk.Frame):
         self.frame2.buttons[self.frame2.buttons_names[2]].grid(column=0, row=11)
 
 
+        self.frame2.entries[self.frame2.entries_names[0]].grid(column=0, row=2)   
+        self.frame2.labels[self.frame2.labels_names[0]].grid(column=0, row=3) 
+
+        self.frame2.entries[self.frame2.entries_names[0]]['width']=20
+        
+     
 #%%TAB 3 'Mouse Experimental' 'Post-op'
         self.frame3= self.frames[self.frames_names[2]]  
         today_date=datetime.date.today()
@@ -227,15 +248,16 @@ class MouseExperimentalTab(tk.Frame):
             self.update_injection_window.wait_window()
             button_update_database(self.gui_ref)
                             
-#%% TO DO PLAN WINDOW            
+#%% windows       
     def plan_window_button(self):
-        # new_window_plan_windows(self)
-        button_update_database(self.gui_ref)    
-#         cage=113
-# selectedanimals=[4158,4182]
-# MouseDat.Experimental_class.plan_new_window(cage=cage,lab_number_selected=selectedanimals)
+        
+        number_of_animals= self.frame2.entries[self.frame2.entries_names[0]].get()
 
-#%%  windows      
+        self.plan_window_parameters_window=plan_window_parameters(self.gui_ref, number=number_of_animals)
+        self.plan_window_parameters_window.wait_window()
+        print('windows planned')
+        button_update_database(self.gui_ref)    
+     
     def prepare_window_templates_button(self):
       
         selected_codes = list()
@@ -248,7 +270,6 @@ class MouseExperimentalTab(tk.Frame):
         selectedwidnowsinfo=selectedwidnows[['Code','Lab_Number','Sex','Cage','Age','WeeksFromInjection','Line_Short','Projects','Labels_types']]
         selectedwidnowsinfo.to_excel(os.path.join(r'C:\Users\sp3660\Desktop\Temp_Excel_Files' ,'InfoForWindowTemplates_{0}.xlsx'.format(datetime.date.today().strftime("%Y%m%d") )))
         
-    
     def update_done_window_button(self):         
         self.update_window_window=new_window_update_done_windows(self.gui_ref)
         self.update_window_window.wait_window()

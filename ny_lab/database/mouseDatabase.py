@@ -16,7 +16,8 @@ import os
 from shutil import copyfile
 import glob
 from pathlib import Path
-
+import logging 
+module_logger = logging.getLogger(__name__)
 from ..AllFunctions.select_values_gui import select_values_gui
 from .fun.guiFunctions.updateLitterInput import UpdateLitterInput
 from .fun.guiFunctions.input_genotypes import input_genotypes
@@ -232,7 +233,7 @@ class MouseDatabase():
         """
         Alive_non_exp_stock =self.arbitrary_query_to_df(query_stock)
         Alive_non_exp_stock_sorted= Alive_non_exp_stock.sort_values(by=['Sex','Lab_Number'],ascending=True)       
-        Alive_non_exp_stock_grouped = Alive_non_exp_stock_sorted.groupby(['Breeders_types', 'Cage', 'Line_Short', 'Sex' ])['Lab_Number'].apply(list)
+        Alive_non_exp_stock_grouped = Alive_non_exp_stock_sorted.groupby(['Breeders_types', 'Cage', 'WeeksOld','Line_Short', 'Sex' ])['Lab_Number'].apply(list)
         Alive_non_exp_stock_grouped_frame=Alive_non_exp_stock_grouped.to_frame()
         self.stock_mice=pd.DataFrame(Alive_non_exp_stock_grouped_frame.Lab_Number.values.tolist(), Alive_non_exp_stock_grouped_frame.index).add_prefix('Mouse_').astype('Int64')
         self.stock_mice.reset_index(inplace=True)

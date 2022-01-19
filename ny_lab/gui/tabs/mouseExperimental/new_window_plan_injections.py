@@ -137,7 +137,7 @@ class new_window_plan_injections(tk.Toplevel):
            
              
         if project in (2,3):
-            stocks=  self.gui.MouseDat.stock_mice[self.gui.MouseDat.stock_mice['Line_Short'].isin(['VRC::PVF::Ai65  ','VRC::SLF::Ai65','VRC::PVF','VRC::SLF'])]['Cage'].tolist()  
+            stocks=  self.gui.MouseDat.stock_mice[self.gui.MouseDat.stock_mice['Line_Short'].isin(['VRC::PVF::Ai65','VRC::SLF::Ai65','VRC::PVF','VRC::SLF'])]['Cage'].tolist()  
 
             exp_siblings=  self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter[self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Line_Short'].isin(['VRC::PVF::Ai65  ','VRC::SLF::Ai65','VRC::PVF','VRC::SLF'])][self.gui.main_tabs['Mouse Experimental'].experimental_recoveryanimalsbetter['Experiment']=='Planned']['Cage'].tolist()
 
