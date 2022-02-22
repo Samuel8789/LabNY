@@ -113,6 +113,9 @@ class Aquisition:
  #%% reading exiting datasets           
         elif not non_imaging: 
             self.read_acqu_and_plane_structure()
+            if not self.mouse_imaging_session_object.yet_to_add:       
+                self.get_all_database_info()
+                self.load_metadata_from_database()
             self.read_existing_datasets()
             
  #%% nopn imaging no pariaire files, only face camera
@@ -450,13 +453,13 @@ class Aquisition:
 
 
     def get_all_database_info(self):
-        self.acquisition_database_info={}
-        self.imaging_database_info={}
-        pass
-    
-    
-    
-    
+        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath'] ==     self.mouse_aquisition_path]['ID'].iloc[0]  
+        if self.aq_ID:
+            self.full_database_dictionary=self.mouse_imaging_session_object.mouse_object.Database_ref.ImagingDatabase_class.get_single_acquisition_database_info(self.aq_ID)
+            self.acquisition_database_info= self.full_database_dictionary['Acq']
+            self.imaging_database_info= self.full_database_dictionary['Imaging']
+            
+
        
     def transfer_ref_images(self):
         self.references_raw_files_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+'\\References\\**', recursive=False) if '.tif' in file  ]
@@ -476,6 +479,9 @@ class Aquisition:
         if self.slow_storage_all_paths['metadata']:
             self.metadata_object=Metadata(acquisition_directory_raw=self.slow_storage_all_paths['metadata'],  aquisition_object=self)
             
+    def load_metadata_from_database(self):
+        self.metadata_object=Metadata(aquisition_object=self, from_database=True)
+        pass
 
 #%% dealing with voltage signals 
 

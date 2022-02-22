@@ -25,6 +25,7 @@ from caiman.motion_correction import apply_shift_online
 from .kalman_stack_filter import kalman_stack_filter
 from .save_imagej_hdf5_tiff import save_imagej_hdf5
 from .bidiShiftManager import BidiShiftManager
+from ...functions.transform_path import transform_path
 
 
 class MotionCorrectedKalman:

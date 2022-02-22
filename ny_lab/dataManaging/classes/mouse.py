@@ -60,12 +60,14 @@ class Mouse:
         self.imaging_sessions_database=self.Database_ref.arbitrary_query_to_df(quey_imaging_session, params)        
         self.load_all_imaging_sessions_from_database()
         self.get_all_mouse_acquisitions(self.imaging_sessions_objects)
+        self.get_all_mouse_acquisitions_datasets(self.imaging_sessions_objects)
+        self.get_all_mouse_FOVdata_datasets()
  
     
     def read_processed_imaging_session_not_in_database(self, session_name):
          module_logger.info('Reading '+ self.mouse_name)
          self.imaging_sessions_not_yet_database_objects={}
-         self.imaging_sessions_not_yet_database_objects[session_name]=MouseImagingSession(session_name, mouse_object=self, adding_to_database=True)
+         self.imaging_sessions_not_yet_database_objects[session_name]=MouseImagingSession(session_name, mouse_object=self, yet_to_add=True)
          self.get_all_mouse_acquisitions(self.imaging_sessions_not_yet_database_objects)
 
      
@@ -83,7 +85,7 @@ class Mouse:
         module_logger.info('Processing '+ self.mouse_name)
         # module_logger.info('Adding prairie sessions')
         self.raw_imaging_sessions_objects={}
-        self.raw_imaging_sessions_objects[session_name]=MouseImagingSession(session_name, raw_imaging_session_path=raw_imaging_session_path, mouse_object=self)
+        self.raw_imaging_sessions_objects[session_name]=MouseImagingSession(session_name, raw_imaging_session_path=raw_imaging_session_path, mouse_object=self, yet_to_add=True)
         self.unload_full_imaging_session(session_name)
         # self.load_all_imaging_sessions()
        

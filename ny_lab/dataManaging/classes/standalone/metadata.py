@@ -15,7 +15,8 @@ import shutil
 import matplotlib.pyplot as plt
 import logging 
 import json
-
+import copy
+from dateutil import parser
 module_logger = logging.getLogger(__name__)
 # from recursively_read_metadata import recursively_read_metadata
 # from select_values_gui import select_values_gui
@@ -38,15 +39,12 @@ class Metadata():
                  voltageoutput_metadataPath=False, 
                  imaging_database_row=None,
                  temporary_path=None,
-                 acquisition_directory_raw=None, aquisition_object=None):
+                 acquisition_directory_raw=None, aquisition_object=None, from_database=False):
         module_logger.info('Processing Metadata')
         
         self.temporary_path=temporary_path
         self.aquisition_object=aquisition_object
-       
 
-        
-        
         self.acquisition_directory_raw=acquisition_directory_raw
         self.full_voltage_recording_metadata=None
         self.all_frames=[]
@@ -60,15 +58,18 @@ class Metadata():
         self.check_metadata_in_folder()
         self.full_metadata=None
         self.full_voltage_recording_metadata=None
+        self.imaging_metadata=None
+        self.translated_imaging_metadata=None
 
         if self.aquisition_object:
-            self.read_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'imaging_metadata.json')
-            self.read_voltage_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'voltage_metadata.json')
-            module_logger.info('readig metdata from json')
-
-            self.read_json_metadata() 
-        
-               
+            if from_database:
+                self.get_all_metadata_from_database()
+            else:
+                self.read_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'imaging_metadata.json')
+                self.read_voltage_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'voltage_metadata.json')
+                module_logger.info('readig metdata from json')
+                self.read_json_metadata()
+                
         if self.imaging_metadata_file:     
             if os.path.isfile(self.imaging_metadata_file):
                     # module_logger.info('getting metadata')
@@ -76,8 +77,8 @@ class Metadata():
         if self.voltage_file :
             if os.path.isfile(self.voltage_file):        
                     self.process_voltage_recording()
-   
-   
+        if not from_database:
+            self.translate_metadata()
         # else:
         #     self.add_metadata_manually()
         #     if self.photostim_metadataPath!=None:
@@ -86,10 +87,12 @@ class Metadata():
         #             self.photostim_extra_metadata=self.create_photostim_sequence(self.photostim_metadata, self.imaging_metadata)#,
         #             self.photostim_metadata['PhotoStimSeriesArtifact']=self.photostim_extra_metadata
 
-        if self.temporary_path: 
-            self.transfer_metadata()  
-        if self.aquisition_object:
-            self.save_metadata_as_json()           
+            if self.temporary_path: 
+                self.transfer_metadata()  
+            if self.aquisition_object:
+                self.save_metadata_as_json()  
+                
+        
     
         # if self.video_params:    
         #     self.plotting()    
@@ -104,9 +107,7 @@ class Metadata():
 
         voltage_aq_time=self.full_voltage_recording_metadata['DateTime']['Description'][self.full_voltage_recording_metadata['DateTime']['Description'].find('T')+1:]
         # voltage_aq_time=root[3].text[root[3].text.find('T')+1:]
-        voltage_aq_time=time.strptime(voltage_aq_time[:-9], '%X.%f')
-        self.voltage_aq_time=time.strftime('%H:%M:%S', voltage_aq_time)
-        
+        self.voltage_aq_time= parser.parse(voltage_aq_time).time().strftime('%H:%M:%S')
         ExperimentInfo=self.full_voltage_recording_metadata['Experiment']          
         # recorded_channels=[elem['Childs']['VisibleSignals']['VRecSignalPerPlotProperties']['Childs']['SignalId']['Value']['Description'] for elem in ExperimentInfo['Childs']["PlotConfigList"].values() if elem['Childs']['VisibleSignals']['VRecSignalPerPlotProperties']]
         recorded_channels=[elem['Childs']['VisibleSignals']['VRecSignalPerPlotProperties']['Childs']['SignalId']['Value']['Description'] if elem['Childs']['VisibleSignals'] else '' for elem in ExperimentInfo['Childs']["PlotConfigList"].values() ]
@@ -133,7 +134,7 @@ class Metadata():
             MicroscopeInfo=self.full_metadata['PVStateShard']
             seqinfo=self.full_metadata['Sequence']
 
-            self.params={'ImagingTime':time.strftime('%H:%M:%S',time.strptime(self.full_metadata['date'],'%m/%d/%Y %X %p')),
+            self.params={'ImagingTime':parser.parse(self.full_metadata['date']).time().strftime('%H:%M:%S'),
                     'Date':self.full_metadata['date'],
                     'AquisitionName':os.path.splitext(os.path.basename(self.imaging_metadata_file))[0]}
               
@@ -761,7 +762,7 @@ class Metadata():
         PhotoStimSeriesArtifact={'artifact_idx':artifact_idx, 'stim_table_ms':stim_table_ms,'Processed_Pockels_Signal' :filtered_resampled_laser}
         
         return PhotoStimSeriesArtifact   
- #%%   new functions
+#%%   new functions
     def transfer_metadata(self):    
 
         self.metadata_raw_files_full_path=[file for file in glob.glob(self.acquisition_directory_raw+'\\**', recursive=False) if '.xml' in file  ]
@@ -772,7 +773,7 @@ class Metadata():
                 self.transfered_metadata_paths.append(os.path.join(self.temporary_path, file))
   
     def check_metadata_in_folder(self):
-     if self.acquisition_directory_raw:
+        if self.acquisition_directory_raw:
             xmlfiles=glob.glob(self.acquisition_directory_raw+'\\**.xml')
             for xml in xmlfiles:
                 if 'Cycle' not in xml:
@@ -786,8 +787,6 @@ class Metadata():
                 if 'VoltageOutput' in xml:
                     self.voltage_output=xml 
 
-    def read_metadata_from_database(self):
-        module_logger.info('TO DO')
     
     def save_metadata_as_json(self):
         if not os.path.isfile(self.read_voltage_metadata_path):
@@ -809,15 +808,206 @@ class Metadata():
             with open(self.read_voltage_metadata_path) as json_file:
                 self.full_voltage_recording_metadata = json.load(json_file)
 
+
+    def get_all_metadata_from_database(self):
+
+        self.aquisition_object.full_database_dictionary
+        self.acquisition_metadata= self.aquisition_object.full_database_dictionary['Acq'].to_dict('records')[0]
+
+        self.imaging_metadata_database=self.aquisition_object.full_database_dictionary['Imaging'].to_dict('records')
+        if self.imaging_metadata_database:
+            self.translated_imaging_metadata=copy.copy(self.imaging_metadata_database[0])
+            self.translated_imaging_metadata['CorrectedObjectivePositions']=self.translated_imaging_metadata['ObjectivePositions']
+            self.translated_imaging_metadata['CorrectedETLPositions']=self.translated_imaging_metadata['ETLPositions']
+            self.translated_imaging_metadata.pop('ID')
+            self.translated_imaging_metadata.pop('AcquisitionID')
+            self.translated_imaging_metadata.pop('ImagingFilename')
+            self.translated_imaging_metadata.pop('ImagingFullFilePath')
+            self.translated_imaging_metadata.pop('IsSlowStorage')
+            self.translated_imaging_metadata.pop('IsWorkingStorage')
+            self.translated_imaging_metadata.pop('SlowStoragePath')
+            self.translated_imaging_metadata.pop('ToDoDeepCaiman')
+            self.translated_imaging_metadata.pop('WorkingStoragePath')
+            self.translated_imaging_metadata = dict( sorted(self.translated_imaging_metadata.items(), key=lambda x: x[0].lower()) )
+
+
         
+        self.facecam_metadata= self.aquisition_object.full_database_dictionary['FaceCam'].to_dict('records')
+        if self.facecam_metadata:
+            self.facecam_metadata=self.facecam_metadata[0]
+            
+        self.visstim_metadata= self.aquisition_object.full_database_dictionary['VisStim'].to_dict('records')
+        if self.visstim_metadata:
+            self.visstim_metadata=self.visstim_metadata[0]
+
+
+
+    def translate_metadata(self):
+        
+        self.translated_imaging_metadata={
+                    'PowerSetting':np.nan,
+                    'Objective':np.nan,
+                    'PMT1GainRed':np.nan,
+                    'PMT2GainGreen':np.nan,
+                    'FrameAveraging':np.nan,
+                    'ObjectivePositions':np.nan,
+                    'ETLPositions':np.nan,
+                    'PlaneNumber':np.nan,
+                    'TotalVolumes':np.nan,
+                    'IsETLStack':np.nan,
+                    'IsObjectiveStack':np.nan,
+                    'InterFramePeriod':np.nan,
+                    'FinalVolumePeriod':np.nan,
+                    'FinalFrequency':np.nan,
+                    'TotalFrames':np.nan,
+                    'FOVNumber':np.nan,
+                    'ExcitationWavelength':np.nan,
+                    'CoherentPower':np.nan,
+                    'CalculatedPower':np.nan,
+                    'Comments':np.nan,
+                    'IsChannel1Red':np.nan,
+                    'IsChannel2Green':np.nan,
+                    'IsGalvo':np.nan,
+                    'IsResonant':np.nan,   
+                    'Resolution':np.nan,
+                    'DwellTime':np.nan,
+                    'Multisampling':np.nan,
+                    'BitDepth':np.nan,
+                    'LinePeriod':np.nan,
+                    'FramePeriod':np.nan,
+                    'FullAcquisitionTime':np.nan,    
+                    'RedFilter':np.nan,
+                    'GreenFilter':np.nan,
+                    'DichroicBeamsplitter':np.nan,
+                    'IsBlockingDichroic':np.nan,
+                    'OverlapPercentage':np.nan,
+                    'AtlasOverlap':np.nan,
+                    'OverlapPercentageMetadata':np.nan,
+                    'AtlasDirection':np.nan,
+                    'AtlasZStructure':np.nan,
+                    'AtlasGridSize':np.nan,
+                    'CorrectedObjectivePositions':np.nan,
+                    'CorrectedETLPositions':np.nan,
+                    'ImagingTime':np.nan,
+                    'IsVoltagERecording':np.nan,
+                    'MicronsPerPixelX':np.nan,
+                    'MicronsPerPixelY':np.nan,
+                    'Xpositions':np.nan,
+                    'Ypositions':np.nan,
+                    'Zoom':np.nan,
+                    'VoltageRecordingChannels':np.nan,
+                    'VoltageRecordingFrequency':np.nan,
+                    'Is10MinRec':np.nan,
+                    'IsGoodObjective':np.nan,
+                                        }
+                    
+                    
+      
+       
+        self.translated_imaging_metadata['PowerSetting']=self.imaging_metadata[1]['Planepowers']    
+        self.translated_imaging_metadata['Objective']=self.imaging_metadata[0]['Objective']       
+        self.translated_imaging_metadata['PMT1GainRed']=self.imaging_metadata[1]['pmtGains_Red']
+        self.translated_imaging_metadata['PMT2GainGreen']=self.imaging_metadata[1]['pmtGains_Green']
+        self.translated_imaging_metadata['FrameAveraging']=self.imaging_metadata[0]['RasterAveraging']   
+        self.translated_imaging_metadata['ObjectivePositions']=self.imaging_metadata[1]['PlanePositionsOBJ']
+        self.translated_imaging_metadata['ETLPositions']=self.imaging_metadata[1]['PlanePositionsETL'] 
+        self.translated_imaging_metadata['Xpositions']=self.imaging_metadata[1]['XPositions'] 
+        self.translated_imaging_metadata['Ypositions']=self.imaging_metadata[1]['YPositions'] 
+        self.translated_imaging_metadata['ImagingTime']=self.imaging_metadata[0]['ImagingTime'] 
+        self.translated_imaging_metadata['MicronsPerPixelX']=self.imaging_metadata[0]['MicronsPerPixelX'] 
+        self.translated_imaging_metadata['MicronsPerPixelY']=self.imaging_metadata[0]['MicronsPerPixelY'] 
+        self.translated_imaging_metadata['Zoom']=self.imaging_metadata[0]['OpticalZoom'] 
+        self.translated_imaging_metadata['CorrectedObjectivePositions']=self.imaging_metadata[1]['PlanePositionsOBJ']
+        self.translated_imaging_metadata['CorrectedETLPositions']=self.imaging_metadata[1]['PlanePositionsETL'] 
+
+
+        if self.imaging_metadata[1]['PlaneNumber']=='Single':
+                self.translated_imaging_metadata['IsETLStack']=0
+                self.translated_imaging_metadata['IsObjectiveStack']=0
+                self.translated_imaging_metadata['PlaneNumber']=1
+                self.translated_imaging_metadata['TotalFrames']=self.imaging_metadata[1]['FrameNumber']
+                self.translated_imaging_metadata['InterFramePeriod']=self.imaging_metadata[0]['framePeriod']*self.translated_imaging_metadata['FrameAveraging']
+                self.translated_imaging_metadata['FinalVolumePeriod']=self.translated_imaging_metadata['InterFramePeriod']
+                self.translated_imaging_metadata['FinalFrequency']=1/self.translated_imaging_metadata['InterFramePeriod']
+                self.translated_imaging_metadata['TotalVolumes']=self.translated_imaging_metadata['TotalFrames']
+        else:
+            self.translated_imaging_metadata['TotalVolumes']=self.imaging_metadata[1]['VolumeNumber']
+            self.translated_imaging_metadata['IsETLStack']=0
+            self.translated_imaging_metadata['IsObjectiveStack']=0
+            self.translated_imaging_metadata['PlaneNumber']=self.imaging_metadata[1]['PlaneNumber']
+         
+            self.translated_imaging_metadata['InterFramePeriod']=self.imaging_metadata[0]['framePeriod']
+            if not isinstance(self.imaging_metadata[2][0][list(self.imaging_metadata[2][0].keys())[0]]['framePeriod'], str):
+                self.translated_imaging_metadata['FinalVolumePeriod']=self.imaging_metadata[2][0][list(self.imaging_metadata[2][0].keys())[0]]['framePeriod']* self.translated_imaging_metadata['PlaneNumber']
+            else:
+                self.translated_imaging_metadata['FinalVolumePeriod']= self.imaging_metadata[0]['framePeriod']* self.translated_imaging_metadata['PlaneNumber']
+              
+            self.translated_imaging_metadata['FinalFrequency']=1/self.translated_imaging_metadata['FinalVolumePeriod']
+            self.translated_imaging_metadata['TotalFrames']= self.translated_imaging_metadata['TotalVolumes']*self.translated_imaging_metadata['PlaneNumber']
+            self.translated_imaging_metadata['PowerSetting']=str(self.translated_imaging_metadata['PowerSetting'])
+            self.translated_imaging_metadata['CorrectedObjectivePositions']=[float(i[8:]) if isinstance(i, str) else i for i in  self.translated_imaging_metadata['ObjectivePositions']]
+            self.translated_imaging_metadata['CorrectedETLPositions']=[float(i[8:]) if isinstance(i, str) else i for i in self.translated_imaging_metadata['ETLPositions']]
+            if not all(element == self.translated_imaging_metadata['CorrectedObjectivePositions'][0] for element in self.translated_imaging_metadata['CorrectedObjectivePositions']):
+                self.translated_imaging_metadata['IsObjectiveStack']=1
+            if not all(element ==  self.translated_imaging_metadata['CorrectedETLPositions'][0] for element in  self.translated_imaging_metadata['CorrectedETLPositions']):
+                self.translated_imaging_metadata['IsETLStack']=1
+
+   
+        
+        self.translated_imaging_metadata['Xpositions']=self.imaging_metadata[1]['XPositions']
+        self.translated_imaging_metadata['Ypositions']=self.imaging_metadata[1]['YPositions']
+        self.translated_imaging_metadata['ImagingTime']=self.imaging_metadata[0]['ImagingTime']
+        self.translated_imaging_metadata['MicronsPerPixelX']=self.imaging_metadata[0]['MicronsPerPixelX']
+        self.translated_imaging_metadata['MicronsPerPixelY']=self.imaging_metadata[0]['MicronsPerPixelY']
+        self.translated_imaging_metadata['Zoom']=self.imaging_metadata[0]['OpticalZoom']
+        
+        
+        if 'Atlas' in  self.imaging_metadata[1]['MultiplanePrompt']:
+            self.translated_imaging_metadata['AtlasOverlap']=str((self.imaging_metadata[1]['StageGridXOverlap'],  self.imaging_metadata[1]['StageGridYOverlap'] ))
+            self.translated_imaging_metadata['OverlapPercentageMetadata']= self.imaging_metadata[1]['StageGridOverlapPercentage']
+            self.translated_imaging_metadata['AtlasGridSize']=str((self.imaging_metadata[1]['StageGridNumXPositions'],  self.imaging_metadata[1]['StageGridNumYPositions']))
+            self.translated_imaging_metadata['Xpositions']=str(tuple( self.translated_imaging_metadata['Xpositions']))
+            self.translated_imaging_metadata['Ypositions']=str(tuple(self.translated_imaging_metadata['Ypositions']))
+  
+
+        self.translated_imaging_metadata['IsChannel1Red']=0
+        self.translated_imaging_metadata['IsChannel2Green']=0
+
+        if not self.imaging_metadata[1]['RedChannelName']=='No Channel':
+            self.translated_imaging_metadata['IsChannel1Red']=1
+        if not self.imaging_metadata[1]['GreenChannelName']=='No Channel':
+            self.translated_imaging_metadata['IsChannel2Green']=1
+        self.translated_imaging_metadata['IsGalvo']=1
+        self.translated_imaging_metadata['IsResonant']=0
+        if 'Resonant' in  self.imaging_metadata[0]['ScanMode']:
+             self.translated_imaging_metadata['IsResonant']=1
+             self.translated_imaging_metadata['IsGalvo']=0
+             self.translated_imaging_metadata['Multisampling']=self.imaging_metadata[0]['ResonantSampling']
+        
+        self.translated_imaging_metadata['Resolution']=str(self.imaging_metadata[0]['LinesPerFrame'])+'x'+ str(self.imaging_metadata[0]['PixelsPerLine'])
+        self.translated_imaging_metadata['DwellTime']=self.imaging_metadata[0]['dwellTime']
+        
+        self.translated_imaging_metadata['BitDepth']=self.imaging_metadata[0]['BitDepth']
+            
+        self.translated_imaging_metadata['LinePeriod']=self.imaging_metadata[0]['ScanLinePeriod']
+        self.translated_imaging_metadata['FramePeriod']=self.imaging_metadata[0]['framePeriod']
+        self.translated_imaging_metadata['FullAcquisitionTime']=self.imaging_metadata[1]['FullAcquisitionTime']
+
+   
+        self.translated_imaging_metadata['IsVoltageRecording']=0
+        if self.full_voltage_recording_metadata:
+            self.translated_imaging_metadata['IsVoltageRecording']=1
+            self.translated_imaging_metadata['VoltageRecordingChannels']=str((self.recorded_signals and self.recorded_signals_csv))
+            self.translated_imaging_metadata['VoltageRecordingFrequency']=1000
+
           
 #%%    
 if __name__ == "__main__":
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIFFrameNumberK3planeallen\Plane3'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211007\Mice\SPIK\FOV_1\Aq_1\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000'   
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane3'
-    path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKG\FOV_1\Aq_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
-    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop'
+    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKG\FOV_1\Aq_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
+    # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210917\Mice\SPGT\Atlas_1\Volumes\Aq_1\20210917_SPGT_Atlas_1050_50024_607_without_105_135z_5z_1ol-005'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210930\Mice\SPKI\FOV_1\Aq_1\210930_SPKI_FOV1_AllenA_920_50024_narrow_without-000'
     # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211022\Mice\SPKS\FOV_1\Aq_1\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
@@ -828,17 +1018,17 @@ if __name__ == "__main__":
     # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000'
     # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
     # temporary_path1='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKJ\FOV_1\1050_3PlaneTomato\Aq_1\211015_SPKJ_FOV1_1050tomato3plane_990_50024_narrow_without-000'
-    temporary_path1=path
-
+    # temporary_path1=path
 
     
-    xmlfile_voltage=[]
-    xmlfiles=glob.glob(path+'\\**.xml')
-    xmlfile_imaging=xmlfiles[0]
-    for xml in xmlfiles:
-        if 'VoltageRecording' in xml:
-            xmlfile_voltage=xml
+    # xmlfile_voltage=[]
+    # xmlfiles=glob.glob(path+'\\**.xml')
+    # xmlfile_imaging=xmlfiles[0]
+    # for xml in xmlfiles:
+    #     if 'VoltageRecording' in xml:
+    #         xmlfile_voltage=xml
 
+    temporary_path1='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPJA\imaging\20210702\data aquisitions\FOV_1\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\metadata'
     
     # meta =Metadata(aq_metadataPath=image_sequence_directory_full_path, temporary_path=temporary_path)
     # meta =Metadata(aq_metadataPath=xmlfile_imaging, voltagerec_metadataPath=xmlfile_voltage)
@@ -848,6 +1038,4 @@ if __name__ == "__main__":
 
 
 
-
-
-   
+  

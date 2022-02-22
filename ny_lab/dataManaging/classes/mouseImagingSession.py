@@ -37,7 +37,7 @@ from tkinter import ttk
 
 class MouseImagingSession():
     
-    def __init__(self,  imaging_session_name=None, imaging_session_ID=None, raw_imaging_session_path=None, mouse_object=None, adding_to_database=None):   
+    def __init__(self,  imaging_session_name=None, imaging_session_ID=None, raw_imaging_session_path=None, mouse_object=None, yet_to_add=None):   
         module_logger.info('Loading Mouse Imaging Session ' + imaging_session_name)
 
         self.imaging_session_name=imaging_session_name
@@ -47,7 +47,7 @@ class MouseImagingSession():
         self.mouse_session_path=os.path.join(self.mouse_object.mouse_slow_subproject_path,
                                               'imaging',
                                               self.imaging_session_name)
-        self.adding_to_database=adding_to_database
+        self.yet_to_add=yet_to_add
         
         
        
@@ -120,7 +120,7 @@ class MouseImagingSession():
             self.ImagedMiceinfo=mouse_object.Database_ref.arbitrary_query_to_df(quey_imaging_session, params)       
             self.session_slowstoragepath= self.ImagedMiceinfo.SlowStoragePath
             self.session_workingstoragepath=self.ImagedMiceinfo.WorkingStoragePath
-            
+            self.get_acq_IDs_from_database()
             
             self.load_existing_FOVs()
             self.load_existing_Test_Aquisitions()
@@ -129,7 +129,7 @@ class MouseImagingSession():
             self.load_existing_0coordinate_Aquisitions()
             # self.load_existing_atlas()
             
-        elif self.adding_to_database:
+        elif self.yet_to_add:
             
             self.mouse_code=self.mouse_object.mouse_name
             module_logger.info('adding prairie session '+ self.mouse_code+' '+self.imaging_session_name)
@@ -502,4 +502,17 @@ class MouseImagingSession():
                      
                        for  directory in os.listdir(os.path.join(self.mouse_session_path, 'atlases'))
                        if 'Atlas' in directory} 
-#%% unlaod memory
+#%% get all aqcuisitions from database
+
+
+    def get_acq_IDs_from_database(self):
+        imaged_mice_id=self.mouse_object.imaging_sessions_database.iloc[:,1].tolist()
+        quey_acquisitions_ID="""SELECT ID,ImagedMouseID, SlowDiskPath
+                                    FROM Acquisitions_table  
+                                    WHERE ImagedMouseID IN(%s)""" % ','.join('?' for i in imaged_mice_id) 
+                                    
+        params=tuple(imaged_mice_id)
+        self.database_acquisitions=self.mouse_object.Database_ref.arbitrary_query_to_df(quey_acquisitions_ID, params)      
+                
+                
+        

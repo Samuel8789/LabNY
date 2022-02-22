@@ -32,7 +32,7 @@ class ImageSequenceDataset:
         self.associated_aquisiton=aquisition_object        
         self.selected_dataset_mmap_path=selected_dataset_mmap_path
         self.dataset_name=dataset_name
-        self.metadata= self.associated_aquisiton.metadata_object
+        self.metadata = self.associated_aquisiton.metadata_object
         self.bidishift_object=None
         self.most_updated_caiman=None
         self.kalman_object=None
@@ -322,6 +322,8 @@ class ImageSequenceDataset:
 
     def do_deep_caiman(self):
         
-
-        self.deep_caiman=CaimanExtraction(self.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metdata_object=self.metadata, force_run=True, deep=True)
+        if self.metadata.imaging_metadata_database[0]['ToDoDeepCaiman']:
+            self.deep_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True)
         
+    def open_dataset_directory(self):
+        os.startfile(self.selected_dataset_mmap_path)

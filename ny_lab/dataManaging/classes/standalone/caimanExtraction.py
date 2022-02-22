@@ -18,6 +18,10 @@ import sys
 # import caiman as cm
 from .OnACID import run_on_acid
 from .metadata import Metadata
+from .caimanResults import CaimanResults
+from ...functions.transform_path import transform_path
+
+
 # from .motionCorrectedKalman import MotionCorrectedKalman
 # from .summaryImages import SummaryImages
 import logging 
@@ -50,31 +54,26 @@ class CaimanExtraction():
             self.get_info_from_metadata()
             self.set_caiman_parameters()
 
-            if first_pass_mot_correct:
-                
+            if first_pass_mot_correct: 
                 self.dataset_caiman_parameters['epochs']=1
                 self.save_mot_correct=True
                 self.dataset_caiman_parameters['use_cnn']=False
             else:
-                self.dataset_caiman_parameters['mot_corr']=False
-    
-    
+                self.dataset_caiman_parameters['motion_correct']=False
+
             self.apply_caiman()
             self.check_motion_corrected_on_acid()
             self.check_caiman_files()
             self.check_shifts_files()
             self.remove_unclipped_issue_shifted_movies()
             
-            
         elif self.temporary_path:
             self.check_motion_corrected_on_acid()
             self.check_caiman_files()
             self.check_shifts_files()
             # self.load_cnmf_object()
-            
-        # self.unload_cnmf_object()
-            
-            
+            # self.unload_cnmf_object()
+
     def eliminate_caiman_extra_from_mmap(self) :   
         caiman_filename=None
         if self.bidishifted_movie_path:
@@ -89,12 +88,7 @@ class CaimanExtraction():
                 self.caiman_extra=caiman_filename[caiman_filename.find('_d1_'):caiman_filename.find('_mmap')-4]   
             else:
                 self.good_filename=os.path.splitext(caiman_filename)[0]  
-             
 
-
-    # %%   Set up some parameters
-    
-    
     def get_info_from_metadata(self):
 
         if (not self.metadata_object) and self.metadata_file_path :
@@ -106,30 +100,32 @@ class CaimanExtraction():
         try:    
             module_logger.info('checking metadata for caiman ' + self.bidishifted_movie_path )
 
-            datasetmeta=self.metadata.imaging_metadata
-                     
-            objective=self.metadata.imaging_metadata[0]['Objective']
-            if objective=='MBL Olympus 20x':
+            if self.metadata.imaging_metadata:
+                datasetmeta=self.metadata.imaging_metadata
+                         
+                self.objective=self.metadata.imaging_metadata[0]['Objective']
+                self.framePeriod=float(datasetmeta[0]['framePeriod'])
+                self.rastersPerFrame=int(datasetmeta[0]['RasterAveraging'])
+                self.number_planes=datasetmeta[1]['PlaneNumber']
+                if self.number_planes=='Single':
+                    self.number_planes=1
+                    self.volume_period=self.framePeriod*self.rastersPerFrame
+                
+                if self.number_planes>1:
+                    self.etl_frame_period=float(datasetmeta[2][0][0]['framePeriod'])
+                    self.plane_period=float(self.framePeriod*self.rastersPerFrame)
+                    self.volume_period=self.etl_frame_period*self.number_planes
+                    
+            elif self.metadata.translated_imaging_metadata:
+                self.objective=self.metadata.translated_imaging_metadata['Objective']
+                self.volume_period=self.metadata.translated_imaging_metadata['FinalVolumePeriod']
+                
+            if self.objective=='MBL Olympus 20x':
                 self.halfsize=2.5
-            elif '25' in objective:
-               self.halfsize=5
-           
+            elif '25' in self.objective:
+               self.halfsize=5          
                if '20x' in self.bidishifted_movie_path:
-                    self.halfsize=2.5
-            
-            #%% 
-             
-            self.framePeriod=float(datasetmeta[0]['framePeriod'])
-            self.rastersPerFrame=int(datasetmeta[0]['RasterAveraging'])
-            self.number_planes=datasetmeta[1]['PlaneNumber']
-            if self.number_planes=='Single':
-                self.number_planes=1
-                self.volume_period=1/(self.framePeriod*self.rastersPerFrame)
-            
-            if self.number_planes>1:
-                self.etl_frame_period=float(datasetmeta[2][0][0]['framePeriod'])
-                self.plane_period=float(self.framePeriod*self.rastersPerFrame)
-                self.volume_period=1/(self.etl_frame_period*self.number_planes)
+                    self.halfsize=2.5    
         except:
             module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
 
@@ -153,15 +149,13 @@ class CaimanExtraction():
         # (these are default values but can change depending on dataset properties)
         init_batch = 100 # number of frames for initialization (presumably from the first file)
         K = 2  # initial number of components
-        epochs = 5 # number of passes over the data
+        epochs = 3 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8
         use_cnn = True  # use the CNN classifier
         min_cnn_thr = 0.90  # if cnn classifier predicts below this value, reject
         cnn_lowest = 0.3  # neurons with cnn probability lowe
 
-        
-        
         self.dataset_caiman_parameters = {'fnames': self.bidishifted_movie_path,
                                            'fr': fr,
                                            'decay_time': decay_time,
@@ -189,10 +183,7 @@ class CaimanExtraction():
                                            'cnn_lowest': cnn_lowest
                                             }
         
-        
-
-    def apply_caiman(self):
-        
+    def apply_caiman(self):       
         if self.caiman_path and self.mc_onacid_path:
             
                 if not self.force_run:
@@ -228,7 +219,6 @@ class CaimanExtraction():
             except:
                     module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
 
-
     def load_cnmf_object(self):
         try:
             if self.caiman_path:
@@ -237,7 +227,6 @@ class CaimanExtraction():
         except:
             module_logger.exception('Could not load cnmf object' + self.temporary_path )
 
-
     def unload_cnmf_object(self):
              
         if self.cnm_object:
@@ -245,9 +234,6 @@ class CaimanExtraction():
             gc.collect()
             # sys.stdout.flush()
             self.cnm_object=None
-     
-        
-        
 
     def check_motion_corrected_on_acid(self):
           self.mc_onacid_custom_pats=[]
@@ -269,7 +255,6 @@ class CaimanExtraction():
           elif self.mc_onacid_full_path:
               self.mc_onacid_path=self.mc_onacid_full_path
 
-
     def check_caiman_files(self):
 
         self.caiman_custom_pats=[]
@@ -288,8 +273,11 @@ class CaimanExtraction():
 
         if self.caiman_full_paths:
             self.caiman_full_path= self.caiman_full_paths[indxx]
+            self.all_caiman_full_paths=self.caiman_full_paths             
         if self.caiman_custom_paths:
             self.caiman_custom_path= self.caiman_custom_paths[indxx]
+            self.all_caiman_full_paths=self.caiman_custom_paths
+            
             
         if self.caiman_custom_path:  
             self.caiman_path=self.caiman_custom_path
@@ -316,8 +304,7 @@ class CaimanExtraction():
              self.caiman_shifts_path=self.caiman_shifts_custom_path
          elif self.caiman_shifts_full_path:
              self.caiman_shifts_path=self.caiman_shifts_full_path            
-            
-          
+                   
     def remove_unclipped_issue_shifted_movies(self):
         module_logger.info('removing unclipped ')
 
@@ -331,8 +318,15 @@ class CaimanExtraction():
         if self.caiman_shifts_custom_path and  self.caiman_shifts_full_path :
             if os.path.isfile(self.caiman_shifts_full_path):
                 os.remove(self.caiman_shifts_full_path)
+          
 
-        
+
+    def load_results_object(self, caiman_file_path=None):    
+        if not caiman_file_path:
+            caiman_file_path=self.caiman_path       
+        self.CaimanResults_object=CaimanResults(caiman_file_path,  dataset_object=self.dataset_object, caiman_object=self)
+
+                                      
 
 if __name__ == "__main__":
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane3'

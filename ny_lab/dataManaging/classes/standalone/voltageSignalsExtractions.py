@@ -4,7 +4,6 @@ Created on Fri Sep 10 15:32:35 2021
 
 @author: sp3660
 """
-
 import os
 import numpy as np
 import pandas as pd
@@ -15,6 +14,8 @@ import mplcursors
 import pickle
 import math
 import shutil
+import scipy.io as sio
+
 import gc
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
@@ -26,21 +27,21 @@ class VoltageSignalsExtractions():
     
     def __init__(self, voltage_excel_path=False, temporary_path=False, just_copy=False, acquisition_directory_raw=False, voltage_signals_object=None):
         module_logger.info('Processing Voltage Signals')
+        
         self.voltage_excel_path=voltage_excel_path
         self.temporary_path=temporary_path
         self.acquisition_directory_raw=acquisition_directory_raw
         self.voltage_signals_object=voltage_signals_object
 
 
-            
+
+
         if just_copy and self.voltage_excel_path:
             self.check_csv_in_folder()
-
-    
             shutil.copy(self.voltage_excel_path, self.temporary_path)
             
-  
-        elif not just_copy:
+        
+        elif not just_copy and self.voltage_excel_path:
             self.check_csv_in_folder()
 
             self.voltage_signals_raw = pd.read_csv(self.voltage_excel_path)    
@@ -77,12 +78,13 @@ class VoltageSignalsExtractions():
             
             # self.plotting_paradigm_transitions()
             # self.plotting_grating_transitions()
-        
+        elif self.voltage_signals_object:
+            pass
+            
         
         
 #%% methods
-
-
+   
 
     def correct_signals_names(self):       
         signals=list(self.voltage_signals.keys())
@@ -112,6 +114,23 @@ class VoltageSignalsExtractions():
         self.acceleration_array=np.absolute(self.acceleration_array)
         # add the datapoint lost during the diff
         self.acceleration_array=np.insert(self.acceleration_array,0,0) 
+    def plot_locomotion(self):
+ 
+        fig, ax = plt.subplots(nrows=3,sharey=True)
+        # fig.set_title('Snapping cursor')
+        for i in range(0,2):
+            if i==0:
+                line, = ax[i].plot(self.locomotion_aray) 
+            elif i==1:
+                line, = ax[i].plot(self.rectified_speed_array)  
+            elif i==2:
+                line, = ax[i].plot(self.acceleration_array)  
+         
+        # snap_cursor = SnappingCursor(ax[0], line)  
+        # fig.canvas.mpl_connect('motion_notify_event', snap_cursor.on_mouse_move)
+        mplcursors.cursor(line) # or just mplcursors.cursor()
+        
+        
         
     def process_allenA_signals(self):   
         module_logger.info('Analysing AllenA Gratings')
@@ -514,10 +533,23 @@ class VoltageSignalsExtractions():
 if __name__ == "__main__":
     
     # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000\Plane1\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    # temporary_path1='/home/samuel/Desktop/SPJAFUllAllen/210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    
-    voltagesignals=VoltageSignalsExtractions(temporary_path1)
+    temporary_path1='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPJA\imaging\20210702\data aquisitions\FOV_1\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\raw_volatge_csv\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
 
-    plt.plot(voltagesignals.rectified_speed_array)
+    voltagesignals=VoltageSignalsExtractions(temporary_path1)
+    # voltagesignals.plot_locomotion()
+    fig, ax = plt.subplots(nrows=2,sharex=True)
+    line, = ax[0].plot(voltagesignals.locomotion_aray) 
+
+    # fig.set_title('Snapping cursor')
+    # for i in range(0,2):
+    #     if i==0:
+    #         line, = ax[i].plot(voltagesignals.locomotion_aray) 
+    #     elif i==1:
+    #         line, = ax[i].plot(voltagesignals.rectified_speed_array)  
+    #     elif i==2:
+    #         line, = ax[i].plot(voltagesignals.acceleration_array)  
+     
+    # # snap_cursor = SnappingCursor(ax[0], line)  
+    # # fig.canvas.mpl_connect('motion_notify_event', snap_cursor.on_mouse_move)
+    # mplcursors.cursor(line) # or just mplcursors.cursor()
+  

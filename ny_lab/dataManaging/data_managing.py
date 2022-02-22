@@ -19,6 +19,7 @@ module_logger  = logging.getLogger(__name__)
 
 from .functions.select_face_camera import select_face_camera
 from .functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
+from .functions.transform_path import transform_path
 from .classes.mouse import Mouse
 from .classes.prairieImagingSession  import PrairieImagingSession
 import datetime
@@ -85,7 +86,7 @@ class DataManaging():
         self.find_imaged_mouse_codes_not_in_database()
         self.build_all_unimaged_mice_objects_from_database()
         self.all_experimetal_mice_objects={**self.all_imaged_mice_objects, **self.all_non_imaged_mice_objects}
-        
+        # self.get_all_deep_caiman_objects()
         
         
         module_logger.info('Reading directory structure')
@@ -351,7 +352,7 @@ class DataManaging():
     def read_all_imaging_sessions_not_in_database(self):     
         test=[session[2] for session in self.all_existing_sessions_database]
         self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in  test]
-
+        # this ignores jesus and hakim sessions any folder with name sin it
         test2=[value for key, value in self.all_existing_sessions.items() if key.isdigit() and datetime.datetime.strptime(key,'%Y%m%d')>datetime.datetime.strptime( os.path.split(test[-1])[1],'%Y%m%d')]
 
         self.all_new_unprocessed_session={session_name:session for session_name, session in  self.all_existing_sessions.items() if (session in test2) and (session not in test)}
@@ -528,7 +529,8 @@ class DataManaging():
             recursively_eliminate_empty_folders(fast_path)
             self.read_all_data_path_structures()    
       
-
+    def remove_mouse_info_from_fast_disk(self,mouse):
+        pass
  
     
 #%% reading and updating all database imaging stroage paths  
@@ -754,417 +756,25 @@ class DataManaging():
     def load_raw_session(self, session_path):
         imaging_session=PrairieImagingSession(session_raw_path=session_path, data_managing_object=self)
         return imaging_session
+#%% dep caiman
+    def get_all_deep_caiman_objects(self):    
+         self.all_deep_caiman_objects={}      
+         for mouse_code in self.all_imaged_mice_objects.keys():
+             mouse_object=self.all_experimetal_mice_objects[mouse_code]
+             mouse_object.get_all_mouse_FOVdata_datasets()       
+             greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key and 'Red' not in key}   
+             tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 and dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']!=1}
+             for name, dat in tododeepgreensatasets.items():
+                 if len(dat.most_updated_caiman.all_caiman_full_paths)>1:
+                    self.all_deep_caiman_objects[name]=dat.most_updated_caiman
 
-    # def cleaning_up_raw_acquisitions(self, session_path):
-            
-    #     mice_directory_path=os.path.join(session_path,'Mice')
-    #     mice_paths=glob.glob( mice_directory_path+'\\SP**', recursive=False)
-    #     # mice_codes=[os.path.split(mouse_path)[1] for mouse_path in mice_paths]
-        
-        
-    #     for mouse_path in mice_paths:
-    #         Coordinate0path=os.path.join(mouse_path,'0CoordinateAcquisiton')   
-    #         nonimagingacquisitionspath=os.path.join(mouse_path,'NonImagingAcquisitions')  
-    #         Testacquisitionspath=os.path.join(mouse_path,'TestAcquisitions')  
-            
-    #         allAq_folders=[Coordinate0path, nonimagingacquisitionspath, Testacquisitionspath]
-            
-    #         self.process_aquisition_folder(allAq_folders, mouse_path)
-    #         emptyatlases=glob.glob( mouse_path+'\\Atlas_', recursive=False)
-    #         emptyfovs=glob.glob( mouse_path+'\\FOV_', recursive=False)
-    #         for  emptyfov in emptyfovs:
-    #             noimagin=0
-    #             nofacecamera=0
-    #             novisstim=0       
-    #             if not glob.glob( emptyfov+'\\**\\**.env', recursive=True) :
-    #                 noimagin=1                  
-        
-    #             if not glob.glob( emptyfov+'\\**\\DisplaySettings.json', recursive=True) :
-    #                 nofacecamera=1
-        
-    #             if not glob.glob( emptyfov+'\\**\\**.mat', recursive=True) :
-    #                 novisstim=1
-                    
-    #             if noimagin and  nofacecamera and novisstim:
-    #                 recursively_eliminate_empty_folders(emptyfov)  
-                    
-    #             else:    
-    #                 if emptyfov.endswith('FOV_'):
-    #                     all_fovs=glob.glob(mouse_path +'\\FOV_**', recursive=False) 
-    #                     empty_fovs=glob.glob(mouse_path +'\\FOV_', recursive=False) 
-    #                     current_fov=[i for i in all_fovs if i not in empty_fovs]
-    #                     curent_good_fovs=len(current_fov)
-    #                     fov_number=[os.path.split(i)[1] for i in all_fovs if i not in empty_fovs]
-    #                     current=[int(i[i.find('_')+1:]) for i in fov_number]
-    #                     wanted=[i+1 for i in range(curent_good_fovs)]
-    #                     to_change=[i for i in current if i not in wanted ]                  
-    #                     to_change_to=[i for i in wanted if i not in current ]
-                        
-    #                     if curent_good_fovs==0:
-    #                         to_change_to=[1]                         
-    #                     os.rename(emptyfov, emptyfov+str(to_change_to[0]))  
-                        
-    #         for  emptyatlas in emptyatlases:
-    #             if not glob.glob( emptyatlas+'\\**\\**.env', recursive=True) :
-    #                 recursively_eliminate_empty_folders(emptyatlas) 
-    #             else:    
-    #                  if emptyatlas.endswith('Atlas_'):
-    #                      all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
-    #                      empty_atlases=glob.glob(mouse_path +'\\Atlas_', recursive=False) 
-    #                      current_atlas=[i for i in all_atlases if i not in empty_atlases]
-    #                      curent_good_atlases=len(current_atlas)
-    #                      atlas_number=[os.path.split(i)[1] for i in all_atlases if i not in empty_atlases]
-    #                      current_atlas=[int(i[i.find('_')+1:]) for i in atlas_number]
-    #                      wanted_atlas=[i+1 for i in range(curent_good_atlases)]
-    #                      to_change_atlases=[i for i in current_atlas if i not in wanted_atlas ]                  
-    #                      to_change_to_atlases=[i for i in wanted_atlas if i not in current_atlas ]
-                         
-    #                      if curent_good_atlases==0:
-    #                          to_change_to_atlases=[1]                         
-    #                      os.rename(emptyatlas, emptyatlas+str(to_change_to_atlases[0]))     
-                    
-                
-    #         all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
-    #         all_fovs=glob.glob(mouse_path +'\\FOV_**', recursive=False) 
-            
-    #         empty_fovs=glob.glob(mouse_path +'\\FOV_', recursive=False) 
-    #         empty_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
-
-    #         current_fov=[i for i in all_fovs if i not in empty_fovs]
-    #         current_atlas=[i for i in all_atlases if i not in empty_atlases]
-
-    #         curent_good_fovs=len(current_fov)
-    #         curent_good_atlases=len(current_atlas)
-
-    #         fov_number=[os.path.split(i)[1] for i in all_fovs if i not in empty_fovs]
-    #         atlas_number=[os.path.split(i)[1] for i in all_atlases if i not in empty_atlases]
-
-    #         current=[int(i[i.find('_')+1:]) for i in fov_number]
-    #         current_atlas=[int(i[i.find('_')+1:]) for i in atlas_number]
-            
-    #         wanted=[i+1 for i in range(curent_good_fovs)]
-    #         wanted_atlas=[i+1 for i in range(curent_good_atlases)]
-
-    #         to_change=[i for i in current_atlas if i not in wanted_atlas ]
-    #         to_change_atlases=[i for i in current_atlas if i not in wanted_atlas ]
-            
-            
-    #         for atlas in current_atlas:
-    #              if to_change_atlases:
-    #                 if atlas.find('Atlas_' + str(to_change[0]))!=-1: 
-    #                     os.rename(atlas, atlas[:atlas.find('Atlas_')+5]+str(to_change_to_atlases[0]))   
-    #                     to_change_atlases.remove(to_change_atlases[0])
-                             
-    #         all_atlases=glob.glob(mouse_path +'\\Atlas_**', recursive=False) 
-            
-    #         for fov in current_fov:
-    #             if to_change:
-    #                if fov.find('FOV_' + str(to_change[0]))!=-1: 
-    #                    os.rename(fov, fov[:fov.find('FOV_')+3]+str(to_change_to[0]))   
-    #                    to_change.remove(to_change[0])
-                            
-    #         all_fovs=glob.glob(mouse_path +'\\FOV_**', recursive=False) 
-            
-            
-    #         for FOV in all_fovs:
-        
-    #             Plane3Tomato1050=os.path.join(FOV, '1050_3PlaneTomato')
-    #             HighResStackTomato1050=os.path.join(FOV, '1050_HighResStackTomato' )  
-    #             Tomato1050=os.path.join(FOV, '1050_Tomato')
-    #             HighResStackGreen=os.path.join(FOV, 'HighResStackGreen')
-    #             SurfaceImage =os.path.join(FOV, 'SurfaceImage' )
-    #             OtherAcq=os.path.join(FOV, 'OtherAcq')
-                
-    #             all_FOVs_Aq_folders=[Plane3Tomato1050, HighResStackTomato1050, Tomato1050, HighResStackGreen, SurfaceImage, OtherAcq, FOV]       
-        
-    #             self.process_aquisition_folder(all_FOVs_Aq_folders, mouse_path)
-                              
-    #         for atlas in all_atlases:
-          
-    #               Overview=os.path.join(atlas, 'Overview')
-    #               Preview=os.path.join(atlas, 'Preview' )  
-    #               Volumes=os.path.join(atlas, 'Volumes')
-    #               Coordinates=os.path.join(atlas, 'Coordinates')
-    #               if os.path.isdir(Coordinates):
-    #                 if  len(os.listdir(Coordinates))==0:
-    #                     recursively_eliminate_empty_folders(Coordinates)  
-                  
-    #               all_atlases_Aq_folders=[Overview, Preview, Volumes]       
-          
-    #               self.process_aquisition_folder(all_atlases_Aq_folders, mouse_path)
-                            
-    # def process_aquisition_folder(self, aq_folder_list, mouse_path):
-    
-    #     UnprocessedFaceCameras=os.path.join(mouse_path,'UnprocessedFaceCameras')   
-    #     UnprocessedVisStim=os.path.join(mouse_path,'UnprocessedVisStim')   
-    #     UnprocessedFaceCameraspaths=glob.glob(UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-    #     UnprocessedFaceCamerasnames=[os.path.split(UnprocessedFaceCameraspath)[1] for UnprocessedFaceCameraspath in UnprocessedFaceCameraspaths]
-    #     UnprocessedVisStimpaths=glob.glob(UnprocessedVisStim +'\\**.mat', recursive=False)
-    #     UnprocessedVisStimnames=[os.path.split(UnprocessedVisStimpaths)[1] for UnprocessedVisStimpaths in UnprocessedVisStimpaths]
-    
-        
-    #     if glob.glob(UnprocessedVisStim +'\\**.mat.mat', recursive=False) :
-    #         for mat in glob.glob(UnprocessedVisStim +'\\**.mat.mat', recursive=False):      
-    #             os.rename(mat,mat[:-4])
-    
-        
-    #     for generic_aq_folder in aq_folder_list:
-    #         # module_logger.info(generic_aq_folder)
-    #         if 'FOV' in os.path.split(generic_aq_folder)[1]:
-    #             generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False)  
-    #         elif 'Atlas' in os.path.split(generic_aq_folder)[1] :
-    #             generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False)  
-    #         else:
-    #             generic_aq_folder_prairieaq=glob.glob(generic_aq_folder +'\\**\\**.env', recursive=False) 
-                           
-    #         allaq=glob.glob(generic_aq_folder +'\\Aq_**', recursive=False) 
-    #         emptyaq=glob.glob(generic_aq_folder +'\\Aq_', recursive=False) 
-    #         Aq_number=[os.path.split(i)[1] for i in allaq if i not in emptyaq]
-    #         currentaq=[i for i in allaq if i not in emptyaq]
-    #         curent_good_aq=len(Aq_number)
-    
-    #         if generic_aq_folder_prairieaq:
-    #             for i, aq_path in enumerate(generic_aq_folder_prairieaq):  
-    #                 destination=os.path.join(generic_aq_folder,'Aq_'+str(1+i+curent_good_aq))
-    #                 os.mkdir(destination) 
-    #                 shutil.move(os.path.split(aq_path)[0],destination)
-                    
-    #         allaq=glob.glob(generic_aq_folder +'\\Aq_**', recursive=False)    
-    
-    
-    #         for aq in allaq:
-    #             # module_logger.info(aq)
-                
-    #             if glob.glob(aq +'\\EyeCamera', recursive=False):
-    #                 os.rename(aq +'\\EyeCamera',aq +'\\FaceCamera')
-                    
-    #             noimagin=0
-    #             nofacecamera=0
-    #             novisstim=0
-                
-    #             if not glob.glob(aq +'\\**\\**.env', recursive=False):
-    #                 noimagin=1                  
-    #             if not glob.glob(aq +'\\FaceCamera\\**\\DisplaySettings.json', recursive=True):          
-    #                 nofacecamera=1
-    #                 if os.path.isdir(aq +'\\FaceCamera'):
-    #                      recursively_eliminate_empty_folders(aq +'\\FaceCamera')  
-    #             else:
-    #                 if not glob.glob(aq +'\\FaceCamera\\DisplaySettings.json', recursive=False):
-    #                     falsefacecameradir=os.path.split(glob.glob(aq +'\\FaceCamera\\**\\DisplaySettings.json', recursive=False)[0])[0]
-                        
-    #                     files = os.listdir(falsefacecameradir)
-    #                     for f in files:
-    #                         shutil.move(os.path.join(falsefacecameradir, f), aq +'\\FaceCamera') 
-    #                     if not glob.glob(falsefacecameradir +'\\DisplaySettings.json', recursive=False):
-    #                         recursively_eliminate_empty_folders(falsefacecameradir)      
-                    
-                    
-    #             if not glob.glob(aq +'\\VisStim\\**.mat', recursive=False):
-    #                 novisstim=1
-    #                 if os.path.isdir(aq +'\\VisStim'):
-    #                     recursively_eliminate_empty_folders(aq +'\\VisStim') 
-                        
-    #             elif glob.glob(aq +'\\VisStim'+'\\**.mat.mat', recursive=False) :                   
-    #                 for mat in glob.glob(aq +'\\VisStim'+'\\**.mat.mat', recursive=False) :  
-    #                     os.rename(mat,mat[:-3])
-    
-    #             if noimagin and  nofacecamera and novisstim:
-    #                 recursively_eliminate_empty_folders(aq)  
-                    
-    #             elif noimagin and novisstim:
-    #                 module_logger.info('Face camera only')
-                    
-                    
-    #             else:    
-    #                 prairie_imaging_path=os.path.split(glob.glob(aq +'\\**\\**.env', recursive=False)[0])[0]
-    #                 if aq.endswith('Aq_'):
-    #                    allaq=glob.glob(generic_aq_folder +'\\Aq_**', recursive=False) 
-    #                    emptyaq=glob.glob(generic_aq_folder +'\\Aq_', recursive=False) 
-    #                    currentaq=[i for i in allaq if i not in emptyaq]
-    #                    curent_good_aq=len(currentaq)
-    #                    Aq_number=[os.path.split(i)[1] for i in allaq if i not in emptyaq]
-    #                    current=[int(i[i.find('_')+1:]) for i in Aq_number]
-    #                    wanted=[i+1 for i in range(curent_good_aq)]
-    #                    to_change=[i for i in current if i not in wanted ]                  
-    #                    to_change_to=[i for i in wanted if i not in current ]                   
-    #                    os.rename(aq, aq+str(to_change_to[0]))  
-                       
-    #                 if os.path.isdir(prairie_imaging_path):
-    #                     self.file_cleanup_prairie_new(prairie_imaging_path)   
-                    
-    #                 if nofacecamera and novisstim:  
-                    
-    #                     if UnprocessedFaceCamerasnames or UnprocessedVisStimnames:   
-    #                         if not UnprocessedFaceCamerasnames:
-    #                             UnprocessedFaceCamerasnames=['None']
-    #                         if not UnprocessedVisStimnames:
-    #                             UnprocessedVisStimnames=['None']
-                            
-    #                         # root = Tkinter.Tk()
-    #                         # app = select_face_camera(root, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], UnprocessedFaceCamerasnames, UnprocessedVisStimnames)
-    #                         # root.mainloop()
-    #                         # get_values=app.values
-
-                            
-    #                         self.select_face_camera_window=select_face_camera(self.LabProjectObject.gui, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], UnprocessedFaceCamerasnames, UnprocessedVisStimnames)
-    #                         self.select_face_camera_window.wait_window()
-    #                         get_values= self.select_face_camera_window.values
-                            
-                            
-                            
-    #                         if get_values[1][1]:
-    #                             facecameradir=os.path.join(aq, 'FaceCamera')   
-    #                             # unprocessedfacecameraname= os.path.split(os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0])[1]
-    #                             unprocessedfacecamerafullpath=os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0]
-
-    #                             if not os.path.isdir(facecameradir):
-    #                                 os.mkdir(facecameradir)
-                                
-    #                             files = glob.glob(unprocessedfacecamerafullpath+'\\**' )
-    #                             for f in files:
-    #                                   shutil.move(f, facecameradir)               
-                                
-    #                         if get_values[2][1]:
-    #                             visstimdir=os.path.join(aq, 'VisStim')   
-    #                             unprocessedvisstim= os.path.split([name for name in UnprocessedVisStimpaths if get_values[2][1] in name][0])[0]
-    #                             if not os.path.isdir(visstimdir):
-    #                                 os.mkdir(visstimdir)
-                                
-    #                             files = glob.glob(unprocessedvisstim+'\\**' )
-    #                             for f in files:
-    #                                     shutil.move(f, visstimdir)   
-                           
-                           
-   
-    #         UnprocessedFaceCameraspaths=glob.glob(UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-    #         UnprocessedFaceCamerasnames=[os.path.split(UnprocessedFaceCameraspath)[1] for UnprocessedFaceCameraspath in UnprocessedFaceCameraspaths]
-    #         UnprocessedVisStimpaths=glob.glob(UnprocessedVisStim +'\\**.mat', recursive=False)
-    #         UnprocessedVisStimnames=[os.path.split(UnprocessedVisStimpaths)[1] for UnprocessedVisStimpaths in UnprocessedVisStimpaths]   
-    #         if not UnprocessedFaceCameraspaths:
-    #             if os.path.isdir(UnprocessedFaceCameras):
-    #                 recursively_eliminate_empty_folders(UnprocessedFaceCameras)
-    #         if not UnprocessedVisStimpaths:
-    #             if os.path.isdir(UnprocessedVisStim):
-    #                 recursively_eliminate_empty_folders(UnprocessedVisStim)    
-                        
-    
-    #         allaq=glob.glob(generic_aq_folder +'\\Aq_**', recursive=False) 
-    #         emptyaq=glob.glob(generic_aq_folder +'\\Aq_', recursive=False) 
-    #         currentaq=[i for i in allaq if i not in emptyaq]
-    #         curent_good_aq=len(currentaq)
-    #         Aq_number=[os.path.split(i)[1] for i in allaq if i not in emptyaq]
-    #         current=[int(i[i.find('_')+1:]) for i in Aq_number]
-    #         wanted=[i+1 for i in range(curent_good_aq)]
-    #         to_change=[i for i in current if i not in wanted ]                  
-    #         to_change_to=[i for i in wanted if i not in current ] 
-            
-    #         for aq in currentaq:
-    #             if to_change:
-    #                if aq.find('Aq_' + str(to_change[0]))!=-1: 
-    #                    os.rename(aq, aq[:aq.find('Aq_')+3]+str(to_change_to[0]))   
-    #                    to_change.remove(to_change[0])
-    #         # module_logger.info('finalremoval')           
-    #         recursively_eliminate_empty_folders(generic_aq_folder)
-    #         # module_logger.info('finalremovaldone')                   
-  
-    # def file_cleanup_prairie_new(self, prairie_imaging_path):
-               
-    #     # file_list = os.listdir(prairie_imaging_path)
-    
-    # # check channle and plane structure     and current folders
-    #     directory_red=os.path.join(prairie_imaging_path,'Ch1Red')
-    #     directory_green=os.path.join(prairie_imaging_path, 'Ch2Green')
-        
-    #     correction=False  
-    #     ChannelPaths=[directory_red, directory_green]  
-    #     ChannelRedExists=False
-    #     ChannelGreenExists=False
-    #     PlaneNumber=False
-        
-    #     if os.path.exists(directory_red) or os.path.exists(directory_green):            
-    #           aq_info=check_channels_and_planes(prairie_imaging_path, correction)
-    #           correction=True  
-    #           if os.path.exists(directory_red):
-    #               ChannelRedExists=True            
-    #               folder_selected_list_red = os.listdir(directory_red)
-    #               if any('plane' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
-                      
-    #                   PlaneNumber=len(folder_selected_list_red) + aq_info[9]
-    #                   Multiplane=False
-    #                   if PlaneNumber>1:
-    #                       Multiplane=True
-    #               else:
-    #                   aq_info =check_channels_and_planes(directory_red, correction)
-                  
-    #           if os.path.exists(directory_green):
-    #               ChannelGreenExists=True           
-    #               folder_selected_list_green = os.listdir(directory_green)  
-    
-    #               if any('plane' in file_name  for file_name in folder_selected_list_green if os.path.isdir(directory_green + os.sep + file_name)):
-    #                   PlaneNumber=len(folder_selected_list_green) + aq_info[10]
-    #                   Multiplane=False
-    #                   if PlaneNumber>1:
-    #                       Multiplane=True
-    #               else:
-    #                   aq_info=check_channels_and_planes(directory_green, correction)
-    
-    #     else:
-    #         aq_info = check_channels_and_planes(prairie_imaging_path, correction)
-    #         if aq_info[0]:
-    #             ChannelRedExists=1
-    #             PlaneNumber=aq_info[9]
-    #         if aq_info[1]:
-    #             ChannelGreenExists=1
-    #             PlaneNumber=aq_info[10]
-    
-    #     ImagedChannels=['lolo','lolo']
-    #     if ChannelRedExists:
-    #         ImagedChannels[0]='Ch1Red'
-    #     if ChannelGreenExists:
-    #         ImagedChannels[1]='Ch2Green'
-    
-    #       # create necessary folders     
-    #     if ChannelRedExists or ChannelGreenExists:     
-    #         all_image_sequence_paths=[]
-    #         PlanePaths=[os.sep +'plane'+str(i+1) for i in range(PlaneNumber)]       
-    #         for ch in ImagedChannels:
-    #             for i, channel_path in enumerate(ChannelPaths):
-    #                 if ch in channel_path :
-    #                     for n in range(PlaneNumber):
-    #                         all_image_sequence_paths.append(ChannelPaths[i]+PlanePaths[n])
-    #                         if not os.path.exists(ChannelPaths[i]+PlanePaths[n]):
-    #                             os.makedirs(ChannelPaths[i]+PlanePaths[n])
-    
-           
-                            
-    #         # move files  
-    #         # module_logger.info('Moving Files')     
-    #         Multiplane=aq_info[8]
-    #         if correction:
-    #             if glob.glob(prairie_imaging_path+'\\**.tif', recursive=False):             
-    #                 move_files(prairie_imaging_path,ChannelPaths,PlanePaths, Multiplane,aq_info[-1] ) 
-    #             for channel_folder in ChannelPaths:
-    #                 if os.path.isdir(channel_folder):
-    #                     file_list_channel = os.listdir(channel_folder)
-                        
-    #                     if len (file_list_channel)>3:
-    #                           move_files(channel_folder,ChannelPaths,PlanePaths, Multiplane, aq_info[-1]) 
-    #                     elif len(file_list_channel)<3:  
-    #                           for plane_folder in file_list_channel:
-    #                               if os.path.isdir(plane_folder):
-    #                                   # file_list_plane=os.listdir(plane_folder)
-    #                                   move_files(plane_folder,ChannelPaths,PlanePaths, Multiplane,aq_info[-1] ) 
-                  
-    #         else:       
-    #             move_files(prairie_imaging_path,ChannelPaths,PlanePaths, Multiplane,aq_info[-1]) 
-    
-    #         return  [ImagedChannels, PlaneNumber, all_image_sequence_paths]      
-    #     else:        
-    #         return  [False, False, False]  
-        
-    # def  cleaning_up_calibrations(self, session_path):  
-        
-    #     calibrations_directory_path=os.path.join(session_path,'Calibrations')
-    #     recursively_eliminate_empty_folders(calibrations_directory_path)          
-        
-
+    def do_deep_caiman_of_mice_datasets(self, mice_codes:list):
+        for mouse_code in mice_codes:
+              mouse_object=self.all_experimetal_mice_objects[mouse_code]
+              mouse_object.get_all_mouse_FOVdata_datasets()       
+              mouse_object.all_mouse_acquisitions_datasets
+              greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key}   
+              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 and dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']!=1}
+              for dataset in tododeepgreensatasets.values():
+                  dataset.do_deep_caiman()
+        self.get_all_deep_caiman_objects()
