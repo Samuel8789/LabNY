@@ -132,6 +132,8 @@ class ResultsAnalysis():
         self.interplane_period=3/1000+self.acquisition_object.metadata_object.translated_imaging_metadata['InterFramePeriod']
         
 
+        self.all_planes_timestamps_equivalences={}
+    
         for dataset_name in list(self.caiman_results.keys()):
             if 'Plane1' in dataset_name:
                 plane=     'Plane1'   
@@ -148,21 +150,23 @@ class ResultsAnalysis():
             selected_binarymcmc=selected_plane_caiman.binarized_MCMC
             selected_plane_prairie_timetamps=self.all_planes_timestamps[plane][0:-1]
             calculated_timestamps= (np.arange(0,len(selected_plane_prairie_timetamps))/self.fr)+self.interplane_period*plane_number
+            plt.figure()
             plt.plot(selected_plane_prairie_timetamps, selected_binarydfdt[0,:])
-            timestamp_equivalence=np.array([selected_plane_prairie_timetamps, calculated_timestamps])
-            plt.plot(timestamp_equivalence[0,:])
-            plt.plot(timestamp_equivalence[1,:])
+            plt.show()
+            self.timestamp_equivalence=np.array([selected_plane_prairie_timetamps, calculated_timestamps])
+            plt.figure()
 
+            plt.plot(self.timestamp_equivalence[0,:])
+            plt.plot(self.timestamp_equivalence[1,:])
+            plt.show()
 
+        self.transfrom_voltage_ms_index_to_frame_index()
+        self.resample_voltage_matrixes()
             
     def transfrom_voltage_ms_index_to_frame_index(self):        
             
-            
-            self.paradigm_frame_transitions_dictionary={key:(np.abs(selected_plane_prairie_timetamps - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
-            
-            
-            
-            
+            self.paradigm_frame_transitions_dictionary={key:(np.abs(self.timestamp_equivalence[0] - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
+
             if self.signals_object.vis_stim_protocol =='AllenA':
                 # firtfirts=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['first_drifting_set_first']/1000)).argmin()
                 # firstlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['first_drifting_set_last']/1000)).argmin()
@@ -170,48 +174,19 @@ class ResultsAnalysis():
                 # secondlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['second_drifting_set_last']/1000)).argmin()
                 # thirdfirts=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['third_drifting_set_first']/1000)).argmin()
                 # thirdlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['third_drifting_set_last']/1000)).argmin()
-                sliced_grating_on_indexes=np.vstack([[(np.abs(selected_plane_prairie_timetamps - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_on_transition_indexes])
-                sliced_grating_off_indexes=np.vstack([[(np.abs(selected_plane_prairie_timetamps - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_off_transition_indexes])
+                self.sliced_grating_on_indexes=np.vstack([[(np.abs(self.timestamp_equivalence[0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_on_transition_indexes])
+                self.sliced_grating_off_indexes=np.vstack([[(np.abs(self.timestamp_equivalence[0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_off_transition_indexes])
 
-              
-                
-                
             elif self.signals_object.vis_stim_protocol =='AllenC':
-                pass
                 # firtfirts=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['first_noise_set_first']/1000)).argmin()
                 # firstlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['first_noise_set_last']/1000)).argmin()
                 # secondfirts=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['second_noise_set_first']/1000)).argmin()
                 # secondlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['second_noise_set_last']/1000)).argmin()
                 # thirdfirts=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['third_noise_set_first']/1000)).argmin()
                 # thirdlast=(np.abs(selected_plane_prairie_timetamps - self.signals_object.transitions_dictionary['third_noise_set_last']/1000)).argmin()
-                sliced_grating_on_indexes=np.vstack([[(np.abs(selected_plane_prairie_timetamps - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_on_transition_indexes])
-                sliced_grating_off_indexes=np.vstack([[(np.abs(selected_plane_prairie_timetamps - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.drifting_off_transition_indexes])
+                self.sliced_noise_on_indexes=np.vstack([[(np.abs(self.timestamp_equivalence[0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.noise_on_transition_indexes])
+                self.sliced_noise_off_indexes=np.vstack([[(np.abs(self.timestamp_equivalence[0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.noise_off_transition_indexes])
                 
-                
-            # f=interpolate.interp1d(selected_plane_prairie_timetamps, selected_binarydfdt)
-            # xnew = np.arange(0, int(np.round(selected_plane_prairie_timetamps[-1]))-1, 0.001)
-            # ynew = f(xnew)
-            # ynew[ynew>0.8]=1
-            
-            # plt.plot(selected_plane_prairie_timetamps, selected_binarydfdt[0,:])
-            # plt.plot(xnew, ynew[0,:])
-    
-            # driftinggartaings1activity=ynew[:, self.signals_object.transitions_dictionary['first_drifting_set_first']: self.signals_object.transitions_dictionary['first_drifting_set_last']]
-            # driftinggartaings2activity=ynew[:, self.signals_object.transitions_dictionary['second_drifting_set_first']: self.signals_object.transitions_dictionary['second_drifting_set_last']]
-            # driftinggartaings3activity=ynew[:, self.signals_object.transitions_dictionary['third_drifting_set_first']: self.signals_object.transitions_dictionary['third_drifting_set_last']]
-    
-    
-            # combined_gratings_signal=np.concatenate((self.signals_object.first_drifting_set, self.signals_object.second_drifting_set, self.signals_object.third_drifting_set))
-            # combined_gratings_binarized_activity=np.concatenate((driftinggartaings1activity, driftinggartaings2activity, driftinggartaings3activity), axis=1)
-            
-            # plt.plot(combined_gratings_binarized_activity[0,:])
-            # plt.plot(combined_gratings_signal)
-            
-            # return combined_gratings_binarized_activity, combined_gratings_signal
-            
-            # x=np.arange(0, combined_gratings_binarized_activity.shape[1],1)
-            # y=combined_gratings_binarized_activity
-    
     def resample_voltage_matrixes(self):
         
             self.milisecond_period=1000/self.fr

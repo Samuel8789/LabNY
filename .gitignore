@@ -6,6 +6,9 @@
 # Windows default autosave extension
 *.asv
 *.pdf
+*.mat
+*.png
+*.svg
 nATURALmOVIE1.mat
 naturalmovie3.mat
 mov.mat
