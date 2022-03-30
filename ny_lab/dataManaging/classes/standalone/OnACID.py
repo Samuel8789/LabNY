@@ -35,11 +35,15 @@ import pickle
 
 
 # %%
-def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, mot_corretc=False, save_mot_correct=False ):
+def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, mot_corretc=False, save_mot_correct=False, initial_shallow=False):
     module_logger.info('running ' +__name__)
 
     pass # For compatibility between running under Spyder and the CLI
-
+    filename_append='cnmf_results.hdf5'
+    if initial_shallow:
+        filename_append='cnmf_results_1run_initial.hdf5'
+    
+    
     if save_mot_correct:
         mot_corretc=True
 #%%
@@ -101,7 +105,7 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     images = np.reshape(Yr.T, [T] + list(dims), order='F')
     cnm.estimates.evaluate_components(images, cnm.params, dview=None)
     timestr = time.strftime("%Y%m%d-%H%M%S")
-    caiman_results_path='_'.join([MC_onacid_file_path, timestr,'cnmf_results.hdf5'])  
+    caiman_results_path='_'.join([MC_onacid_file_path, timestr,filename_append])  
 
     #%%
     try:

@@ -36,7 +36,8 @@ class Gui(tk.Tk):
         self.geometry('1200x1200')
         self.todays_date=datetime.date.today().strftime("%Y%m%d")
         self.lab=lab_object
-        self.datamanaging=self.lab.datamanaging
+        self.datamanaging=None
+
         self.MouseDat=self.lab.database
 
 #%% TAB DEFINITIONS

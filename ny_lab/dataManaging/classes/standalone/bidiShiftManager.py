@@ -26,7 +26,7 @@ class BidiShiftManager:
     
     def __init__(self, caiman_movie=None, expanded_dataset_name=None, dataset_full_file_mmap_path=None, 
                  dataset_image_sequence_path=None, bidiphase_file_path=None, shifted_movie_path=None,
-                 temporary_path=None, dataset_object=None, fullscripttemp=False, custom_start_end=False):
+                 temporary_path=None, dataset_object=None, fullscripttemp=False, custom_start_end=False, force=False):
         
         self.start_end_flag=False
         self.caiman_movie=caiman_movie
@@ -61,8 +61,8 @@ class BidiShiftManager:
                     self.read_custom_start_end()
                 self.create_output_names_if_dont_exist()
 
-                    
-                if self.shifted_movie_full_caiman_path:
+                    # check if there is already a shifted file
+                if self.shifted_movie_full_caiman_path and not force:
                     
                     if self.start_end_flag:
     
@@ -103,10 +103,9 @@ class BidiShiftManager:
                             module_logger.info('bidishifs path: '+  self.bidiphase_file_path)
                         except:
                             module_logger.exception('bidishifs path doesn exist')
-
+                
                 elif self.dataset_image_sequence_path:  
                     # self.dataset_image_sequence_path=self.selected_dataset_raw_path
-
 
                     if os.path.isfile(self.bidiphase_file_path):
                         module_logger.info('loading bidishifts')
@@ -115,6 +114,11 @@ class BidiShiftManager:
                     module_logger.info('loading raw image sequence')
                     # self.load_dataset_from_image_sequence()
                     self.load_dataset_from_image_sequence()
+                    
+                    if not self.start_end_flag:
+                       
+
+                        self.frame_end= len(self.image_sequence)+1
                     self.correct_bidi_movie() 
               
                         

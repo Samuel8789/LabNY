@@ -28,7 +28,7 @@ from .fun.guiFunctions.addFacecameraInfo import AddFacecameraInfo
 
 from .fun.databaseCodesTransformations import transform_filterinfo_to_codes
 
-from ..dataManaging.classes.metadata import Metadata
+from ..dataManaging.classes.standalone.metadata import Metadata
 
 
 #%%
@@ -623,7 +623,38 @@ class ImagingDatabase():
             for i, df in enumerate(all_dfs):
                 df.to_excel(writer,sheet_name='Imaging',startrow=i*(len(all_dfs[0])+3) , startcol=0)
                 
-  
+    def get_single_acquisition_database_info(self, acquisition_ID):
+        
+        query_single_acquisition_info="""
+            SELECT *        
+            FROM Acquisitions_table 
+            WHERE ID IN(?)""" 
+        query_single_acquisition_imaging_info="""
+            SELECT *        
+            FROM Imaging_table 
+            WHERE AcquisitionID IN(?)""" 
+        
+        query_single_acquisition_facecam_info="""
+            SELECT *        
+            FROM FaceCamera_table 
+            WHERE AcquisitionID IN(?)""" 
+            
+        query_single_acquisition_visstim_info="""
+            SELECT a.*, b.*        
+            FROM VisualStimulations_table a 
+            LEFT JOIN VisualStimProtocols_table b ON b.ID=a.VisualStimulationProtocolID
+            WHERE AcquisitionID IN(?)""" 
+        
+        params=(int(acquisition_ID),)
+        acq_info=self.databse_ref.arbitrary_query_to_df(query_single_acquisition_info, params)
+        imaging_info=self.databse_ref.arbitrary_query_to_df(query_single_acquisition_imaging_info, params)
+        visstim_info=self.databse_ref.arbitrary_query_to_df(query_single_acquisition_visstim_info, params)
+        facecam_info=self.databse_ref.arbitrary_query_to_df(query_single_acquisition_facecam_info, params)
+
+        acquisition_database_info_dict={'Acq':acq_info,'Imaging':imaging_info,'FaceCam':facecam_info,'VisStim':visstim_info}
+        
+        return acquisition_database_info_dict
+        
 
 #%% ADDING FUNCTIOSN        
     def add_new_session_to_database(self, gui, session_path):
@@ -904,8 +935,11 @@ class ImagingDatabase():
         Ishighrestomatostack=0  
         Ishighresgreenstack=0      
         Isotherfovaq=0   
+        if glob.glob( acquisition_path+'\\**', recursive=False) :
+            acq_name=glob.glob(acquisition_path+'\\**', recursive=False)[0]
+        
       
-        self.add_acquisition_info_window=AddAcquisitionInfo(gui, AcquisitonRawPath)
+        self.add_acquisition_info_window=AddAcquisitionInfo(gui, acq_name)
         self.add_acquisition_info_window.wait_window()
         get_values= self.add_acquisition_info_window.values
         Comments=get_values[1][1]
@@ -1202,6 +1236,7 @@ class ImagingDatabase():
         IsGoodObjective=1
         correctedObjectivePositions=np.nan
         correctedETLPositions=np.nan
+        Is10MinRec=np.nan
         
         
       
@@ -1273,12 +1308,13 @@ class ImagingDatabase():
             DichroicBeamsplitter=get_values[3][1]
             filtervalues=[RedFilter,GreenFilter,DichroicBeamsplitter]
             filtercodes=transform_filterinfo_to_codes(filtervalues, self.databse_ref)
+            
+            
 
             IsBlockingDichroic=0   
             if 'Yes' in get_values[4][1]:
                 IsBlockingDichroic=1
                 
-            IsGoodObjective=1
             if 'No' in get_values[5][1]:
                 IsGoodObjective=1
 
@@ -1286,6 +1322,11 @@ class ImagingDatabase():
             CoherentPower=get_values[7][1]
             CalculatedPower=np.nan
             Comments=get_values[8][1]
+            
+            ToDoDeepCaiman=0
+            if 'Yes' in get_values[12][1]:
+                ToDoDeepCaiman=1
+
             
             Xpositions=metadata.imaging_metadata[1]['XPositions']
             Ypositions=metadata.imaging_metadata[1]['YPositions']
@@ -1338,6 +1379,7 @@ class ImagingDatabase():
             VoltageRecordingChannels=str((metadata.recorded_signals and metadata_object.recorded_signals_csv))
             VoltageRecordingFrequency=1000
 
+        CaimanComments=None
     
         query_add_imaging="""
                 INSERT INTO Imaging_table(
@@ -1351,6 +1393,8 @@ class ImagingDatabase():
                     IsBlockingDichroic,
                     FOVNumber,
                     IsETLStack,
+                    Is10MinRec,
+                    ToDoDeepCaiman,
                     IsObjectiveStack,
                     PlaneNumber,
                     Objective,
@@ -1389,19 +1433,20 @@ class ImagingDatabase():
                     IsSlowStorage,
                     OverlapPercentage,
                     AtlasOverlap,
-                    OverlapPercentageMetadata,
                     AtlasDirection,
                     AtlasZStructure,
                     AtlasGridSize,
+                    OverlapPercentageMetadata,
                     Xpositions,
                     Ypositions,
                     ImagingTime,
                     MicronsPerPixelX,
                     MicronsPerPixelY,
                     Zoom,
-                    IsGoodObjective
+                    IsGoodObjective,
+                    CaimanComments
                     )
-                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
                 """    
         params=(ImagingID,
                 AcquisitionID,
@@ -1413,6 +1458,8 @@ class ImagingDatabase():
                 IsBlockingDichroic,
                 FOVNumber,
                 IsETLStack,
+                Is10MinRec,
+                ToDoDeepCaiman,
                 IsObjectiveStack,
                 PlaneNumber,
                 Objective,
@@ -1448,20 +1495,21 @@ class ImagingDatabase():
                 aqslowstoragepath,
                 aqworkingstoragepath,
                 0,
-                0,
+                1,
                 OverlapPercentage,
                 AtlasOverlap,
-                OverlapPercentageMetadata,
                 AtlasDirection,
                 AtlasZStructure,
                 AtlasGridSize,
+                OverlapPercentageMetadata,
                 Xpositions,
                 Ypositions,
                 ImagingTime,
                 MicronsPerPixelX,
                 MicronsPerPixelY,
                 Zoom,
-                IsGoodObjective
+                IsGoodObjective,
+                CaimanComments
                 )
         self.databse_ref.arbitrary_inserting_record(query_add_imaging, params )   
         return ImagingID

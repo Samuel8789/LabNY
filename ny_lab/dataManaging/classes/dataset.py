@@ -18,7 +18,7 @@ module_logger = logging.getLogger(__name__)
 from ...data_pre_processing.bidicorrect_image import shiftBiDi, biDiPhaseOffsets
 from ..functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
 # from functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
-from .standalone.initialProcessing import InitialProcessing
+# from .standalone.initialProcessing import InitialProcessing
 
 from .standalone.motionCorrectedKalman import MotionCorrectedKalman
 from .standalone.summaryImages import SummaryImages
@@ -38,10 +38,10 @@ class ImageSequenceDataset:
         self.kalman_object=None
         self.summary_images_object=None
         self.initial_caiman=None
+        self.selected_dataset_raw_path=selected_dataset_raw_path
 
         if selected_dataset_raw_path:
 
-            self.selected_dataset_raw_path=selected_dataset_raw_path
             self.channel=os.path.split(os.path.split(self.selected_dataset_raw_path)[0])[1]
             self.plane=os.path.split(self.selected_dataset_raw_path)[1]
             self.find_associated_channel_dataset()
@@ -61,6 +61,7 @@ class ImageSequenceDataset:
                         if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
                             self.apply_green_MC_to_red_channel()
                         else:
+
                             self.do_initial_caiman_extraction()
                         self.do_initial_kalman()
                         self.do_summary_images(self.kalman_movie_path)
@@ -87,9 +88,10 @@ class ImageSequenceDataset:
                     pass
                     
                 elif self.associated_aquisiton.FOV_object:   
-                    self.do_bidishift()
                     
                     if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
+                        self.do_bidishift()
+
                         if  self.dataset_frame_number>100:
                             if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
                                 self.apply_green_MC_to_red_channel()
@@ -105,7 +107,15 @@ class ImageSequenceDataset:
                         else:
                             module_logger.info('File Problem')
 
+
+                    elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
+                        module_logger.info('High Res Stack')
+                        self.do_bidishift()
+                        self.do_summary_images(self.shifted_movie_path)
+                
                     else:
+                        self.do_bidishift()
+
                         self.do_summary_images(self.shifted_movie_path)
                         
                 # self.unload_dataset()        
@@ -116,8 +126,10 @@ class ImageSequenceDataset:
                 module_logger.exception('Something wrong with raw processing ' +   self.selected_dataset_raw_path)
 
         else:
-            
             self.read_all_paths()
+            self.plane=os.path.split(os.path.split(self.selected_dataset_mmap_path)[0])[1]
+            self.channel=os.path.split(self.selected_dataset_mmap_path)[1]
+
             
             module_logger.info('Reading Exiting Datasets')
             
@@ -131,7 +143,7 @@ class ImageSequenceDataset:
         self.summary_images_object=SummaryImages(dataset_object=self)
 
 
-    def load_dataset(self):
+    def load_dataset(self, kalman=True):
         # if self.bidishift_object:
         #     self.bidishift_object.load_shifted_movie_from_mmap()
         #     self.bidishift_object.load_bidiphases_from_file()
@@ -139,7 +151,7 @@ class ImageSequenceDataset:
         if self.most_updated_caiman:   
              self.most_updated_caiman.load_cnmf_object()
              
-        if self.kalman_object:
+        if kalman and self.kalman_object:
             self.kalman_object.load_mc_kalman_tiff()
             
         if self.summary_images_object:
@@ -166,10 +178,10 @@ class ImageSequenceDataset:
     
     def read_issues_file(self):
         pass        
-    def do_bidishift(self):  
+    def do_bidishift(self, force=False):  
         module_logger.info('Bidishifting ' + self.selected_dataset_raw_path)
 
-        self.bidishift_object=BidiShiftManager(dataset_image_sequence_path=self.selected_dataset_raw_path, temporary_path=self.selected_dataset_mmap_path , dataset_object=self, custom_start_end=True)
+        self.bidishift_object=BidiShiftManager(dataset_image_sequence_path=self.selected_dataset_raw_path, temporary_path=self.selected_dataset_mmap_path , dataset_object=self, custom_start_end=True, force=force)
         self.shifted_movie_path=self.bidishift_object.shifted_movie_full_caiman_path        
 
     def do_initial_caiman_extraction(self):
@@ -290,35 +302,60 @@ class ImageSequenceDataset:
                     os.remove(self.mc_with_green_file_full )
 
     def find_associated_channel_dataset(self):
-        try:
-    
-            self.associated_channel_dataset_object=None
-    
-            module_logger.info('getting associated channel dataset ' +   self.selected_dataset_raw_path)
-            self.assocated_channel_raw_paths=[key for key in self.associated_aquisiton.dataset_path_equivalences.keys() if (self.plane in key) and   (self.channel not in key)]
-            if  self.assocated_channel_raw_paths:
-                self.assocated_channel_raw_path= self.assocated_channel_raw_paths[0]
-                self.assocated_channel_working_path=self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][2]
-
-                self.associated_dataset_name=   self.dataset_name[:self.dataset_name.find('_Plane')]+'_'+\
-                                self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][1]+'_'+\
-                                self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][0]
-                            
-                if self.associated_aquisiton.all_raw_datasets:            
-                    if  self.associated_dataset_name in self.associated_aquisiton.all_raw_datasets.keys():
-                        self.associated_channel_dataset_object=self.associated_aquisiton.all_raw_datasets[ self.associated_dataset_name]
-                        module_logger.info('gotten associated channel dataset ' +  self.dataset_name+' '+  self.associated_dataset_name)
-    
-                    else:    
-                        module_logger.info('no green ' + self.selected_dataset_raw_path)
+        if self.selected_dataset_raw_path:
+            try:
         
+                self.associated_channel_dataset_object=None
+        
+                module_logger.info('getting associated channel dataset ' +   self.selected_dataset_raw_path)
+                self.assocated_channel_raw_paths=[key for key in self.associated_aquisiton.dataset_path_equivalences.keys() if (self.plane in key) and   (self.channel not in key)]
+                if  self.assocated_channel_raw_paths:
+                    self.assocated_channel_raw_path= self.assocated_channel_raw_paths[0]
+                    self.assocated_channel_working_path=self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][2]
+    
+                    self.associated_dataset_name=   self.dataset_name[:self.dataset_name.find('_Plane')]+'_'+\
+                                    self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][1]+'_'+\
+                                    self.associated_aquisiton.dataset_path_equivalences[ self.assocated_channel_raw_path][0]
+                                
+                    if self.associated_aquisiton.all_raw_datasets:            
+                        if  self.associated_dataset_name in self.associated_aquisiton.all_raw_datasets.keys():
+                            self.associated_channel_dataset_object=self.associated_aquisiton.all_raw_datasets[ self.associated_dataset_name]
+                            module_logger.info('gotten associated channel dataset ' +  self.dataset_name+' '+  self.associated_dataset_name)
+        
+                        else:    
+                            module_logger.info('no green ' + self.selected_dataset_raw_path)
+            
+                    else:
+                        module_logger.info('no green ' + self.selected_dataset_raw_path)
                 else:
-                    module_logger.info('no green ' + self.selected_dataset_raw_path)
-            else:
-                module_logger.info('no green associated ' + self.selected_dataset_raw_path)
+                    module_logger.info('no green associated ' + self.selected_dataset_raw_path)
+                    
+            except:
+                module_logger.exception('Something wrong with getting associated dataset ' +   self.selected_dataset_raw_path)
                 
-        except:
-            module_logger.exception('Something wrong with getting associated dataset ' +   self.selected_dataset_raw_path)
+        else:
+            
+            self.associated_channel_datasets={key:dataset for key, dataset in self.associated_aquisiton.all_datasets.items() if self.plane in key and 'Red' in key}
+            self.associated_channel_dataset_object=list(self.associated_channel_datasets.values())[0]
+
+
+            
+    def find_associated_fov_tomato_dataset(self):   
+        
+        self.associated_aquisiton.get_associated_tomato_fov_datasets()        
+        self.plane=os.path.split(os.path.split(self.selected_dataset_mmap_path)[0])[1]
+
+        self.associated_fov_tomato_datasets={key:dataset for key, dataset in self.associated_aquisiton.associated_fov_tomato_acquisition.all_datasets.items() if self.plane in key}
+        
+        for dataset_name in list(   self.associated_fov_tomato_datasets.keys()):
+            if  'Green' in dataset_name:
+                self.associated_fov_tomato_dataset_green_object=self.associated_aquisiton.associated_fov_tomato_acquisition.all_datasets[dataset_name]
+            elif 'Red'  in dataset_name:
+                self.associated_fov_tomato_dataset_red_object=self.associated_aquisiton.associated_fov_tomato_acquisition.all_datasets[dataset_name]
+         
+    def  redo_initial_caiman(self):
+        
+        self.initial_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True)        
 
     def do_deep_caiman(self):
         

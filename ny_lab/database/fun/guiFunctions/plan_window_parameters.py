@@ -140,10 +140,21 @@ class plan_window_parameters(tk.Toplevel):
 
         self.destroy()
         self.update()
-        if not self.number:
-            self.gui.MouseDat.Experimental_class.plan_new_window(self.values, codes_selected=self.selected_codes)
+        if not self.selected_codes:
+            for i in self.values[1:]:
+                try:
+                    int(i[0])
+                except:
+                    self.selected_codes.append(i[0])
+
+        
+        if self.selected_codes:
+            self.gui.MouseDat.Experimental_class.plan_multiple_new_windows(self.values, codes_selected=self.selected_codes)
+            # self.gui.MouseDat.Experimental_class.plan_new_window(self.values, codes_selected=self.selected_codes)
         else:
-            self.gui.MouseDat.Experimental_class.plan_new_window(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
+            self.gui.MouseDat.Experimental_class.plan_multiple_new_windows(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
+            # self.gui.MouseDat.Experimental_class.plan_new_window(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
+
            
 
 

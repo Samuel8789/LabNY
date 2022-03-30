@@ -101,6 +101,65 @@ class DataExplorationsTab(tk.Frame):
         self.mouse_session_select_2_widefield_frame.canvas.draw()
               
        
+        
+''' 
+TO REVIEW
+#%% data exploration
+# mouse_codes=datamanaging.all_existing_sessions_not_database_objects[session_name].session_imaged_mice_codes
+# imaging_session=mouse_object.imaging_sessions_not_yet_database_objects[session_name]
+# os.startfile(imaging_session.mouse_session_path)
+ 
+# acqs=[datamanaging.all_experimetal_mice_objects[mouse_code].all_mouse_acquisitions  for mouse_code in mouse_codes]
+# imaging_session=[datamanaging.all_experimetal_mice_objects[mouse_code]  for mouse_code in mouse_codes]
+# fullalen=acqs[1][list(acqs[1].keys())[-2]]
+# fullalen.face_camera.full_eye_camera.play()
+# test=pd.DataFrame(fullalen.voltage_signals_dictionary['Locomotion'])
+# test.plot()
+# fullalen.metadata_object
+# fullalen.all_datasets
+# surface=list(fullalen.FOV_object.all_datasets[-1].values())[0]
+# surface_green=list(surface.all_datasets.values())[0]
+# surface_red=list(surface.all_datasets.values())[0]
+# surface_green.summary_images_object.plotting()
+# surface_red.summary_images_object.plotting()
+# fullalgrenplane1=fullalen.all_datasets[list(fullalen.all_datasets.keys())[0]]
+# fullalgrenplane1.kalman_object.dataset_kalman_caiman_movie.play(fr=1000)
+# fullalgrenplane1.summary_images_object.plotting()
+# # %matplotlib qt
+# fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
+# fullalgrenplane1.selected_dataset_mmap_path
+# os.startfile(fullalgrenplane1.selected_dataset_mmap_path)
+# coord0=list(fullalen.FOV_object.mouse_imaging_session_object.all_0coordinate_Aquisitions.values())[0]
+# widef=fullalen.FOV_object.mouse_imaging_session_object.widefield_image[list(fullalen.FOV_object.mouse_imaging_session_object.widefield_image.keys())[0]]
+# widef.plot_image()
+
+    #%%
+# mice_codes=['SPJA', 'SPJC']
+# datamanaging.copy_all_mouse_with_data_to_working_path(mice_codes)
+
+# all_prairie_sessions=datamanaging.all_existing_sessions
+# all_database_sessions_objects=datamanaging.all_existing_sessions_database_objects
+# all_database_sessions=datamanaging.all_existing_sessions_database
+
+ 
+
+# selected_mouse='SPJA'
+# selected_mouse_info={'Project':secondary_data_mice_projects[selected_mouse], 
+#                  'Path': secondary_data_mice_paths[selected_mouse], 
+#                  'Code':selected_mouse,
+#                  'Mouse_object': all_experimetal_mice_objects[selected_mouse],
+#                  'imaging_sessions':all_experimetal_mice_objects[selected_mouse].imaging_sessions_objects
+#                      }
+# selected_mouse_info['Mouse_object'].get_all_mouse_FOVdata_datasets()
+# mooom=selected_mouse_info['Mouse_object'].all_mouse_FOVdata_datasets
+# session=selected_mouse_info['imaging_sessions']['20210624']  
+# fov=session.all_FOVs['FOV_1']                   
+# fov.all_existing_1050tomato
+# fov.all_existing_1050tomato
+# dataset=fov.all_aquisitions[list(fov.all_aquisitions.keys())[0]]
+
+
+       '''
        
        
        

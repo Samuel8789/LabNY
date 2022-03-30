@@ -13,7 +13,7 @@ import matplotlib.image as mpimg
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
-
+import time
 from ....database import MouseDatabase
 
 
@@ -45,11 +45,14 @@ class MainGuiTab(tk.Frame):
         self.frame1.buttons={}
         self.frame1.buttons_names=['Update Database',
                                    'Close Database',
-                                   'Restart Database'
+                                   'Restart Database',
+                                   'Do Datamanaging'
+                                   
                                    ]
         self.frame1.buttons_commands=[self.button_update_database, 
                                       self.button_close_database, 
-                                      self.button_restart_database
+                                      self.button_restart_database,
+                                      self.do_datamanaging_button
                                       ]
         for i in range(len(self.frame1.buttons_names)):
             self.frame1.buttons[self.frame1.buttons_names[i]]= ttk.Button(self.frame1, text=self.frame1.buttons_names[i], command=self.frame1.buttons_commands[i])
@@ -57,6 +60,8 @@ class MainGuiTab(tk.Frame):
         self.frame1.buttons[self.frame1.buttons_names[0]].grid(column=0, row=0)
         self.frame1.buttons[self.frame1.buttons_names[1]].grid(column=0, row=1)
         self.frame1.buttons[self.frame1.buttons_names[2]].grid(column=0, row=2)
+        self.frame1.buttons[self.frame1.buttons_names[3]].grid(column=0, row=3)
+
 #%%   
         self.frame2= self.frames[self.frames_names[1]]
         
@@ -79,6 +84,18 @@ class MainGuiTab(tk.Frame):
 
 
 #%%
+    def do_datamanaging_button(self):
+        print('Doing Datamanging')
+        t = time.time()
+        self.gui_ref.lab.do_datamanaging()
+        self.gui_ref.datamanaging= self.gui_ref.lab.datamanaging
+        elapsed = time.time() - t
+
+        print('Finsihed Datamanging'+str(elapsed))
+
+       
+        
+
     def button_update_database(self):
             self.gui_ref.MouseDat.update_variables()    
             self.gui_ref.Database_attributes=pd.DataFrame(list(vars( self.gui_ref.MouseDat).keys()))      

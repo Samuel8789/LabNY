@@ -26,6 +26,12 @@ else
     disp('RAFA: Welcome new user, you should join the Yuste lab, it is great, no?');
     f_cs_update_log(app, 'RAFA: Welcome new user, you should join the Yuste lab, it is great, no?');
 end
+if exist(ops.file_path_from_python)
+    app.file_loc=ops.file_path_from_python ;
+    app.ops.browse_path=fileparts(app.file_loc)
+    f_cs_load_button_pushed(app);
+end
+
 
 app.ops = ops;
 

@@ -422,7 +422,369 @@ class ExperimentalDatabase():
 
 
              
-#%%            
+#%%   new cleaner methods          
+    def add_multiple_mice_to_exp(self, database_code_list, commit=False):
+        max_code=self.max_current_experimenatl_code[0]
+        max_lettercode=self.max_current_experimenatl_code[1]
+        all_exp_codes=[]
+        for mouse_database_code in database_code_list:
+            max_code, max_lettercode,mouse_id  =self.assign_mouse_experimental_code(mouse_database_code, max_code, max_lettercode, commit)
+            all_exp_codes.append([max_code, max_lettercode, mouse_id])
+            
+        return all_exp_codes
+            
+    def assign_mouse_experimental_code(self, database_code, current_max_code, current_max_lettercode, commit=False):
+        
+        query_mouse_info="SELECT ID, Cage, Line, Label, Room FROM MICE_table   WHERE Lab_number=?"
+        params=(database_code,)
+        mouse_to_add_exp = self.databse_ref.arbitrary_query_to_df(query_mouse_info, params).values.tolist()[0]
+        mouse_ID=mouse_to_add_exp[0]
+        mouse_cage=mouse_to_add_exp[1]      
+        mouse_line=mouse_to_add_exp[2] 
+        mouse_label=mouse_to_add_exp[3] 
+        
+        if mouse_label==1:
+            EarMark=7
+        else:
+            EarMark=mouse_label
+
+        this_mouse_code=int(current_max_code+1)
+        this_mouse_nextletter_code=get_next_twolettercode(current_max_lettercode)
+        
+        if mouse_line in [5,12,13]:
+            project=4
+        elif mouse_line in [18,19,20,21,22,23]:
+            project=2               
+        elif mouse_line in [16,17]:
+            project=7
+        elif mouse_line in [26]:
+            project=8   
+                
+            
+        # update MICE_table
+        query_mouse_update_exp_status="""
+         UPDATE MICE_table
+         SET  Experimental_Status=3, Experimental_Code=?
+         WHERE ID=?
+         """
+        params=(this_mouse_code, mouse_ID)
+        self.databse_ref.arbitrary_updating_record(query_mouse_update_exp_status, params, commit=commit)
+        
+        # add action
+        actions_dictionary={mouse_cage:{11:((database_code,),(),())                                   
+                                  }
+                            }
+        self.databse_ref.add_multiple_actions(actions_dictionary, commit=commit)   
+
+        # add new record to experimental        
+        query_add_exps=""" 
+              INSERT INTO ExperimentalAnimals_table( ID, Code, Project, Mouse_ID, EarMark, Experimental_status, Experiment)
+              VALUES(?,?,?,?,?,1,3) 
+            """              
+        params_insert=(this_mouse_code, 
+                this_mouse_nextletter_code,
+                project,
+                mouse_ID, 
+                EarMark)    
+        self.databse_ref.arbitrary_inserting_record(query_add_exps, params_insert, commit=commit)          
+        
+        return this_mouse_code, this_mouse_nextletter_code, mouse_ID
+    
+    def move_cage_to_experimental_room(self, cage, raw_date_performed, commit=False):
+        
+        date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
+        query_mice_incage_info= "SELECT ID, Lab_number, Line, Label, Room, Experimental_Code  FROM MICE_table   WHERE Cage=?"
+        params=(cage,)
+        mice_info=self.databse_ref.arbitrary_query_to_df(query_mice_incage_info,params).values.tolist() 
+        room=mice_info[0][4]
+        
+        if room==2:
+            actions_dictionary={cage:{12:((),(),(date_performed)) 
+                                      }
+                                }
+            self.databse_ref.add_multiple_actions(actions_dictionary, commit=commit)
+        else:
+            print('already out of colony')
+        
+        query_mice_cage_update="""
+                UPDATE MICE_table
+                SET  Room=3
+                WHERE Cage=?
+            """        
+        params=(cage,)
+        self.databse_ref.arbitrary_updating_record(query_mice_cage_update, params, commit=commit)
+        
+    def plan_new_single_injection(self, values, cage, animal_selected, injection_sites, virus_dilutions, max_injection_id):
+   
+        res = list(zip(*virus_dilutions))   
+        virus_tuple=res[0]
+        viruscomb=get_combination_from_virus(virus_tuple, self)
+        all_inject_params=values
+        this_injection_id=int(max_injection_id+1)
+        
+        if isinstance(animal_selected, int): # check if input is lab number or experimental code
+            mouse_exp_codes =self.add_multiple_mice_to_exp([animal_selected]) # is not experimental code add mouse to experimental
+            selected_mouse_exp_ID=mouse_exp_codes[0][0]
+            selected_mouse_ID=mouse_exp_codes[0][2]
+            
+        elif isinstance(animal_selected, str):
+            params=tuple(animal_selected)
+            
+            query_mouse_exp_info='SELECT ID, Mouse_ID FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in params)  
+            selected_mouse_all_IDs = self.databse_ref.arbitrary_query_to_df(query_mouse_exp_info, params).values.tolist()
+            
+            selected_mouse_ID=selected_mouse_all_IDs[1] 
+            selected_mouse_exp_ID=selected_mouse_all_IDs[0]
+   
+        params=(selected_mouse_ID,)
+        query_mouse_info='SELECT ID, Lab_number, Line, Label, Room FROM MICE_table   WHERE ID IN (%s)' % ','.join('?' for i in params)  
+        
+        mouse_info = self.databse_ref.arbitrary_query_to_df(query_mouse_info, params).values.tolist()[0]
+   
+        if mouse_info[2] in [5,12,13]:
+             if any(x in res for x in ['B', 'C1V1', 'I']):
+                  mouse_info.append(5)  
+             else:
+                  mouse_info.append(4)
+        elif mouse_info[2] in [18,19,20,21,22,23]:
+            if any(x in res for x in ['B', 'C1V1', 'I']):
+                  mouse_info.append(3)
+            else:
+                  mouse_info.append(2)
+                 
+        elif mouse_info[2] in [16,17]:
+                  mouse_info.append(7)
+
+        query_update_exps=""" 
+             UPDATE  ExperimentalAnimals_table
+             SET Project=?, Experimental_status=1 , Experiment=2 , NumberOfInjections=1 , Injection1Date='TODO', Injection1ID=?
+             WHERE Mouse_ID=?
+             """  
+        params=(mouse_info[-1], this_injection_id, mouse_info[0])
+        self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+             
+        # add new record to injecitons
+        query_add_injections=""" 
+                 INSERT INTO Injections_table(
+                     ExpID,
+                     InjDate,
+                     VirusCombination,
+                     DilutionSensor1,
+                     DilutionSensor2,
+                     DilutionOpto,
+                     CorticalArea,
+                     InjectionSites,
+                     InjectionSite1Coordinates,
+                     InjectionSite1volume,
+                     InjectionSite1speed,
+                     InjectionSite1pretime,
+                     InjectionSite1posttime,
+                     InjectionSite2Coordinates,
+                     InjectionSite2volume,
+                     InjectionSite2speed,
+                     InjectionSite2pretime,
+                     InjectionSite2posttime                     
+                   )
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) 
+               """           
+
+        params=((selected_mouse_exp_ID, all_inject_params[1],viruscomb[0][0])+ tuple( (all_inject_params[5:15])+(all_inject_params[17:22])  ))
+        self.databse_ref.arbitrary_inserting_record(query_add_injections, params)
+        
+        return this_injection_id
+
+    def plan_new_multiple_injection(self, values, cage, animals_selected, injection_sites, virus_dilutions):
+        max_injection_id=self.max_current_injection_code
+
+        for i, mouse in enumerate(animals_selected):
+            max_injection_id=self.plan_new_single_injection(values[i+1], cage, mouse, injection_sites, virus_dilutions, max_injection_id)
+    
+        self.databse_ref.independent_commit()    
+
+    def update_performed_injections(self, all_inject_params, cage, selected_codes, raw_date_performed):
+        
+        date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
+      
+              
+        query_mice_exp_info="SELECT ExperimentalAnimals_table.ID, MICE_table.ID, Lab_number,Code,Label,Room,ExperimentalAnimals_table.Experimental_status, MICE_table.Experimental_status, Experiment,Injection1ID FROM ExperimentalAnimals_table LEFT JOIN MICE_table ON MICE_table.ID = ExperimentalAnimals_table.Mouse_ID WHERE Cage=?"
+        cage=cage       
+        params=(cage,)
+        mice_exp=self.databse_ref.arbitrary_query_to_df(query_mice_exp_info,params).values.tolist()  
+   
+        
+        good_mice_exp=[i for i in mice_exp if i[3] in selected_codes]
+         
+        moved_room=int(all_inject_params[1][26])
+        
+        
+        labels_list=[mouse[1] for mouse in all_inject_params[1:]]
+        labels_tuple=tuple(labels_list)
+        labels=transform_earlabels_to_codes(labels_tuple, self)
+        for i,mouse in enumerate(all_inject_params[1:]):
+            mouse[1]=labels[i]
+        
+
+        # udate actions room change and experiment 
+        if moved_room:
+            self.move_cage_to_experimental_room(cage, raw_date_performed)
+            
+        
+        # update queries  
+        query_mice_injected_update="""
+                UPDATE MICE_table
+                SET Label=?, Experimental_Status=2
+                WHERE ID=?
+            """
+        query_update_exps=""" 
+             UPDATE  ExperimentalAnimals_table
+             SET EarMark=?, Experimental_status=2 ,Experiment=2 , NumberOfInjections=1 , Injection1Date=date(?)
+             WHERE ID=?
+             """
+        query_update_injections=""" 
+                 UPDATE  Injections_table
+                 SET 
+                     InjDate=date(?),
+                     VirusCombination=?,
+                     DilutionSensor1=?,
+                     DilutionSensor2=?,
+                     DilutionOpto=?,
+                     CorticalArea=?,
+                     InjectionSites=?,
+                     InjectionSite1Coordinates=?,
+                     InjectionSite1volume=?,
+                     InjectionSite1speed=?,
+                     InjectionSite1pretime=?,
+                     InjectionSite1posttime=?,
+                     InjectionSite1goodvolume=?,
+                     InjectionSite1bleeding=?,
+                     InjectionSite2Coordinates=?,
+                     InjectionSite2volume=?,
+                     InjectionSite2speed=?,
+                     InjectionSite2pretime=?,
+                     InjectionSite2posttime=?,
+                     InjectionSite2goodvolume=? ,                  
+                     InjectionSite2bleeding=?,
+                     Notes=?
+                     WHERE  ID=?
+                    
+                """    
+                
+   
+        for i, mouse in enumerate(good_mice_exp):
+            noinjection=0
+            if not (all_inject_params[i+1][3] or all_inject_params[i+1][4] or all_inject_params[i+1][3] ):
+                for j, k in enumerate(all_inject_params[i+1][:-1]):
+                    if j>5:
+                        all_inject_params[i+1][j]=np.nan                       
+                        noinjection=1
+        # update MICE_table
+            params=(all_inject_params[i+1][1], mouse[1],)
+            self.databse_ref.arbitrary_updating_record(query_mice_injected_update,params)
+        # update exper
+   
+            params=(all_inject_params[i+1][1], date_performed ,mouse[0] )
+            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+        # update injection
+        
+            virus_tuple=(all_inject_params[i+1][3],all_inject_params[i+1][4],all_inject_params[i+1][5])
+            if any(virus_tuple):
+                viruscomb=get_combination_from_virus(virus_tuple, self)
+            else:
+                viruscomb=[[28]]
+            list_for_update=[all_inject_params[i+1][2],viruscomb[0][0]]+all_inject_params[i+1][6:]  
+            list_for_update[0]=date_performed
+            if not noinjection:
+                list_for_update_integercorrected=[ int(float(j))  if i in [5,6,7,14] else j for i,j in enumerate(list_for_update)]
+            else:
+                list_for_update_integercorrected=list_for_update
+            tuple_for_update=tuple(list_for_update_integercorrected[:-1] )
+            tuple_inje_id=(int(mouse[-1]),)
+            tuple_for_update=  (tuple_for_update +tuple_inje_id)
+            
+            params=(tuple_for_update)
+            self.databse_ref.arbitrary_updating_record(query_update_injections,params)
+            
+        self.databse_ref.independent_commit()    
+        
+    def plan_multiple_new_windows(self, all_windows_parameters, lab_number_selected=False, codes_selected=False,):
+        current_max_window=self.max_current_window_code               
+
+        for mouse_window_parameters in all_windows_parameters[1:]:
+            if codes_selected:
+                current_max_window=self.plan_new_single_window( mouse_window_parameters, lab_number_selected=False, codes_selected=mouse_window_parameters[0], max_window=current_max_window )
+            elif lab_number_selected:
+                current_max_window=self.plan_new_single_window( mouse_window_parameters, lab_number_selected=mouse_window_parameters[0], codes_selected=False, max_window=current_max_window )
+
+        self.databse_ref.independent_commit()    
+
+    def plan_new_single_window(self, mouse_window_parameters, lab_number_selected=False, codes_selected=False, max_window=False ):
+
+        this_window_id=int(max_window+1)
+        if lab_number_selected:
+           mouse_exp_codes =self.add_multiple_mice_to_exp([lab_number_selected]) # is not experimental code add mouse to experimental
+           selected_mouse_exp_ID=mouse_exp_codes[0][0]
+           selected_mouse_ID=mouse_exp_codes[0][2]
+           selected_mouse_code=mouse_exp_codes[0][1]
+           codes_selected=selected_mouse_code
+           
+        params=tuple([codes_selected])
+        # query_check_exp_info="SELECT * FROM ExperimentalAnimals_table  WHERE Code=?"
+        query_check_exp_info='SELECT * FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in [codes_selected])    
+        selected_mouse_exp_info=self.databse_ref.arbitrary_query_to_df(query_check_exp_info, params)
+
+        
+        mouse_dict={}
+        # get animal info
+        mouse_dict['Code']=selected_mouse_exp_info['Code'][0]
+        mouse_dict['WindowDate']='TODO'
+        mouse_dict['WindowID']=this_window_id    
+        mouse_dict['ExpID']=int(selected_mouse_exp_info['ID'][0])
+        mouse_dict['Experimental_status']=1
+        mouse_dict['Experiment']=4
+        mouse_dict['MouseID']=int(selected_mouse_exp_info['Mouse_ID'][0])
+        
+
+       
+             
+        query_add_window=""" 
+                    INSERT INTO Windows_table(   
+                      ID,
+                      ExpID,
+                      WindDate,
+                      CorticalArea,
+                      HeadPlateCoordinates,
+                      WindowType,
+                      CranioSize,
+                      CoverType,
+                      CoverSize,
+                      Durotomy            
+                      )
+                    VALUES(?,?,'TODO',?,?,?,?,?,?,?) 
+                  """             
+
+      
+        # add new window
+        integg=[2,3,4,5,6,7,8]
+        window_parameters=[int(param) if i in integg else param for i, param in enumerate(mouse_window_parameters)]
+        tuple_for_adding_window=(mouse_dict['WindowID'], mouse_dict['ExpID'],)+tuple(window_parameters[2:])            
+        params2=tuple_for_adding_window
+        self.databse_ref.arbitrary_inserting_record(query_add_window,params2)
+        
+        query_update_exps=""" 
+             UPDATE ExperimentalAnimals_table
+             SET Experimental_status=1, Experiment=4, WindowDate='TODO', WindowID=?
+             WHERE ID=?
+             """  
+             
+       
+             
+        params1=(int(mouse_dict['WindowID']), int(mouse_dict['ExpID']))
+        self.databse_ref.arbitrary_updating_record(query_update_exps,params1)
+
+        return this_window_id
+        
+#%%       
+    
     def add_new_planned_experimental_cage(self,cage):  
         
         query_mice_exp_info="SELECT ID, Lab_number, Line, Label, Room FROM MICE_table   WHERE Cage=?"
@@ -462,12 +824,12 @@ class ExperimentalDatabase():
             # update MICE_table
             if i==0:
                 max_code=self.max_current_experimenatl_code[0]
-                next_code=max_code+1
+                next_code=int(max_code+1)
                 max_lettercode=self.max_current_experimenatl_code[1]
                 nextletter_code=get_next_twolettercode(max_lettercode)
                 
             else:
-                next_code=next_code+1
+                next_code=int(next_code+1)
                 nextletter_code=get_next_twolettercode(nextletter_code)
                 
             params=(next_code,mouse)
@@ -492,301 +854,87 @@ class ExperimentalDatabase():
             
         return mice_exp
     
-    def plan_new_injection(self, values,  cage, animals_selected, injection_sites, virus_dilutions):
-        
-        res = list(zip(*virus_dilutions))   
-        virus_tuple=res[0]
-        viruscomb=get_combination_from_virus(virus_tuple, self)
-        
-        if isinstance(animals_selected[0], int):
-            mice_exp=self.add_new_planned_experimental_cage(cage) 
-            seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[1] in animals_selected]
-            selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
-            params=tuple(selected_mouse_IDs)    
-            query_mice_exp_info='SELECT ID FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)   
-            mice_experiments_IDs = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()
-        else:    
-            params=tuple(animals_selected)
-            query_mice_exp_info='SELECT ID, Mouse_ID FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in params)  
-            mice_experiments_IDs = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()
-            selected_mouse_IDs=[i[1] for i in mice_experiments_IDs ]
-            selected_mouse_exp_IDs=[i[0] for i in mice_experiments_IDs ]
-            params=tuple(selected_mouse_IDs)
-            query_mice_exp_info2='SELECT ID, Lab_number, Line, Label, Room FROM MICE_table   WHERE ID IN (%s)' % ','.join('?' for i in params)  
-            mice_exp = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info2, params).values.tolist()
-            seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if mouse_exp[0] in selected_mouse_IDs]
 
-        for mouse in  seleced_mice_exp:
-            if mouse[2] in [5,12,13]:
-                 if any(x in res[0] for x in ['B', 'C1V1', 'I']):
-                      mouse.append(5)  
-                 else:
-                      mouse.append(4)
-            elif mouse[2] in [18,19,20,21,22,23]:
-                if any(x in res[0] for x in ['B', 'C1V1', 'I']):
-                      mouse.append(3)
-                else:
-                      mouse.append(2)
-                     
-            elif mouse[2] in [16,17]:
-                      mouse.append(7)
-         
-        query_update_exps=""" 
-             UPDATE  ExperimentalAnimals_table
-             SET Project=?, Experimental_status=1 , Experiment=2 , NumberOfInjections=1 , Injection1Date='TODO', Injection1ID=?
-             WHERE Mouse_ID=?
-             """  
-             
-        query_add_injections=""" 
-                  INSERT INTO Injections_table(
-                      ExpID,
-                      InjDate,
-                      VirusCombination,
-                      DilutionSensor1,
-                      DilutionSensor2,
-                      DilutionOpto,
-                      CorticalArea,
-                      InjectionSites,
-                      InjectionSite1Coordinates,
-                      InjectionSite1volume,
-                      InjectionSite1speed,
-                      InjectionSite1pretime,
-                      InjectionSite1posttime,
-                      InjectionSite2Coordinates,
-                      InjectionSite2volume,
-                      InjectionSite2speed,
-                      InjectionSite2pretime,
-                      InjectionSite2posttime                     
-                    )
-                  VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) 
-                """           
-       
-   
-  
-        all_inject_params=values
-        datezz='TODO'
+    # def plan_new_window(self, all_winodws_parameters, lab_number_selected=False, codes_selected=False, ):
         
-        for i, mouse_exp in enumerate(seleced_mice_exp):
-  
-            if i==0:
-                next_injection_id=self.max_current_injection_code+1
-            else:
-                next_injection_id=next_injection_id+1
-                     
-            params=(mouse_exp[-1], next_injection_id, mouse_exp[0])
-            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+    #     if lab_number_selected:
+    #         params=tuple(lab_number_selected)    
+    #         query_mice_cage='SELECT Cage FROM MICE_table WHERE Lab_Number IN (%s)' % ','.join('?' for i in params)   
+    #         mice_cages = self.databse_ref.arbitrary_query_to_df(query_mice_cage, params).values.tolist()
             
-            # add new record to injecitons
-            exp_ID=mice_experiments_IDs[i][0]
-            
-            params=((exp_ID, datezz,viruscomb[0][0])+ tuple( (all_inject_params[i+1][5:15])+(all_inject_params[i+1][17:22])  ))
-            self.databse_ref.arbitrary_inserting_record(query_add_injections,params)
-            
-        self.databse_ref.independent_commit()    
+    #         codes_selected=[]
+    #         for cage in mice_cages:
+    #             mice_exp=self.add_new_planned_experimental_cage(cage[0])
+    #             seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if str(mouse_exp[1]) in lab_number_selected]
+    #             selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
+    #             params=tuple(selected_mouse_IDs)    
+    #             query_mice_exp_info='SELECT Code FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)   
+    #             mice_experiments_codes = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()[0]
+    #             codes_selected.append(mice_experiments_codes)
+    #         codes_selected = [item for sublist in codes_selected for item in sublist]
 
-    def update_performed_injections(self, all_inject_params, cage, selected_codes, raw_date_performed):
-        
-        date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
-      
-              
-        query_mice_exp_info="SELECT ExperimentalAnimals_table.ID, MICE_table.ID, Lab_number,Code,Label,Room,ExperimentalAnimals_table.Experimental_status, MICE_table.Experimental_status, Experiment,Injection1ID FROM ExperimentalAnimals_table LEFT JOIN MICE_table ON MICE_table.ID = ExperimentalAnimals_table.Mouse_ID WHERE Cage=?"
-        cage=cage       
-        params=(cage,)
-        mice_exp=self.databse_ref.arbitrary_query_to_df(query_mice_exp_info,params).values.tolist()  
-
-        
-        good_mice_exp=[i for i in mice_exp if i[3] in selected_codes]
-         
-        all_inject_params=all_inject_params
             
-        
-        
-        labels_list=[mouse[1] for mouse in all_inject_params[1:]]
-        labels_tuple=tuple(labels_list)
-        labels=transform_earlabels_to_codes(labels_tuple, self)
-        for i,mouse in enumerate(all_inject_params[1:]):
-            mouse[1]=labels[i]
-        
-
-        room=good_mice_exp[0][5]
-        # udate actions room change and experiment 
-        
-        
-        if room==2:
-            actions_dictionary={cage:{12:((),(),(date_performed)) 
-                                      }
-                                }
-            self.databse_ref.add_multiple_actions(actions_dictionary)
-            
-        else:
-            print('already out of colony')
-        
-        query_mice_cage_update="""
-                UPDATE MICE_table
-                SET  Room=3
-                WHERE Cage=?
-            """        
-        params=(cage,)
-        self.databse_ref.arbitrary_updating_record(query_mice_cage_update, params)
-        
-        # update queries  
-        query_mice_injected_update="""
-                UPDATE MICE_table
-                SET  Room=3, Label=?, Experimental_Status=2
-                WHERE ID=?
-            """
-        query_update_exps=""" 
-             UPDATE  ExperimentalAnimals_table
-             SET EarMark=?, Experimental_status=2 ,Experiment=2 , NumberOfInjections=1 , Injection1Date=date(?)
-             WHERE ID=?
-             """
-        query_update_injections=""" 
-                 UPDATE  Injections_table
-                 SET 
-                     InjDate=date(?),
-                     VirusCombination=?,
-                     DilutionSensor1=?,
-                     DilutionSensor2=?,
-                     DilutionOpto=?,
-                     CorticalArea=?,
-                     InjectionSites=?,
-                     InjectionSite1Coordinates=?,
-                     InjectionSite1volume=?,
-                     InjectionSite1speed=?,
-                     InjectionSite1pretime=?,
-                     InjectionSite1posttime=?,
-                     InjectionSite1goodvolume=?,
-                     InjectionSite1bleeding=?,
-                     InjectionSite2Coordinates=?,
-                     InjectionSite2volume=?,
-                     InjectionSite2speed=?,
-                     InjectionSite2pretime=?,
-                     InjectionSite2posttime=?,
-                     InjectionSite2goodvolume=? ,                  
-                     InjectionSite2bleeding=?,
-                     Notes=?
-                     WHERE  ID=?
-                    
-                """    
-                
-
-        for i, mouse in enumerate(good_mice_exp):
-            noinjection=0
-            if not (all_inject_params[i+1][3] or all_inject_params[i+1][4] or all_inject_params[i+1][3] ):
-                for j, k in enumerate(all_inject_params[i+1][:-1]):
-                    if j>5:
-                        all_inject_params[i+1][j]=np.nan                       
-                        noinjection=1
-        # update MICE_table
-            params=(all_inject_params[i+1][1], mouse[1],)
-            self.databse_ref.arbitrary_updating_record(query_mice_injected_update,params)
-        # update exper
-  
-            params=(all_inject_params[i+1][1], date_performed ,mouse[0] )
-            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
-        # update injection
-        
-            virus_tuple=(all_inject_params[i+1][3],all_inject_params[i+1][4],all_inject_params[i+1][5])
-            if any(virus_tuple):
-                viruscomb=get_combination_from_virus(virus_tuple, self)
-            else:
-                viruscomb=[[28]]
-            list_for_update=[all_inject_params[i+1][2],viruscomb[0][0]]+all_inject_params[i+1][6:]  
-            list_for_update[0]=date_performed
-            if not noinjection:
-                list_for_update_integercorrected=[ int(float(j))  if i in [5,6,7,14] else j for i,j in enumerate(list_for_update)]
-            else:
-                list_for_update_integercorrected=list_for_update
-            tuple_for_update=tuple(list_for_update_integercorrected )
-            tuple_inje_id=(mouse[-1],)
-            tuple_for_update=  (tuple_for_update +tuple_inje_id)
-            
-            params=(tuple_for_update)
-            self.databse_ref.arbitrary_updating_record(query_update_injections,params)
-            
-        self.databse_ref.independent_commit()    
-
-    def plan_new_window(self, all_winodws_parameters, lab_number_selected=False, codes_selected=False, ):
-        
-        if lab_number_selected:
-            params=tuple(lab_number_selected)    
-            query_mice_cage='SELECT Cage FROM MICE_table WHERE Lab_Number IN (%s)' % ','.join('?' for i in params)   
-            mice_cages = self.databse_ref.arbitrary_query_to_df(query_mice_cage, params).values.tolist()
-            
-            codes_selected=[]
-            for cage in mice_cages:
-                mice_exp=self.add_new_planned_experimental_cage(cage[0])
-                seleced_mice_exp=[mouse_exp for mouse_exp in mice_exp if str(mouse_exp[1]) in lab_number_selected]
-                selected_mouse_IDs=[i[0] for i in seleced_mice_exp ]
-                params=tuple(selected_mouse_IDs)    
-                query_mice_exp_info='SELECT Code FROM ExperimentalAnimals_table WHERE Mouse_ID IN (%s)' % ','.join('?' for i in params)   
-                mice_experiments_codes = self.databse_ref.arbitrary_query_to_df(query_mice_exp_info, params).values.tolist()[0]
-                codes_selected.append(mice_experiments_codes)
-            codes_selected = [item for sublist in codes_selected for item in sublist]
-
-    
-    
-            
-        params=tuple(codes_selected)
-        # query_check_exp_info="SELECT * FROM ExperimentalAnimals_table  WHERE Code=?"
-        query_check_exp_info='SELECT * FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in codes_selected)    
-        selected_mice_exp_info=self.databse_ref.arbitrary_query_to_df(query_check_exp_info, params)
+    #     params=tuple(codes_selected)
+    #     # query_check_exp_info="SELECT * FROM ExperimentalAnimals_table  WHERE Code=?"
+    #     query_check_exp_info='SELECT * FROM ExperimentalAnimals_table WHERE Code IN (%s)' % ','.join('?' for i in codes_selected)    
+    #     selected_mice_exp_info=self.databse_ref.arbitrary_query_to_df(query_check_exp_info, params)
 
  
-        all_winodws_parameters=all_winodws_parameters
+    #     all_winodws_parameters=all_winodws_parameters
 
-        query_update_exps=""" 
-             UPDATE  ExperimentalAnimals_table
-             SET  Experimental_status=1, Experiment=4, WindowDate='TODO', WindowID=?
-             WHERE ID=?
-             """  
-        query_add_windw=""" 
-                    INSERT INTO Windows_table(   
-                      ID,
-                      ExpID,
-                      WindDate,
-                      CorticalArea,
-                      HeadPlateCoordinates,
-                      WindowType,
-                      CranioSize,
-                      CoverType,
-                      CoverSize,
-                      Durotomy            
-                      )
-                    VALUES(?,?,'TODO',?,?,?,?,?,?,?) 
-                  """             
+    #     query_update_exps=""" 
+    #           UPDATE  ExperimentalAnimals_table
+    #           SET  Experimental_status=1, Experiment=4, WindowDate='TODO', WindowID=?
+    #           WHERE ID=?
+    #           """  
+    #     query_add_windw=""" 
+    #                 INSERT INTO Windows_table(   
+    #                   ID,
+    #                   ExpID,
+    #                   WindDate,
+    #                   CorticalArea,
+    #                   HeadPlateCoordinates,
+    #                   WindowType,
+    #                   CranioSize,
+    #                   CoverType,
+    #                   CoverSize,
+    #                   Durotomy            
+    #                   )
+    #                 VALUES(?,?,'TODO',?,?,?,?,?,?,?) 
+    #               """             
 
-        mice_info_list=[]       
-        mouse_dict={}
-        # get animal info
-        # for i, exp in enumerate(selected_mice_exp_info):
-        for index, row in selected_mice_exp_info.iterrows():
+    #     mice_info_list=[]       
+    #     mouse_dict={}
+    #     # get animal info
+    #     # for i, exp in enumerate(selected_mice_exp_info):
+    #     for index, row in selected_mice_exp_info.iterrows():
 
-            mouse_dict['Code']=row['Code']
-            mouse_dict['WindowDate']='TODO'
-            if index==0:
-                windowcode=self.max_current_window_code+1               
-            else:
-                windowcode=windowcode+1
-            mouse_dict['WindowID']=windowcode    
-            mouse_dict['ExpID']=row['ID']
-            mouse_dict['Experimental_status']=1
-            mouse_dict['Experiment']=4
-            mouse_dict['MouseID']=row['Mouse_ID']
-            mice_info_list.append(mouse_dict)
-            # update exp and main     
+    #         mouse_dict['Code']=row['Code']
+    #         mouse_dict['WindowDate']='TODO'
+    #         if index==0:
+    #             windowcode=self.max_current_window_code+1               
+    #         else:
+    #             windowcode=windowcode+1
+    #         mouse_dict['WindowID']=windowcode    
+    #         mouse_dict['ExpID']=row['ID']
+    #         mouse_dict['Experimental_status']=1
+    #         mouse_dict['Experiment']=4
+    #         mouse_dict['MouseID']=row['Mouse_ID']
+    #         mice_info_list.append(mouse_dict)
+    #         # update exp and main     
             
-            params=( mouse_dict['WindowID'],mouse_dict['ExpID'])
-            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
-        # add new window
-            integg=[2,3,4,5,6,7,8]
-            windwo_parameters=[int(param) if i in integg else param for i, param in enumerate(all_winodws_parameters[index+1])]
+    #         params=( mouse_dict['WindowID'],mouse_dict['ExpID'])
+    #         self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+    #     # add new window
+    #         integg=[2,3,4,5,6,7,8]
+    #         windwo_parameters=[int(param) if i in integg else param for i, param in enumerate(all_winodws_parameters[index+1])]
 
-            tuple_for_adding_window=(mouse_dict['WindowID'],mouse_dict['ExpID'],)+tuple(windwo_parameters[2:])            
-            params=tuple_for_adding_window
-            self.databse_ref.arbitrary_inserting_record(query_add_windw,params)
+    #         tuple_for_adding_window=(mouse_dict['WindowID'],mouse_dict['ExpID'],)+tuple(windwo_parameters[2:-1])    
+
+    #         params=tuple_for_adding_window
+    #         self.databse_ref.arbitrary_inserting_record(query_add_windw,params)
             
-        self.databse_ref.independent_commit()        
+    #     self.databse_ref.independent_commit()        
     
                        
     def update_performed_window(self,all_inject_params, cage, animals_selected, raw_date_performed=False):   
@@ -882,7 +1030,7 @@ class ExperimentalDatabase():
 
         # update injection
         
-            list_for_update=[updated_window_values[i+1][1]]+updated_window_values[i+1][3:] 
+            list_for_update=[updated_window_values[i+1][1]]+updated_window_values[i+1][3:-1] 
             list_for_update[0]=date_performed
 
             list_for_update_integercorrected=[ int(j)  if i in list(range(1,8)) else j for i,j in enumerate(list_for_update)]
@@ -1075,7 +1223,7 @@ class ExperimentalDatabase():
             self.databse_ref.add_multiple_actions(actions_dictionary)
             
     
-            Brain_ID =self.max_current_brain_code+1
+            Brain_ID =int(self.max_current_brain_code+1)
             Exp_Mouse_ID=brain_mouse_info[0]
             Fixation_date=corrected_date_performed
             Perfusion_solution=values[i+1][2]

@@ -14,10 +14,10 @@ import datetime
 import os
 
 class select_face_camera(tk.Toplevel):
-    def __init__(self,  gui, aquisition_path, UnprocessedFaceCameraspaths, UnprocessedVisStimpaths):
+    def __init__(self,  gui, aquisition_path, UnprocessedFaceCameraspaths, UnprocessedVisStimpaths, UnprocessedDaqRecordingpaths ):
         tk.Toplevel.__init__(self, gui) #inst     
       
-        row_labels=['FaceCamera', 'VisStim']
+        row_labels=['FaceCamera', 'VisStim', 'DaqRecording']
         self.total_rows=len(row_labels)+1
         self.values=list()
         self.b = list()
@@ -42,18 +42,26 @@ class select_face_camera(tk.Toplevel):
                 elif j>0:
                     if i==1:
                         values=UnprocessedFaceCameraspaths
-                        var = StringVar()
-                        self.b[i].append(ttk.Combobox(self, values=values,textvariable=var, width=70)) # b[i][j]
+                        var1 = StringVar()
+                        self.b[i].append(ttk.Combobox(self, values=values, textvariable=var1, width=70)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)   
                         self.b[i][j].current(0)     
                         self.values[i].append(self.b[i][j].get())   
                     if i==2:
                         values=UnprocessedVisStimpaths
-                        var = StringVar()
-                        self.b[i].append(ttk.Combobox(self, values=values,textvariable=var, width=70)) # b[i][j]
+                        var2 = StringVar()
+                        self.b[i].append(ttk.Combobox(self, values=values, textvariable=var2, width=70)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)   
                         self.b[i][j].current(0)     
-                        self.values[i].append(self.b[i][j].get())   
+                        self.values[i].append(self.b[i][j].get())  
+                    if i==3:
+                        values=UnprocessedDaqRecordingpaths
+                        var3 = StringVar()
+                        self.b[i].append(ttk.Combobox(self, values=values, textvariable=var3, width=70)) # b[i][j]
+                        self.b[i][j].grid(row=i+1, column=j)   
+                        self.b[i][j].current(0)     
+                        self.values[i].append(self.b[i][j].get())  
+     
  
  
         enter_button = Button(self, text="Enter", command=self.retrieve_input)

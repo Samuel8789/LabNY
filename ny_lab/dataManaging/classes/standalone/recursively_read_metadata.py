@@ -5,6 +5,9 @@ Created on Fri Sep 24 10:12:02 2021
 @author: sp3660
 """
 
+import xml.etree.ElementTree as ET
+
+
 def recursively_read_metadata(root):
     metadata={}
     if list(root):
@@ -54,3 +57,9 @@ def recursively_read_metadata(root):
     return metadata
 
 
+def read_raw_metadata(metadata_path):
+    
+    tree = ET.parse(metadata_path)       
+    root = tree.getroot()
+    full_metadata=recursively_read_metadata(root)  
+    return full_metadata

@@ -95,25 +95,43 @@ def channel_and_plane_of_image(single_image_full_path, multiplane, aq_type):
         Plane=int(single_image_full_path[-14:-8])
     else:
         Plane=1   
+        
+    cycle=int((single_image_full_path)[-24:-19])
          
-    return Ch, Plane
+    return Ch, Plane, cycle
 
 
-def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type):
+def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type, is_highstack=False):
     
     file_list = os.listdir(current_directory)
-     
-    for i, fname in enumerate(file_list):
-        file_path=os.path.join(current_directory,fname)
-        if os.path.isfile(file_path):
-            if file_path.endswith('.tif'):
-                Ch, Plane = channel_and_plane_of_image(current_directory + os.sep + fname, Multiplane, aq_type)
-                if Ch:
-                    ChannelPath = [i for i in ChannelPaths if Ch in i] 
-                    
-                    if Plane<=len(PlanePaths):
-                        new_directory=ChannelPath[0] + PlanePaths[Plane-1]
-                        os.rename(current_directory + os.sep + fname, new_directory + os.sep + fname)
+    
+    if not is_highstack:
+        for i, fname in enumerate(file_list):
+            file_path=os.path.join(current_directory,fname)
+            if os.path.isfile(file_path):
+                if file_path.endswith('.tif'):
+                    Ch, Plane = channel_and_plane_of_image(current_directory + os.sep + fname, Multiplane, aq_type)
+                    if Ch:
+                        ChannelPath = [i for i in ChannelPaths if Ch in i] 
+                        
+                        if Plane<=len(PlanePaths):
+                            new_directory=ChannelPath[0] + PlanePaths[Plane-1]
+                            os.rename(current_directory + os.sep + fname, new_directory + os.sep + fname)
+    else:
+        for i, fname in enumerate(file_list):
+            file_path=os.path.join(current_directory,fname)
+            if os.path.isfile(file_path):
+                if file_path.endswith('.tif'):
+                    Ch, Plane, cycle = channel_and_plane_of_image(current_directory + os.sep + fname, Multiplane, aq_type)
+                    if Ch:
+                        ChannelPath = [i for i in ChannelPaths if Ch in i] 
+                        if cycle==len(PlanePaths):
+                            new_directory=ChannelPath[0] + PlanePaths[cycle-1]
+                            os.rename(current_directory + os.sep + fname, new_directory + os.sep + fname)
+                        
+                        
+        pass
+                            
 
 
 
@@ -302,4 +320,32 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
                 0, False, False, 
                 0, False, False, 
                 0, 0, 0, 
-                False,False,False,False,sq_type[0]]                
+                False,False,False,False,sq_type[0]]        
+
+
+'''
+def restore_initial_org():
+    import os
+    import glob
+    from functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
+
+    sphaqpath=r'F:\Projects\LabNY\Imaging\2021\20210520\Mice\SPHQ\TestAcquisitions'
+    aq='Aq_2'
+    aq_name='210520_SPHQ_MaxResMechZSTack_940-000'
+    ch1='Ch1Red'
+    ch2='Ch2Green'
+
+    images1=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch1)+'\\**\\**.tif')
+    images2=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch2)+'\\**\\**.tif')
+
+    for i in images1:
+        os.rename(i, os.path.join( sphaqpath,aq,aq_name,os.path.split(i)[1]))
+
+    for i in images2:
+        os.rename(i, os.path.join( sphaqpath,aq,aq_name,os.path.split(i)[1]))
+            
+        
+
+    recursively_eliminate_empty_folders(os.path.join(sphaqpath,aq,aq_name,ch1))
+    recursively_eliminate_empty_folders(os.path.join(sphaqpath,aq,aq_name,ch2))
+    '''

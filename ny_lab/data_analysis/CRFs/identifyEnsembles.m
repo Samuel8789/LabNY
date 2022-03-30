@@ -60,7 +60,8 @@ addpath(fullfile(basepath,'src_fun','Utility'));
             if ii <= num_node
                 frame_vec  = X(:,:);
                 frame_vec(:,ii) = 0;
-                LL_frame{ii} = compute_log_likelihood_no_loop_by_frame(best_model.theta.node_potentials,best_model.theta.edge_potentials,best_model.theta.logZ,frame_vec); 
+                LL_frame{ii} = compute_log_likelihood_no_loop_by_frame(best_model.theta.node_potentials,...
+                best_model.theta.edge_potentials,best_model.theta.logZ,frame_vec); 
             else
                 frame_vec=X(:,:);
                 frame_vec(:,ii-num_node) = 1;

@@ -89,18 +89,21 @@ for key in database_structure.keys():
 params=()
 query_brains="""
 SELECT*
-FROM Behaviours_table
+FROM Windows_table
+WHERE ID=196
 """
 zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE Injections_table
-                SET VirusCombination=29
-                WHERE ID IN (174,175)
+                UPDATE VisualStimulations_table
+                SET VisualStimulationProtocol=1
+                WHERE ID IN (20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42)
             """        
 params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+
 
 #%% inserting
 import datetime
@@ -124,8 +127,17 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
-DELETE FROM Injections_table
-WHERE  ID IN (219,221)
+DELETE FROM ExperimentalAnimals_table
+WHERE  ID IN (359,360)
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+#%% removals
+query_remove="""
+DELETE FROM Windows_table
+WHERE  ID IN (195,196)
+
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)

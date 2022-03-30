@@ -538,7 +538,9 @@ class MouseDatabase():
                line=23
         elif 5 in lines and 2 in lines:
                line=5
-             
+        elif 2 in lines:
+               line=2
+                 
                
              
         maleID  = int(linesdf[ linesdf['Lab_Number']== male]['ID'].iloc[0])
@@ -899,7 +901,8 @@ class MouseDatabase():
                                         }   
             self.add_multiple_actions(actions_dictionary_females, commit=False)     
             self.add_multiple_actions(actions_dictionary_males, commit=True)   
-            
+        print('Weanings added')
+   
 
     def update_old_litters(self, values):
         c=self.database_connection.cursor()
@@ -1232,7 +1235,7 @@ class MouseDatabase():
     def add_single_action(self, action_type, cage_start, cage_end, mice, action_date, commit=False):
 
         if not action_date:
-            action_date= datetime.datetime.now()
+            action_date= datetime.date.today()
          
         query_mice_info="SELECT ID, Lab_number FROM MICE_table WHERE Cage=?"  
 
@@ -1316,6 +1319,7 @@ class MouseDatabase():
         if commit:
             self.database_connection.commit()  
         self.update_variables() 
+
         
     def arbitrary_updating_record(self, query, params, commit=False):   
         c=self.database_connection.cursor()

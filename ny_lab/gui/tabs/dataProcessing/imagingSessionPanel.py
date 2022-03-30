@@ -4,18 +4,33 @@ Created on Thu Jan 13 09:18:34 2022
 
 @author: sp3660
 """
+import matplotlib as mpl
+import os
 import tkinter as tk
-from tkinter import END, Label, RAISED, Text, WORD, StringVar, Button, ttk, Listbox, Scrollbar
+from tkinter import Canvas,END, Label, RAISED, Text, WORD, StringVar, Button, ttk, Listbox, Scrollbar
 from tkinter import ttk
 import  matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 from project_manager.ProjectManager import ProjectManager
+try :
+    from .scrollbarFrame import ScrollbarFrame
+except:
+    from scrollbarFrame import ScrollbarFrame
+import time
+
 import numpy as np
 import shutil
 import sys
+from pprint import pprint
+mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b",'g','y','c','m', 'tab:brown']) 
 
+mpl.rcParams['pdf.fonttype'] = 42
+mpl.rcParams['ps.fonttype'] = 42
+mpl.rcParams['font.family'] = 'Arial'
+
+#%% class definition
 class ImagingSessionPanel(tk.Toplevel):
     def __init__(self,  gui, session_date=None, datamanaging=None):
         tk.Toplevel.__init__(self, gui) #inst
@@ -61,9 +76,9 @@ class ImagingSessionPanel(tk.Toplevel):
         for i in range(len(self.frame1.frames_names)):
               self.frame1.frames[self.frame1.frames_names[i]]=ttk.Frame(self.frame1, borderwidth = 4, relief='groove')
               
-        self.frame1.grid_columnconfigure(0, weight=1)
+        self.frame1.grid_columnconfigure(0, weight=2)
         self.frame1.grid_columnconfigure(1, weight=1)
-        self.frame1.grid_columnconfigure(2, weight=1)
+        self.frame1.grid_columnconfigure(2, weight=3)
         self.frame1.grid_rowconfigure(0, weight=1)
         self.frame1.grid_rowconfigure(1, weight=1)
 
@@ -96,8 +111,10 @@ class ImagingSessionPanel(tk.Toplevel):
             self.frame1.frame1.scrollbar [litbox_name]= Scrollbar(self.frame1.frame1) 
             self.frame1.frame1.listboxes[litbox_name].config(yscrollcommand =  self.frame1.frame1.scrollbar [litbox_name].set)
             self.frame1.frame1.scrollbar [litbox_name].config(command = self.frame1.frame1.listboxes[litbox_name].yview)
-                       
-        self.get_mouse_imaged()    
+            
+        self.get_mouse_imaged() 
+        self.get_all_objects()
+
         
 
     
@@ -121,13 +138,9 @@ class ImagingSessionPanel(tk.Toplevel):
             elif i==3:
                 litbox.grid(column=1, row=1) 
             elif i==4:
-                litbox.grid(column=2, row=0)
+                litbox.grid(column=1, row=2)
             elif i==5:
-                litbox.grid(column=2, row=1)  
-
-                
-
-
+                litbox.grid(column=1, row=3)  
 
 
         # self.frame1.frame1.buttons={}
@@ -181,35 +194,46 @@ class ImagingSessionPanel(tk.Toplevel):
         for i in range(len(self.frame1.frame2.labels_names)):
             self.frame1.frame2.labels[self.frame1.frame2.labels_names[i]]=ttk.Label(self.frame1.frame2, text=self.frame1.frame2.labels_names[i], width=25)
        
-        for i, label in enumerate(self.frame1.frame2.labels_names):
-           if i<8:            
-               self.frame1.frame2.labels[label].grid(column=0, row=i)            
-           elif i<16:              
-               self.frame1.frame2.labels[label].grid(column=2, row=i-8)
-           else:              
-                self.frame1.frame2.labels[label].grid(column=0, row=i-9)
+        # for i, label in enumerate(self.frame1.frame2.labels_names):
+        #    if i<8:            
+        #        self.frame1.frame2.labels[label].grid(column=0, row=i)            
+        #    elif i<16:              
+        #        self.frame1.frame2.labels[label].grid(column=2, row=i-8)
+        #    else:              
+        #         self.frame1.frame2.labels[label].grid(column=0, row=i-9)
 
+        # self.frame1.frame2.labels_values={}
+        # self.frame1.frame2.labels_values_variables={}
+
+        # for i ,label in enumerate(self.frame1.frame2.labels_names):
+        #     self.frame1.frame2.labels_values_variables[label]=StringVar()
+        #     if i<18:
+        #         self.frame1.frame2.labels_values[label]=ttk.Label(self.frame1.frame2, textvariable= self.frame1.frame2.labels_values_variables[label], width=25)
+        #     else:
+        #         self.frame1.frame2.labels_values[label]=ttk.Label(self.frame1.frame2, textvariable= self.frame1.frame2.labels_values_variables[label], width=50)
+
+        # for i, label in enumerate(self.frame1.frame2.labels_names):
+        #    if i<8:            
+        #        self.frame1.frame2.labels_values[label].grid(column=1, row=i) 
+
+        #    elif i<16:              
+        #        self.frame1.frame2.labels_values[label].grid(column=3, row=i-8)
+        #    else:
+        #        self.frame1.frame2.labels_values[label].grid(column=1, row=i-9)
+               
+        for i, label in enumerate(self.frame1.frame2.labels_names):
+            self.frame1.frame2.labels[label].grid(column=0, row=i)            
+      
         self.frame1.frame2.labels_values={}
         self.frame1.frame2.labels_values_variables={}
-
+      
         for i ,label in enumerate(self.frame1.frame2.labels_names):
             self.frame1.frame2.labels_values_variables[label]=StringVar()
-            if i<18:
-                self.frame1.frame2.labels_values[label]=ttk.Label(self.frame1.frame2, textvariable= self.frame1.frame2.labels_values_variables[label], width=25)
-            else:
-                self.frame1.frame2.labels_values[label]=ttk.Label(self.frame1.frame2, textvariable= self.frame1.frame2.labels_values_variables[label], width=50)
-
+            self.frame1.frame2.labels_values[label]=ttk.Label(self.frame1.frame2, textvariable= self.frame1.frame2.labels_values_variables[label], width=80)
+      
         for i, label in enumerate(self.frame1.frame2.labels_names):
-           if i<8:            
-               self.frame1.frame2.labels_values[label].grid(column=1, row=i) 
+            self.frame1.frame2.labels_values[label].grid(column=1, row=i) 
 
-           elif i<16:              
-               self.frame1.frame2.labels_values[label].grid(column=3, row=i-8)
-           else:
-               self.frame1.frame2.labels_values[label].grid(column=1, row=i-9)
-
-
- 
 #%%'Imaging Session Info Frame WIDEFIELD frame' 
         self.frame1.frame3=self.frame1.frames[self.frame1.frames_names[2]]
         
@@ -234,54 +258,66 @@ class ImagingSessionPanel(tk.Toplevel):
         
         self.frame2.frames={}
         for i in range(len(self.frame2.frames_names)):
-              self.frame2.frames[self.frame2.frames_names[i]]=ttk.Frame(self.frame2, borderwidth = 4, relief='groove')
+              self.frame2.frames[self.frame2.frames_names[i]]=ScrollbarFrame(self.frame2, borderwidth = 4, relief='groove')
               
         self.frame2.grid_columnconfigure(0, weight=1)
-        self.frame2.grid_columnconfigure(1, weight=1)
-        self.frame2.grid_rowconfigure(0, weight=1)
+        self.frame2.grid_columnconfigure(1, weight=5)
+        self.frame2.grid_rowconfigure(0, weight=4)
         self.frame2.grid_rowconfigure(1, weight=1)
-        self.frame2.grid_rowconfigure(2, weight=1)
+        self.frame2.grid_rowconfigure(2, weight=10)
+        
 
         self.frame2.frames[self.frame2.frames_names[0]].grid(row=0, column=0, sticky="nswe")         
         self.frame2.frames[self.frame2.frames_names[1]].grid(row=1, column=0, sticky="nswe") 
         self.frame2.frames[self.frame2.frames_names[2]].grid(row=2, column=0, sticky="nswe") 
-        self.frame2.frames[self.frame2.frames_names[3]].grid(row=0, column=1, sticky="nswe") 
+        self.frame2.frames[self.frame2.frames_names[3]].grid(row=0, column=1, sticky="nswe", rowspan=3) 
 
 
          
 #%%'AcquisitionFrame FACECAM frame' 
-        self.frame2.frame1=self.frame2.frames[self.frame2.frames_names[0]]
+        self.frame2.frame1=self.frame2.frames[self.frame2.frames_names[0]].scrolled_frame
 
         self.frame2.frame1.buttons={}
         self.frame2.frame1.buttons_names=['Open facecamera on pyhton',
                                    'Open kalman on pyhton', 
+                                   'Open acquisition directory',
+                                   'Open dataset directory',
                                    'transfer kalman to desktop',
                                    'transfer eye video to desktop',
                                    'transfer caiman to desktop',
-                                   # 'increase contrast',
-                                   # 'decrease contrast',
-                                   'Open acquisition directory',
-                                    'Swicth tomato(if 3plane ac)',  
-                                    'Open dataset directory'
+                                   'reset contrast',
+                                   'increase contrast 1',
+                                   'increase contrast 2',
+                                   'open raw directory',
+                                   'open slow mouse dir',
+                                   'plot signals',
+                                    # 'Swicth tomato(if 3plane ac)',  
                                                               ]
                              
         self.frame2.frame1.buttons_commands=[self.open_facecamera_button, 
                                              self.open_kalman_button,
+                                             self.open_directory_button, 
+                                             self.open_dataset_button,
                                              self.transfer_kalman_to_desktop_button,
                                              self.transfer_facecam_to_desktop_button,
                                              self.transfer_caiman_to_desktop_button,
-                                             # self.increase_contrast,
-                                             # self.decrease_contrast,
-                                             self.open_directory_button, 
-                                             self.switch_red_button,
-                                             self.open_dataset_button,
+                                             self.de_enhance,
+                                             self.enhance_level_1,
+                                             self.enhance_level_2,
+                                             self.open_raw_acquisition_directory_button,
+                                             self.open_slow_mouse_directory_button,
+                                             self.plot_signals_button,
+                                             # self.switch_red_button,
 
                                            ]   
         for i, butt in enumerate( self.frame2.frame1.buttons_names):
               self.frame2.frame1.buttons[ butt]= ttk.Button( self.frame2.frame1 , text= self.frame2.frame1.buttons_names[i], command= self.frame2.frame1.buttons_commands[i])
 
         for i, name in enumerate(self.frame2.frame1.buttons_names):
-               self.frame2.frame1.buttons[name].grid(column=0, row=i+1)     
+              if (i % 2) == 0: 
+                 self.frame2.frame1.buttons[name].grid(row=int(i/2)+1, column=0, sticky="nswe")     
+              else:  
+                  self.frame2.frame1.buttons[name].grid(row=int((i-1)/2)+1, column=1, sticky="nswe")
 
 
         self.frame2.frame1.litbox_names=['Dataset to copy selection',                      
@@ -305,38 +341,130 @@ class ImagingSessionPanel(tk.Toplevel):
 
 
 #%%'AcquisitionFrame VOLTAGE frame' 
-        self.frame2.frame2=self.frame2.frames[self.frame2.frames_names[1]]
+        self.frame2.frame2=self.frame2.frames[self.frame2.frames_names[1]].scrolled_frame
 
-        self.frame2.frame2.test_label=ttk.Label( self.frame2.frame2, text='Test voltage', width=20)
-        self.frame2.frame2.test_label.grid(row=10, column=10, sticky="snew")
+        # self.frame2.frame2.test_label=ttk.Label( self.frame2.frame2, text='Test voltage', width=20)
+        # self.frame2.frame2.test_label.grid(row=10, column=10, sticky="snew")
+
+        self.frame2.frame2.fig = Figure(figsize=(7, 10), dpi=100)
+        
+        
+
+        self.frame2.frame2.canvas = FigureCanvasTkAgg(self.frame2.frame2.fig, master= self.frame2.frame2)  # A tk.DrawingArea.
+        self.frame2.frame2.canvas.draw()
+        self.frame2.frame2.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)        
+        self.frame2.frame2.toolbar = NavigationToolbar2Tk( self.frame2.frame2.canvas,  self.frame2.frame2)
+        self.frame2.frame2.toolbar.update()
+        self.frame2.frame2.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
+  
+        self.frame2.frame2.axs=[]
+        for i in range(7):
+            self.frame2.frame2.axs.append(self.frame2.frame2.fig.add_subplot(7, 1, i+1))
+
 
 #%%'AcquisitionFrame METADATA frame' 
 
-        self.frame2.frame3=self.frame2.frames[self.frame2.frames_names[2]]
-        
-        self.frame2.frame3.test_label=ttk.Label( self.frame2.frame3, text='Test ac meta', width=20)
-        self.frame2.frame3.test_label.grid(row=10, column=10, sticky="snew")
-        
-        
-        self.frame2.frame3.frames_names=['Metadata Frame',
-                            'Ref Images Frame',    
-                            ]
-        
-        self.frame2.frame3.frames={}
-        for i in range(len(self.frame2.frame3.frames_names)):
-              self.frame2.frame3.frames[self.frame2.frame3.frames_names[i]]=ttk.Frame(self.frame2.frame3, borderwidth = 4, relief='groove')
-              
-        self.frame2.frame3.grid_columnconfigure(0, weight=1)
-        self.frame2.frame3.grid_rowconfigure(0, weight=1)
-        self.frame2.frame3.grid_rowconfigure(1, weight=1)
+        self.frame2.frame3=self.frame2.frames[self.frame2.frames_names[2]].scrolled_frame
+        # self.frame2.frame3.frames_names=['Metadata Frame',
+        #                     # 'Ref Images Frame',    
+        #                     ]        
+        # self.frame2.frame3.frames={}
+        # for i in range(len(self.frame2.frame3.frames_names)):
+        #       self.frame2.frame3.frames[self.frame2.frame3.frames_names[i]]=ScrollbarFrame(self.frame2.frame3)
+
+        # self.frame2.frame3.grid_columnconfigure(0, weight=1)
+        # self.frame2.frame3.grid_rowconfigure(0, weight=1)
+        # self.frame2.frame3.grid_rowconfigure(1, weight=1)
    
-        self.frame2.frame3.frames[self.frame2.frame3.frames_names[0]].grid(row=0, column=0, sticky="nswe")         
-        self.frame2.frame3.frames[self.frame2.frame3.frames_names[1]].grid(row=1, column=0, sticky="nswe") 
-   
+        # self.frame2.frame3.frames[self.frame2.frame3.frames_names[1]].grid(row=1, column=0, sticky="nswe") 
+        
+
+        self.frame2.frame3.labels={}
+        self.frame2.frame3.labels_names={
+                    'PowerSetting',
+                    'Objective',
+                    'PMT1GainRed',
+                    'PMT2GainGreen',
+                    'FrameAveraging',
+                    'ObjectivePositions',
+                    'ETLPositions',
+                    'PlaneNumber',
+                    'TotalVolumes',
+                    'IsETLStack',
+                    'IsObjectiveStack',
+                    'InterFramePeriod',
+                    'FinalVolumePeriod',
+                    'FinalFrequency',
+                    'TotalFrames',
+                    'FOVNumber',
+                    'ExcitationWavelength',
+                    'CoherentPower',
+                    'CalculatedPower',
+                    'Comments',
+                    'IsChannel1Red',
+                    'IsChannel2Green',
+                    'IsGalvo',
+                    'IsResonant',   
+                    'Resolution',
+                    'DwellTime',
+                    'Multisampling',
+                    'BitDepth',
+                    'LinePeriod',
+                    'FramePeriod',
+                    'FullAcquisitionTime',    
+                    'RedFilter',
+                    'GreenFilter',
+                    'DichroicBeamsplitter',
+                    'IsBlockingDichroic',
+                    'OverlapPercentage',
+                    'AtlasOverlap',
+                    'OverlapPercentageMetadata',
+                    'AtlasDirection',
+                    'AtlasZStructure',
+                    'AtlasGridSize',
+                    'CorrectedObjectivePositions',
+                    'CorrectedETLPositions',
+                    'ImagingTime',
+                    'IsVoltagERecording',
+                    'MicronsPerPixelX',
+                    'MicronsPerPixelY',
+                    'Xpositions',
+                    'Ypositions',
+                    'Zoom',
+                    'VoltageRecordingChannels',
+                    'VoltageRecordingFrequency'}
+        
+        self.frame2.frame3.labels_names=sorted( self.frame2.frame3.labels_names)
+
+        for i in range(len(self.frame2.frame3.labels_names)):
+            self.frame2.frame3.labels[self.frame2.frame3.labels_names[i]]=ttk.Label(self.frame2.frame3, text=self.frame2.frame3.labels_names[i], width=25)
+       
+        for i, label in enumerate(self.frame2.frame3.labels_names):
+           if i<26:            
+               self.frame2.frame3.labels[label].grid(column=0, row=i)            
+           else:              
+               self.frame2.frame3.labels[label].grid(column=2, row=i-26)
+          
+        self.frame2.frame3.labels_values={}
+        self.frame2.frame3.labels_values_variables={}
+     
+        for i ,label in enumerate(self.frame2.frame3.labels_names):
+            self.frame2.frame3.labels_values_variables[label]=StringVar()
+            self.frame2.frame3.labels_values[label]=ttk.Label(self.frame2.frame3, textvariable= self.frame2.frame3.labels_values_variables[label], width=25)
+
+     
+        for i, label in enumerate(self.frame2.frame3.labels_names):
+           if i<26:            
+               self.frame2.frame3.labels_values[label].grid(column=1, row=i) 
+     
+           else:              
+               self.frame2.frame3.labels_values[label].grid(column=3, row=i-26)
+      
     
+   
 #%%'AcquisitionFrame datasets frame' 
     
-        self.frame2.frame4=self.frame2.frames[self.frame2.frames_names[3]]
+        self.frame2.frame4=self.frame2.frames[self.frame2.frames_names[3]].scrolled_frame
         
         self.frame2.frame4.frames_names=['Dataset1 Frame' ,
                             'Dataset2 Frame',    
@@ -384,48 +512,45 @@ class ImagingSessionPanel(tk.Toplevel):
                 frame.toolbar = NavigationToolbar2Tk( frame.canvas,  frame)
                 frame.toolbar.update()
                 frame.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=1)
-            
-#%% message box
-
-        # self.frame3=self.frames[self.frames_names[2]]
-    
-
-        # self.frame3.labels={}
-        # self.frame3.labels_names=['Text',   
-        #                           ]
-        
-        # for i in range(len(self.frame3.labels_names)):
-        #     self.frame3.labels[self.frame3.labels_names[i]]=Text(self.frame3)
-       
-        # for i, label in enumerate(self.frame3.labels_names):
-        #    if i<8:            
-        #        self.frame3.labels[label].grid(column=0, row=i) 
-               
-        # sys.stdout.write = self.redirector
 
 #%% methods  
+    def get_all_objects(self):
+        # this is the slowest step, load al metdatas
 
-    # def redirector(self, inputStr):
-    #    self.frame3.labels[self.frame3.labels_names[0]].insert(INSERT, inputStr)
-    
-    
+        self.mice_objects={mouse:{'Object':self.datamanaging.all_experimetal_mice_objects[mouse]} for mouse in self.mice}
+        for mouse, m_dic in self.mice_objects.items():
+            m_dic['Acquisitions']={acq: {'Object':acq_ob} for acq, acq_ob in  m_dic['Object'].all_mouse_acquisitions.items()}
+            
+            if  m_dic['Acquisitions'].items():
+                for acq, ac_dic  in  m_dic['Acquisitions'].items():
+                    print('laoding metdata'+ acq)
+                    ac_dic['Object'].load_metadata_slow_working_directories()
+                    if not  ac_dic['Object'].voltage_signal_object.no_voltage_signals:
+                        print('laoding signals'+ acq)
+                        ac_dic['Object'].voltage_signal_object.load_slow_storage_voltage_signals()
+                        ac_dic['Object'].voltage_signal_object.signal_extraction_object()
+
+                    ac_dic['Datasets']={dtset:{'Object':dtset_ob} for dtset, dtset_ob in  ac_dic['Object'].all_datasets.items()}
+
 
  
     def get_mouse_imaged(self):     
         
-        mice=self.datamanaging.all_existing_sessions_not_database_objects[self.session_date].session_imaged_mice_codes
-        self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[0]].set(mice)
-        
+        self.mice=self.datamanaging.all_existing_sessions_not_database_objects[self.session_date].session_imaged_mice_codes
+        self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[0]].set(self.mice)
+
+ 
     def get_all_mouse_acquisitions(self):
+  
         
-        acquisitions=list( self.selected_mouse_object.all_mouse_acquisitions.keys()) 
+        acquisitions=list(self.mice_objects[self.mouse_code]['Acquisitions'].keys())
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[1]].set(acquisitions)   
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].config(width=0,height=0)
-
+        
+        
         
     def get_acquisition_datasets(self):   
-        selected_acq_datasets= list(self.selected_acquisition_object.all_datasets.keys())
-        
+        selected_acq_datasets= list(self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'].keys())
         # for listbox_var in   self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[2:]]:
         for var_name in self.frame1.frame1.litbox_names[2:]:
            listbox_var =self.frame1.frame1.listbox_variables[var_name]
@@ -437,15 +562,15 @@ class ImagingSessionPanel(tk.Toplevel):
         self.frame2.frame1.listbox_variables[list(self.frame2.frame1.listbox_variables.keys())[0]].set(selected_acq_datasets) 
         self.frame2.frame1.listboxes[list(self.frame2.frame1.listboxes.keys())[0]].config(width=0,height=0)
 
+
                 
     def get_dataset_objects(self):
         # self.selected_dataset_object=self.selected_acquisition_object.all_datasets[self.selected_dataset]
         self.selected_dataset_objects={}
         for key, val in  self.selected_datasets.items():
-            self.selected_dataset_objects[key]=self.selected_acquisition_object.all_datasets[val]
+            self.selected_dataset_objects[key]=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'][val]['Object']
             
-
-    
+                   
     def load_selected_datasets(self):
         
         self.selected_acquisition_object.load_vis_stim_info()
@@ -460,10 +585,14 @@ class ImagingSessionPanel(tk.Toplevel):
          
     def get_mouse_object(self):
         
-        self.selected_mouse_object= self.datamanaging.all_experimetal_mice_objects[self.mouse_code]
+        self.selected_mouse_object= self.mice_objects[self.mouse_code]['Object']
+        
+        
         
     def get_acquisition_object(self):
-        self.selected_acquisition_object=self.selected_mouse_object.all_mouse_acquisitions[self.selected_acquisition]
+        self.selected_acquisition_object=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Object']
+        
+
         
     def get_mouse_info_and_data(self, event):
         selection = self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[0]].curselection()
@@ -474,6 +603,7 @@ class ImagingSessionPanel(tk.Toplevel):
             self.get_all_mouse_acquisitions()
             self.get_all_mouse_database_info()
             self.plot_widefield()
+            
         else:
             pass
              
@@ -484,12 +614,33 @@ class ImagingSessionPanel(tk.Toplevel):
             self.selected_acquisition = event.widget.get(index)
             self.get_acquisition_object()
             self.get_acquisition_datasets()  
-            # self.get_ac_metadata()
+            
+     
+            self.get_acq_metadata()
+           
             # self.get_ac_facecam()
             # self.get_ac_voltages()
+            # self.plot_signals()
+
         else:
             pass 
-       
+
+        
+    def get_acq_metadata(self):
+        # self.selected_acquisition_object.load_metadata_slow_working_directories()
+        self.metadata_dict=self.selected_acquisition_object.metadata_object.translated_imaging_metadata
+
+        for i, label in enumerate(self.frame2.frame3.labels_names):  
+            
+            if self.metadata_dict[label] is not np.nan: 
+           
+            
+                self.frame2.frame3.labels_values_variables[label].set( self.metadata_dict[label])
+            else:
+                self.frame2.frame3.labels_values_variables[label].set('NA')
+
+
+        
     def get_dataset_info(self, event):
         self.selected_datasets={}
         
@@ -599,6 +750,12 @@ class ImagingSessionPanel(tk.Toplevel):
     def open_directory_button(self):
         self.open_acquisition_directory_action()
         
+    def open_raw_acquisition_directory_button(self):
+        self.open_raw_acquisition_directory_action()
+        
+    def open_slow_mouse_directory_button(self):
+        self.open_slow_mouse_directory_action()
+        
     def open_dataset_button(self):
         self.open_dataset_directory_action()
             
@@ -670,11 +827,16 @@ class ImagingSessionPanel(tk.Toplevel):
     def open_acquisition_directory_action(self):
         
         os.startfile(self.selected_acquisition_object.mouse_aquisition_path)
+        
+    def open_slow_mouse_directory_action(self):
+        
+        os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging',self.session_date))
+  
                
     def open_raw_acquisition_directory_action(self):
-        pass
-        # os.startfile(self.selected_acquisition_object.mouse_aquisition_path)
-    
+        
+        os.startfile(self.datamanaging.all_existing_sessions_not_database_objects[ self.session_date].imaging_session_mice_path+'\\'+self.mouse_code)
+
     def open_dataset_directory_action(self):
         
         os.startfile(self.selected_dataset_to_copy_object.selected_dataset_mmap_path)
@@ -700,7 +862,53 @@ class ImagingSessionPanel(tk.Toplevel):
                 
         self.frame1.frame3.ax.clear()
         self.frame1.frame3.ax.imshow(self.frame1.frame3_widefield, cmap='inferno')
-        self.frame1.frame3.canvas.draw()        
+        self.frame1.frame3.canvas.draw()   
+        
+        
+        
+        
+        
+    def plot_signals_button(self):
+        t=time.time()
+        print('Plotting signals')
+        self.plot_signals()
+        elapsed=time.time()-t
+
+        print('Signlas pltted '+ str(elapsed) )
+        pass
+        
+    def plot_signals(self):
+        
+
+        for i in self.frame2.frame2.axs:
+            i.clear()
+            
+        self.frame2.frame2.canvas.draw()  
+
+        dats=[]
+        if not self.selected_acquisition_object.voltage_signal_object.no_voltage_signals:
+            if hasattr(self.selected_acquisition_object.voltage_signal_object.extraction_object, 'rectified_speed_array'):               
+                dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.rectified_speed_array)
+            else:
+               dats.append(np.array([False]) )
+               
+            for signal in self.selected_acquisition_object.voltage_signal_object.voltage_signals_dictionary.keys():
+                dats.append(self.selected_acquisition_object.voltage_signal_object.voltage_signals_dictionary[signal])
+
+            # for n, ax in  enumerate(self.frame2.frame2.axs):
+            for n, dat in  enumerate(dats):
+                    self.frame2.frame2.axs[n].clear()
+                    self.frame2.frame2.canvas.draw()  
+                    self.frame2.frame2.axs[n].plot(dat)
+
+        else:
+       
+           dats.append(np.array([False]))
+           self.frame2.frame2.axs[0].clear()
+           self.frame2.frame2.axs[0].plot(dats[0])
+        
+        
+        self.frame2.frame2.canvas.draw()   
    
     def plot_dataset_projections(self, *a):
         
@@ -718,17 +926,15 @@ class ImagingSessionPanel(tk.Toplevel):
                     dataset_final=dataset.summary_images_object.projection_dic['average_projection_path']
 
                 if dataset_final.any():
-                    image_frame.ax.clear()
+                    image_frame.ax.clear()         
                     image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal')
                     image_frame.canvas.draw()   
           
-
-    def increase_contrast(self,*a): 
+    def enhance_level_1(self,*a): 
         self.get_dataset_objects()
         for i, dataset in enumerate(self.selected_dataset_objects.values()):
             
             for j, image_frame in enumerate(self.frame2.frame4.frames[self.frame2.frame4.frames_names[i]].frames.values()):
-                self.vmax=self.vmax-10
                 dataset_final=np.array([False])
                 image_frame.ax.clear()
                 image_frame.canvas.draw()      
@@ -740,17 +946,47 @@ class ImagingSessionPanel(tk.Toplevel):
 
                 if dataset_final.any():
                     image_frame.ax.clear()
-                    image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal')
+                    dataset_final.min()    
+                    average=dataset_final.mean()
+                    std_im=dataset_final.std()
+                    vmin=average-8*std_im
+                    vmax=average+8*std_im
+                    if vmin< dataset_final.min() : vmin = dataset_final.min()
+                    if vmax> dataset_final.max() : vmax =  dataset_final.max()
+                    image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal', vmin=vmin, vmax=vmax) 
                     image_frame.canvas.draw()
-                self.vmax=self.vmax+10
-
-        
-    def decrease_contrast(self,*a): 
+                    
+    def enhance_level_2(self,*a): 
         self.get_dataset_objects()
         for i, dataset in enumerate(self.selected_dataset_objects.values()):
             
             for j, image_frame in enumerate(self.frame2.frame4.frames[self.frame2.frame4.frames_names[i]].frames.values()):
-                self.vmax=self.vmax+10
+                dataset_final=np.array([False])
+                image_frame.ax.clear()
+                image_frame.canvas.draw()      
+    
+                if j==0:
+                    dataset_final=dataset.summary_images_object.projection_dic['std_projection_path']
+                else:
+                    dataset_final=dataset.summary_images_object.projection_dic['average_projection_path']
+    
+                if dataset_final.any():
+                    image_frame.ax.clear()
+                    dataset_final.min()    
+                    average=dataset_final.mean()
+                    std_im=dataset_final.std()
+                    vmin=average-6*std_im
+                    vmax=average+6*std_im
+                    if vmin< dataset_final.min() : vmin = dataset_final.min()
+                    if vmax> dataset_final.max() : vmax =  dataset_final.max()
+                    image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal', vmin=vmin, vmax=vmax) 
+                    image_frame.canvas.draw()
+            
+    def de_enhance(self,*a): 
+        self.get_dataset_objects()
+        for i, dataset in enumerate(self.selected_dataset_objects.values()):
+            
+            for j, image_frame in enumerate(self.frame2.frame4.frames[self.frame2.frame4.frames_names[i]].frames.values()):
 
                 dataset_final=np.array([False])
                 image_frame.ax.clear()
@@ -765,11 +1001,8 @@ class ImagingSessionPanel(tk.Toplevel):
                     image_frame.ax.clear()
                     image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal')
                     image_frame.canvas.draw()   
-                self.vmax=self.vmax-10
-    
-        
-        
-#%%    
+                    
+#%% main startup
 if __name__ == "__main__":
     from pathlib import Path
     import tkinter as tk
@@ -807,73 +1040,222 @@ if __name__ == "__main__":
     gui=0
     lab=ProjectManager.initialize_a_project('LabNY', gui)   
     datamanaging=lab.datamanaging
-    session_name='20211117'
+    session_name='20220213'
+    # for msession not in database
     datamanaging.all_existing_sessions_not_database_objects[session_name].read_all_yet_to_database_mice()
+    mousename='SPJZ'
+    testing=0
+    gui2=1
+    plot=0
     
-#%%
+   
+#%% testing
     
+    if testing:
+      
+        pass
+       
+     #%  dataset exp;lorarions visualizations
+        # mouse_code='SPJM'
+        # datamanaging.all_existing_sessions_not_database_objects
+        
+        
+        # aldatasetss=datamanaging.all_experimetal_mice_objects[mouse_code].\
+        #     all_mouse_acquisitions['20211111_FOV_1_211111_SPJM_FOV1_2planeAllenA_25x_920_50024_narrow_with-000'].\
+        #         all_datasets
+                
+        # green_datasets= [v for key, v in aldatasetss.items() if 'Green' in key ]       
+        # acq=datamanaging.all_experimetal_mice_objects[mouse_code].\
+        #     all_mouse_acquisitions['20211111_FOV_1_211111_SPJM_FOV1_2planeAllenA_25x_920_50024_narrow_with-000']
+                
+        # dat1=aldatasetss['211111_SPJM_FOV1_2planeAllenA_25x_920_50024_narrow_with-000_Plane1_Green']
+                
+        # test=dat1.summary_images_object.projection_dic['std_projection_path']
+        # mouse_codes=datamanaging.all_existing_sessions_not_database_objects[session_name].session_imaged_mice_codes
+        
+        # mouse_code='SPKG'
+        # mouse_object=datamanaging.all_experimetal_mice_objects[mouse_code]
+        # imaging_session=mouse_object.imaging_sessions_not_yet_database_objects[session_name]
+        # os.startfile(imaging_session.mouse_session_path)
+    
+        # acqs=[datamanaging.all_experimetal_mice_objects[mouse_code].all_mouse_acquisitions  for mouse_code in mouse_codes]
+        # imaging_session=[datamanaging.all_experimetal_mice_objects[mouse_code]  for mouse_code in mouse_codes]
+    
+        # fullalen=acqs[1][list(acqs[1].keys())[-2]]
+    
+        # fullalen.face_camera.full_eye_camera.play()
+        # test=pd.DataFrame(fullalen.voltage_signals_dictionary['Locomotion'])
+        # test.plot()
+    
+        # fullalen.metadata_object
+        
+        # fullalen.all_datasets
+        # surface=list(fullalen.FOV_object.all_datasets[-1].values())[0]
+        # surface_green=list(surface.all_datasets.values())[0]
+        # surface_red=list(surface.all_datasets.values())[0]
+        # surface_green.summary_images_object.plotting()
+        # surface_red.summary_images_object.plotting()
+      
+        # fullalgrenplane1=fullalen.all_datasets[list(fullalen.all_datasets.keys())[0]]
+        # fullalgrenplane1.kalman_object.dataset_kalman_caiman_movie.play(fr=1000)
+        # fullalgrenplane1.summary_images_object.plotting()
+        # # %matplotlib qt
+        # fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
+        # fullalgrenplane1.selected_dataset_mmap_path
+        # os.startfile(fullalgrenplane1.selected_dataset_mmap_path)
+    
+        # coord0=list(fullalen.FOV_object.mouse_imaging_session_object.all_0coordinate_Aquisitions.values())[0]
+        # widef=fullalen.FOV_object.mouse_imaging_session_object.widefield_image[list(fullalen.FOV_object.mouse_imaging_session_object.widefield_image.keys())[0]]
+        # widef.plot_image()
+        
+        
+        # fullalen.face_camera.full_eye_camera.play()
+        # fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
+        # fullalgrenplane1.kalman_object.dataset_kalman_caiman_movie.play(fr=1000)
+#%% plotting
+    if plot:
+              
+        # outfigures=1
+        # if outfigures:
+        #     %matplotlib qt
+        # else:
+        #     %matplotlib qt
+                
+        signals.plot_speed()
+        signals.plot_vis_stim_trace()
+        signals.plot_stim_and_speed()
+        
+   
 
-    
-    # datamanaging.all_existing_sessions_not_database_objects
-    
-    
-    # aldatasetss=datamanaging.all_experimetal_mice_objects[mouse_code].\
-    #     all_mouse_acquisitions['20211111_FOV_1_211111_SPJM_FOV1_2planeAllenA_25x_920_50024_narrow_with-000'].\
-    #         all_datasets
+        plot_time =np.arange(0,wsmoothemcmc.shape[1])/caimanresults.data['ops']['init_params_caiman']['data']['fr']
+        signals.time_scale
+        
+        fig, ax=plt.subplots(4,1, sharex=True)
+        ax[1].imshow(wsmoothemcmc, aspect='auto', cmap='binary',vmax=0.02,extent=[0,plot_time[-1],0,8])
+        ax[1].set_yticks(np.arange(1, 8, 1))
+        ax[0].imshow(denoised, aspect='auto', cmap='binary',vmax=20,extent=[0,plot_time[-1],0,8])
+        ax[0].set_yticks(np.arange(1, 8, 1))
+        # ax[0].pcolor([plot_time,8],wsmoothemcmc,cmap='binary',vmax=0.02)
+        # ax[0].pcolor(wsmoothemcmc,cmap='binary',vmax=0.02)
+        ax[2].plot(signals.time_scale,wspeed) 
+        ax[3].plot(signals.time_scale,wvisstim) 
+        
+        # fig, ax=plt.subplots(3,1, sharex=True)
+        # ax[0].imshow(wsmootheddfdt_thres, aspect='auto', cmap='binary',vmax=0.02,extent=[0,plot_time[-1],0,8])
+        # ax[0].set_yticks(np.arange(1, 8, 1))
+        # # ax[0].pcolor([plot_time,8],wsmoothemcmc,cmap='binary',vmax=0.02)
+        # # ax[0].pcolor(wsmoothemcmc,cmap='binary',vmax=0.02)
+        # ax[1].plot(signals.time_scale,wspeed) 
+        # ax[2].plot(signals.time_scale,wvisstim) 
+       
+        # for cell in range(7):
+        for cell in pyrcellindexactivity:
+       
+            fig, ax=plt.subplots(4,1, sharex=True)
+            ax[0].plot(plot_time,denoised[cell,:])
+            ax[1].plot(plot_time,wsmoothemcmc[cell,:])
+            ax[2].plot(signals.time_scale,wspeed) 
+            ax[3].plot(signals.time_scale,wvisstim) 
+       
+        for cell in intercellindexactivity:
+       
+            fig, ax=plt.subplots(4,1, sharex=True)
+            ax[0].plot(plot_time,denoised[cell,:])
+            ax[1].plot(plot_time,wsmoothemcmc[cell,:])
+            ax[2].plot(signals.time_scale,wspeed) 
+            ax[3].plot(signals.time_scale,wvisstim)     
+        # for cell in range(7):
+        #     fig, ax=plt.subplots(4,1, sharex=True)
+        #     ax[0].plot(plot_time,denoised[cell,:])
+        #     ax[1].plot(plot_time,wsmootheddfdt_thres[cell,:])
+        #     ax[2].plot(signals.time_scale,wspeed) 
+        #     ax[3].plot(signals.time_scale,wvisstim) 
+        
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        # ax.set_axis_off()
+        ax.imshow(analysis.corrected_traces, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 10), extent=[0,plot_time[-1],1,131])
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+        
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.set_axis_off()
+        ax.imshow(analysis.spike_traces, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 0.02), extent=[0,plot_time[-1],1,131])
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+        
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.set_axis_off()
+        ax.imshow( analysis.binary_spikes, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 0.05), extent=[0,plot_time[-1],1,131])
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+        
+        #%  plotting for rafa gran
+
+        plot_time =np.arange(0,wsmoothemcmc.shape[1])/caimanresults.data['ops']['init_params_caiman']['data']['fr']
+        signals.time_scale
+        
+      
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        # ax.set_axis_off()
+        ax.imshow(wsmoothemcmc, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 0.02), extent=[0,plot_time[-1],1,131])
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+
+        fig.savefig('Full Raster'+".svg")
+        fig.savefig('Full Raster'+".pdf")
+        fig.savefig('Full Raster'+".png")
+
+
+
+        fig, ax=plt.subplots(len(pyrcellindexactivity),1,figsize=(16,9), sharex=True,sharey=True)
+        fig.suptitle('Pyramidal Cells', fontsize=16, y=0.95)
+        fig.supylabel('Activity', x=0.08)
+        fig.subplots_adjust(hspace=0)
+        for i,cell in enumerate( pyrcellindexactivity):
+            ax[i].plot(plot_time,wsmoothemcmc[cell,:])
+            ax[i].margins(x=0)
+        ax[-1].set_xlabel('Time (s)')
+
+        fig.savefig('Pysamidal_Examples'+".svg")
+        fig.savefig('Pysamidal_Examples'+".pdf")
+        fig.savefig('Pysamidal_Examples'+".png")
+
+
+
             
-    # green_datasets= [v for key, v in aldatasetss.items() if 'Green' in key ]       
-    # acq=datamanaging.all_experimetal_mice_objects[mouse_code].\
-    #     all_mouse_acquisitions['20211111_FOV_1_211111_SPJM_FOV1_2planeAllenA_25x_920_50024_narrow_with-000']
-            
-    # dat1=aldatasetss['211113_SPKF_FOV1_3planteAllenA_25x_920_50024_narrow_without-000_Plane1_Green']
-            
-    #   test=dat1.summary_images_object.projection_dic['std_projection_path']
-    # mouse_codes=datamanaging.all_existing_sessions_not_database_objects[session_name].session_imaged_mice_codes
-    
-    # mouse_code='SPKG'
-    # mouse_object=datamanaging.all_experimetal_mice_objects[mouse_code]
-    # imaging_session=mouse_object.imaging_sessions_not_yet_database_objects[session_name]
-    # os.startfile(imaging_session.mouse_session_path)
+        fig, ax=plt.subplots(len(intercellindexactivity),1,figsize=(16,9), sharex=True,sharey=True)
+        fig.suptitle('Interneurons', fontsize=16,y=0.95)
+        fig.supylabel('Activity', x=0.08)
+        fig.subplots_adjust(hspace=0)
+        for i,cell in enumerate( intercellindexactivity):
+           ax[i].plot(plot_time,wsmoothemcmc[cell,:])
+           ax[i].margins(x=0)
 
-    # acqs=[datamanaging.all_experimetal_mice_objects[mouse_code].all_mouse_acquisitions  for mouse_code in mouse_codes]
-    # imaging_session=[datamanaging.all_experimetal_mice_objects[mouse_code]  for mouse_code in mouse_codes]
-
-    # fullalen=acqs[1][list(acqs[1].keys())[-2]]
-
-    # fullalen.face_camera.full_eye_camera.play()
-    # test=pd.DataFrame(fullalen.voltage_signals_dictionary['Locomotion'])
-    # test.plot()
-
-    # fullalen.metadata_object
-    
-    # fullalen.all_datasets
-    # surface=list(fullalen.FOV_object.all_datasets[-1].values())[0]
-    # surface_green=list(surface.all_datasets.values())[0]
-    # surface_red=list(surface.all_datasets.values())[0]
-    # surface_green.summary_images_object.plotting()
-    # surface_red.summary_images_object.plotting()
-  
-    # fullalgrenplane1=fullalen.all_datasets[list(fullalen.all_datasets.keys())[0]]
-    # fullalgrenplane1.kalman_object.dataset_kalman_caiman_movie.play(fr=1000)
-    # fullalgrenplane1.summary_images_object.plotting()
-    # # %matplotlib qt
-    # fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
-    # fullalgrenplane1.selected_dataset_mmap_path
-    # os.startfile(fullalgrenplane1.selected_dataset_mmap_path)
-
-    # coord0=list(fullalen.FOV_object.mouse_imaging_session_object.all_0coordinate_Aquisitions.values())[0]
-    # widef=fullalen.FOV_object.mouse_imaging_session_object.widefield_image[list(fullalen.FOV_object.mouse_imaging_session_object.widefield_image.keys())[0]]
-    # widef.plot_image()
-    
-    
-    # fullalen.face_camera.full_eye_camera.play()
-    # fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
-    # fullalgrenplane1.kalman_object.dataset_kalman_caiman_movie.play(fr=1000)
-
-
-
-    #%%
-    root = tk.Tk()
-    app = ImagingSessionPanel(root, session_date=session_name, datamanaging=datamanaging)
-    root.mainloop()
-    test=app.micebrought_info
+        ax[-1].set_xlabel('Time (s)')
+        fig.savefig('Interneuron_Examples'+".svg")
+        fig.savefig('Interneuron_Examples'+".pdf")
+        fig.savefig('Interneuron_Examples'+".png")
+       
+#%% opening the vis app
+    if gui2:
+        root = tk.Tk()
+        app = ImagingSessionPanel(root, session_date=session_name, datamanaging=datamanaging)
+        root.mainloop()
+        # test=app.micebrought_info

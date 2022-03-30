@@ -95,6 +95,8 @@ class DataManaging():
                 
         self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
         module_logger.info('Data managing done')
+        print('Data managing done')
+
 #%% building mouse objects and prairire imaging sessions        
     def build_all_mice_objects_from_database(self):
     
@@ -207,16 +209,15 @@ class DataManaging():
         self.all_imaged_mice.Recombinases2.fillna(value='NoInjection', inplace=True)
         self.all_imaged_mice.Recombinases3.fillna(value='NoInjection', inplace=True)
         self.all_imaged_mice.Optos3.fillna(value='NoInjection', inplace=True) 
-        self.all_mouse_info=self.all_imaged_mice.copy(0) 
-        self.all_mouse_info.drop_duplicates(subset ="Code",keep='first', inplace=True)  
+        self.all_imaged_mouse_dbinfo=self.all_imaged_mice.copy(0) 
+        self.all_imaged_mouse_dbinfo.drop_duplicates(subset ="Code",keep='first', inplace=True)  
         
-        for idx, mouse in self.all_mouse_info.iterrows():
+        for idx, mouse in self.all_imaged_mouse_dbinfo.iterrows():
             self.all_imaged_mice_objects[mouse['Code']]=Mouse(mouse['Code'], 
                                                                    self.LabProjectObject, 
                                                                    data_managing_object=self,
                                                                    mouse_info=self.all_imaged_mice[self.all_imaged_mice['Code']==mouse['Code']])
-           
-            
+                      
     def build_all_unimaged_mice_objects_from_database(self):
          query_all_experimental_mice="""
              SELECT  c.Code,         
@@ -318,54 +319,17 @@ class DataManaging():
          self.all_experimental_mice.Recombinases2.fillna(value='NoInjection', inplace=True)
          self.all_experimental_mice.Recombinases3.fillna(value='NoInjection', inplace=True)
          self.all_experimental_mice.Optos3.fillna(value='NoInjection', inplace=True) 
-         self.all_mouse_info=self.all_experimental_mice.copy(0) 
-         self.all_mouse_info.drop_duplicates(subset ="Code",keep='first', inplace=True)  
+         self.all_exp_mouse_dbinfo=self.all_experimental_mice.copy(0) 
+         self.all_exp_mouse_dbinfo.drop_duplicates(subset ="Code",keep='first', inplace=True)  
          
           
-         for idx, mouse in self.all_mouse_info.iterrows():
+         for idx, mouse in self.all_exp_mouse_dbinfo.iterrows():
              if mouse['Code'] not in self.all_imaged_mice['Code'] and mouse['Code'] in self.new_mouse_codes:
                  self.all_non_imaged_mice_objects[mouse['Code']]=Mouse(mouse['Code'], 
                                                                       self.LabProjectObject, 
                                                                       data_managing_object=self,
                                                                       mouse_info=self.all_experimental_mice[self.all_experimental_mice['Code']==mouse['Code']])
-                    
-            
-            
-    def read_all_imaging_sessions_from_directories(self):
-        self.all_existing_sessions={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
- 
-    def read_all_imaging_sessions_from_database(self): 
-        query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
-        self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
-
-    def build_all_paririe_session_from_database(self):
-        for i in  self.all_existing_sessions_database:    
-            self.build_paririe_session_from_database(i[0])
-    
-    def build_paririe_session_from_database(self, ID):
-          query_session_name="SELECT ImagingDate FROM ImagingSessions_table WHERE ID=?"
-          params=(ID,)
-          session_name=self.Database_ref.arbitrary_query_to_df(query_session_name, params).values.tolist()[0][0]    
-          session_name=session_name.replace('-', '')
-          self.all_existing_sessions_database_objects[session_name]=PrairieImagingSession(self.Database_ref.ImagingDatabase_class, session_ID=ID, data_managing_object=self)
-        
-    def read_all_imaging_sessions_not_in_database(self):     
-        test=[session[2] for session in self.all_existing_sessions_database]
-        self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in  test]
-        # this ignores jesus and hakim sessions any folder with name sin it
-        test2=[value for key, value in self.all_existing_sessions.items() if key.isdigit() and datetime.datetime.strptime(key,'%Y%m%d')>datetime.datetime.strptime( os.path.split(test[-1])[1],'%Y%m%d')]
-
-        self.all_new_unprocessed_session={session_name:session for session_name, session in  self.all_existing_sessions.items() if (session in test2) and (session not in test)}
-        
-        
-    def build_all_prairie_sessions_not_in_database(self):
-          for  session_name, session in self.all_new_unprocessed_session.items():
-              self.build_prairie_session_not_in_database(session_name, session)   
-
-    def build_prairie_session_not_in_database(self, session_name, session_path):
-          self.all_existing_sessions_not_database_objects[session_name]=PrairieImagingSession(self.Database_ref.ImagingDatabase_class,session_raw_path=session_path, data_managing_object=self)    
-        
-    
+                 
     def find_imaged_mouse_codes_not_in_database(self):
         
         self.non_database_imaged_mice=[]
@@ -377,8 +341,45 @@ class DataManaging():
         mouse_codes_inDb=list(self.all_imaged_mice_objects.keys())
         
         self.new_mouse_codes=[x for x in self.non_database_imaged_mice if x not in mouse_codes_inDb]
+ 
+#%% prairrie session prcessing   
+ #%% reading sessions                                      
+    def read_all_imaging_sessions_from_directories(self):
+        self.all_existing_sessions={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
+ 
+    def read_all_imaging_sessions_from_database(self): 
+        query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
+        self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
         
-            
+    def read_all_imaging_sessions_not_in_database(self):     
+        test=[session[2] for session in self.all_existing_sessions_database]
+        self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in  test]
+        # this ignores jesus and hakim sessions any folder with name sin it
+        test2=[value for key, value in self.all_existing_sessions.items() if key.isdigit() and datetime.datetime.strptime(key,'%Y%m%d')>datetime.datetime.strptime( os.path.split(test[-1])[1],'%Y%m%d')]
+        self.all_new_unprocessed_session={session_name:session for session_name, session in  self.all_existing_sessions.items() if (session in test2) and (session not in test)}
+
+
+#%% building sessions
+    def build_all_paririe_session_from_database(self):
+        for i in  self.all_existing_sessions_database:    
+            self.build_paririe_session_from_database(i[0])
+    
+    def build_all_prairie_sessions_not_in_database(self):
+          for  session_name, session in self.all_new_unprocessed_session.items():
+              self.build_prairie_session_not_in_database(session_name, session) 
+    
+    
+    def build_paririe_session_from_database(self, ID):
+          query_session_name="SELECT ImagingDate FROM ImagingSessions_table WHERE ID=?"
+          params=(ID,)
+          session_name=self.Database_ref.arbitrary_query_to_df(query_session_name, params).values.tolist()[0][0]    
+          session_name=session_name.replace('-', '')
+          self.all_existing_sessions_database_objects[session_name]=PrairieImagingSession(self.Database_ref.ImagingDatabase_class, session_ID=ID, data_managing_object=self)
+
+    def build_prairie_session_not_in_database(self, session_name, session_path):
+          self.all_existing_sessions_not_database_objects[session_name]=PrairieImagingSession(self.Database_ref.ImagingDatabase_class, session_raw_path=session_path, data_managing_object=self)    
+        
+
 #%% reading data_path_structures
 
     def read_all_data_path_structures(self):
@@ -509,7 +510,7 @@ class DataManaging():
             self.LabProjectObject.database.arbitrary_updating_record(query_mice_paths_update, params, commit=True)         
               
         return all_mice_paths
-    
+    #%% others
     def copy_all_mouse_with_data_to_working_path(self, mice_codes):
                
         query_all_codes="""

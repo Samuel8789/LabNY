@@ -64,19 +64,15 @@ class Mouse:
         self.get_all_mouse_FOVdata_datasets()
  
     
+#%% mouse imaging sessions
+    
+    
     def read_processed_imaging_session_not_in_database(self, session_name):
          module_logger.info('Reading '+ self.mouse_name)
          self.imaging_sessions_not_yet_database_objects={}
          self.imaging_sessions_not_yet_database_objects[session_name]=MouseImagingSession(session_name, mouse_object=self, yet_to_add=True)
          self.get_all_mouse_acquisitions(self.imaging_sessions_not_yet_database_objects)
 
-     
-    def load_processed_imaging_session_not_in_database(self, session_name):
-      
-        for acq in  self.all_mouse_acquisitions.values():
-            acq.load_all()
-
-    
     def load_all_imaging_sessions_from_database(self):
         
         self.imaging_sessions_objects={session[0].replace('-', ''):MouseImagingSession(session[0].replace('-', ''), imaging_session_ID=session[1], mouse_object=self)  for idx, session in self.imaging_sessions_database.iterrows()}       
@@ -89,6 +85,10 @@ class Mouse:
         self.unload_full_imaging_session(session_name)
         # self.load_all_imaging_sessions()
        
+        
+       
+#%% reading datasets
+            
     def get_all_mouse_FOVdata_datasets(self):
         
         self.all_mouse_FOVdata_datasets={}
@@ -99,17 +99,8 @@ class Mouse:
                     for name4, dataset in aquisition.all_datasets.items():
                         self.all_mouse_FOVdata_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
                         
-    def unload_full_imaging_session(self, session_name):
-        module_logger.info('Unloading  '+ session_name)
 
-        if self.raw_imaging_sessions_objects:
-            del self.raw_imaging_sessions_objects
-            gc.collect()
-        
-       
-        
-       
-        
+
     def get_all_mouse_acquisitions(self, session_list):  
        self.all_mouse_acquisitions={}
        for name1, imaging_session in session_list.items():
@@ -177,3 +168,17 @@ class Mouse:
                for name3, aquisition in FOV.all_existing_SurfaceImage.items():
                    for name4, dataset in aquisition.all_datasets.items():
                        self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
+#%% laoding datasets
+                       
+                       
+    def load_processed_imaging_session_not_in_database(self, session_name):
+      
+        for acq in  self.all_mouse_acquisitions.values():
+            acq.load_all()
+            
+    def unload_full_imaging_session(self, session_name):
+        module_logger.info('Unloading  '+ session_name)
+
+        if self.raw_imaging_sessions_objects:
+            del self.raw_imaging_sessions_objects
+            gc.collect()

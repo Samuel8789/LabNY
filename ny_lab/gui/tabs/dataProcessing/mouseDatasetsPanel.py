@@ -789,9 +789,7 @@ if __name__ == "__main__":
     from sys import platform
     import socket
     from project_manager.ProjectManager import ProjectManager
-    import urllib3
     import os
-    import pandas as pd
 
 
     house_PC='DESKTOP-V1MT0U5'
@@ -818,10 +816,9 @@ if __name__ == "__main__":
 
     ProjectManager=ProjectManager(githubtoken_path, computer, platform)
     gui=0
-    lab=ProjectManager.initialize_a_project('LabNY', gui)   
+    lab=ProjectManager.initialize_a_project('LabNY', gui)  
+    lab.do_datamanaging()
     datamanaging=lab.datamanaging
-    session_name='20211117'
-    datamanaging.all_existing_sessions_not_database_objects[session_name].read_all_yet_to_database_mice()
     
 #%%
     
@@ -889,4 +886,4 @@ if __name__ == "__main__":
     root = tk.Tk()
     app = MouseDatasetsPanel(root, datamanaging=datamanaging)
     root.mainloop()
-    test=app.micebrought_info
+    # test=app.micebrought_info

@@ -62,7 +62,7 @@ class modify_injection_params(tk.Toplevel):
         injection_params['Virus1']=virus_dilutions[0][0]
         injection_params['Dilution1']=virus_dilutions[0][1]
         res = list(zip(*virus_dilutions))
-        if any(x in res[0] for x in ['B', 'C1V1', 'I']):
+        if any(x in res[0] for x in ['B', 'C1V1', 'I', 'T']):
             injection_params['Virus3']=virus_dilutions[-1][0]
             injection_params['Dilution3']=virus_dilutions[-1][1]
             if len(virus_dilutions)==3:
@@ -140,7 +140,8 @@ class modify_injection_params(tk.Toplevel):
 
         self.destroy()
         self.update()
-        self.gui.MouseDat.Experimental_class.plan_new_injection(self.values, self.cage, self.selected_codes, self.injection_sites, self.virus_dilutions)
+        self.gui.MouseDat.Experimental_class.plan_new_multiple_injection(self.values, self.cage, self.selected_codes, self.injection_sites, self.virus_dilutions)
+
 if __name__ == "__main__":
     root = tk.Tk()
     # app = modify_injection_params(root, mice_codes, injection_sites, virus_dilutions)

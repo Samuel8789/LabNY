@@ -125,7 +125,7 @@ class CaimanExtraction():
             elif '25' in self.objective:
                self.halfsize=5          
                if '20x' in self.bidishifted_movie_path:
-                    self.halfsize=2.5    
+                    self.halfsize=2.5  
         except:
             module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
 
@@ -198,7 +198,7 @@ class CaimanExtraction():
                     module_logger.info('Rerunning caiman with custom length movie ' + self.bidishifted_movie_path )
         
                     try:
-                        self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+                        self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
                         # self.remove_unclipped_issue_shifted_movies()
                     except:
                             module_logger.exception('Something wrong with On Acid processing ' + self.bidishifted_movie_path )
@@ -215,7 +215,7 @@ class CaimanExtraction():
                     
         else:  
             try:
-                self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+                self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
             except:
                     module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
 

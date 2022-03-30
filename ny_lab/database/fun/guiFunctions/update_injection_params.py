@@ -107,6 +107,7 @@ class update_injection_params(tk.Toplevel):
         self.b.append(list())  
         self.values.append(list())
         col_labels=list(mixe_exp_extended[list(mixe_exp_extended.keys())[0]].keys())
+        col_labels.append('MovedRoom')
         self.col_labels=col_labels
         for j in range(len(col_labels)): #Columns
            self.b[0].append( Label( self, text =col_labels[j], relief=RAISED)) # b[i][j]
@@ -137,13 +138,17 @@ class update_injection_params(tk.Toplevel):
                         self.b[i][j].current(mice_exp[i-1][11]-1)
                     elif j==18:
                         self.b[i][j].current(mice_exp[i-1][18]-1)
+                        
+                elif j==26:
+                    self.b[i].append(ttk.Combobox( self, values=[0,1]) ) # b[i][j]
+                    self.b[i][j].current(0)
 
                 else:
                     self.b[i].append(Entry(self, text="", width=5)) # b[i][j]
                     
                 self.b[i][j].grid(row=j, column=i+1,sticky = 'w')
 
-                if j not in [1,9,11,18,17,24,25]:
+                if j not in [1,9,11,18,17,24,25,26]:
                     self.b[i][j].insert(0, row_defaults[j]) 
                 
                 if j not in [17,24,25]    :
@@ -168,6 +173,7 @@ class update_injection_params(tk.Toplevel):
             self.values[i][9]= self.good_brain_areas.index(self.values[i][9])+1
             self.values[i][11]= self.good_coordinates.index(self.values[i][11])+1
             self.values[i][18]= self.good_coordinates.index(self.values[i][18])+1
+
 
         self.destroy()
         self.update()

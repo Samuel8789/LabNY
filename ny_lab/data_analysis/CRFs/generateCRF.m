@@ -48,9 +48,6 @@ function [params,best_model,model_collection,results] = generateCRF()
 % of these ensembles
 [results] = identifyMotifs(params,best_model,results); %motif identification function
 
-
-
-
 end
 
 

@@ -11,15 +11,18 @@ import numpy as np
 import pandas as pd
 import gc
 import sys
+import tifffile
 
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .dataset import ImageSequenceDataset
 from .voltageSignals import VoltageSignals
+from ...data_analysis.resultsAnalysis import ResultsAnalysis
+
 
 from .eyeVideo import EyeVideo
 from ..functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
 # from functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
-from .standalone.initialProcessing import InitialProcessing
+# from .standalone.initialProcessing import InitialProcessing
 import logging 
 module_logger = logging.getLogger(__name__)
 from .standalone.metadata import Metadata
@@ -40,8 +43,9 @@ class Aquisition:
         self.aquisition_dir_raw_structure=[]    
         self.all_datasets={}
         self.plane_number=0   
+        self.full_database_dictionary={}
         # self.voltage_signals_dictionary={}
-
+        
         
 
               
@@ -55,7 +59,8 @@ class Aquisition:
                              'photostim',
                              'metadata',
                              'ref images',
-                             'raw_volatge_csv'
+                             'raw_volatge_csv',
+                             'voltage_signals_daq'
                              }    
         
         self.plane_structure={'Green',
@@ -214,15 +219,22 @@ class Aquisition:
             if len(os.listdir(self.slow_storage_all_paths['planes']))>0:
                    self.plane_number=len(next(os.walk(self.slow_storage_all_paths['planes']))[1])
                    
+        if '1050_HighResStackTomato' in self.mouse_aquisition_path or 'HighResStackGreen' in self.mouse_aquisition_path:
+            acq_type_name='Volume'
+        else:
+            acq_type_name='Plane'           
+                   
+                   
         self.plane_channel_paths={}
         if self.plane_number>0:
             for plane in range(self.plane_number) :
-                self.plane_channel_paths['Plane' + str(plane+1)]={}
+                self.plane_channel_paths[acq_type_name + str(plane+1)]={}
                 for info in   self.plane_structure:
                     if 'Photo' not in info:
-                        self.plane_channel_paths['Plane' + str(plane+1)][info]=os.path.join(self.slow_storage_all_paths['planes'], 'Plane' + str(plane+1), info )
+                        self.plane_channel_paths[acq_type_name + str(plane+1)][info]=os.path.join(self.slow_storage_all_paths['planes'], acq_type_name + str(plane+1), info )
                         
 #%% raw  
+
     def create_aquisition_structure_in_mouse_file(self):
         
        if not os.path.isdir(self.mouse_aquisition_path):
@@ -233,10 +245,16 @@ class Aquisition:
        self.plane_paths={}       
        if any(self.aquisition_dir_raw_structure):
            for plane in range(self.plane_number) :
-                self.plane_paths['Plane' + str(plane+1)]=os.path.join(self.slow_storage_all_paths['planes'], 'Plane' + str(plane+1) )
-                if not os.path.isdir(self.plane_paths['Plane' + str(plane+1)]):
-                    os.mkdir(self.plane_paths['Plane' + str(plane+1)])
-                    create_dir_structure(self.plane_paths['Plane' + str(plane+1)], self.plane_structure)
+                if '1050_HighResStackTomato' in self.mouse_aquisition_path or 'HighResStackGreen' in self.mouse_aquisition_path:
+                    acq_type_name='Volume'
+                else:
+                    acq_type_name='Plane'
+
+                self.plane_paths[acq_type_name + str(plane+1)]=os.path.join(self.slow_storage_all_paths['planes'], acq_type_name + str(plane+1) )
+
+                if not os.path.isdir(self.plane_paths[acq_type_name + str(plane+1)]):
+                    os.mkdir(self.plane_paths[acq_type_name + str(plane+1)])
+                    create_dir_structure(self.plane_paths[acq_type_name + str(plane+1)], self.plane_structure)
 
     def read_raw_aquisition_structure(self):
         
@@ -262,23 +280,30 @@ class Aquisition:
              
     def raw_main_path_equivalence(self):
          self.dataset_path_equivalences={}
-         for dataset_raw_path in sorted(self.all_raw_image_sequence_paths, reverse=True):
-             
+         if '1050_HighResStackTomato' in self.mouse_aquisition_path or 'HighResStackGreen' in self.mouse_aquisition_path:
+             acq_type_name='Volume'
+             acq_type_name2=acq_type_name
+         else:
+             acq_type_name='plane'
+             acq_type_name2='Plane'
 
+
+         for dataset_raw_path in sorted(self.all_raw_image_sequence_paths, reverse=True):
              channel_info=os.path.split(os.path.split(dataset_raw_path)[0])[1]
              channel=channel_info[channel_info.find('Ch')+3:]
-             plane_number=os.path.split(dataset_raw_path)[1][os.path.split(dataset_raw_path)[1].find('plane')+5:] 
+             
+             
+             plane_number=os.path.split(dataset_raw_path)[1][os.path.split(dataset_raw_path)[1].find(acq_type_name)+len(acq_type_name):] 
              self.dataset_path_equivalences[dataset_raw_path]=[channel, 
-                                                               'Plane'+ str(plane_number), 
+                                                               acq_type_name2+ str(plane_number), 
                                                                os.path.join(self.mouse_aquisition_path,
                                                                             'planes',
-                                                                            'Plane'+ str(plane_number),
+                                                                            acq_type_name2+ str(plane_number),
                                                                              channel)
                                                                ]
        
     def file_cleanup_prairie_dataset(self):
                  
-    # file_list = os.listdir(self.Prairireaqpath)
       
       # check channle and plane structure     and current folders
           directory_red=os.path.join(self.Prairireaqpath,'Ch1Red')
@@ -302,6 +327,13 @@ class Aquisition:
                         Multiplane=False
                         if PlaneNumber>1:
                             Multiplane=True
+                    elif any('Volume' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
+                        last_cycle=len(folder_selected_list_red) + aq_info[9]
+                        PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+'\\**'))     
+                        Multiplane=False
+                        if PlaneNumber>1:
+                            Multiplane=True
+
                     else:
                         aq_info =check_channels_and_planes(directory_red, correction)
                     
@@ -314,6 +346,13 @@ class Aquisition:
                         Multiplane=False
                         if PlaneNumber>1:
                             Multiplane=True
+                            
+                    elif any('Volume' in file_name  for file_name in folder_selected_list_green if os.path.isdir(os.path.join(directory_green , file_name))):
+                        last_cycle=len(folder_selected_list_green) + aq_info[9]
+                        PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+'\\**'))     
+                        Multiplane=False
+                        if PlaneNumber>1:
+                            Multiplane=True        
                     else:
                        aq_info=check_channels_and_planes(directory_green, correction)
       
@@ -321,11 +360,16 @@ class Aquisition:
               aq_info = check_channels_and_planes(self.Prairireaqpath, correction)
               if aq_info[0]:
                   ChannelRedExists=1
-                  PlaneNumber=aq_info[9]
+                  PlaneNumber=aq_info[9]     
+                  first_cycle=  int(aq_info[6] [5:]    ) 
+                  last_cycle=  int(aq_info[7]   [5:]   )
+
               if aq_info[1]:
                   ChannelGreenExists=1
                   PlaneNumber=aq_info[10]
-      
+                  first_cycle=  int(aq_info[3][5:])
+                  last_cycle=  int(aq_info[4] [5:]   )  
+
           ImagedChannels=['No','No']
           if ChannelRedExists:
               ImagedChannels[0]='Ch1Red'
@@ -333,7 +377,7 @@ class Aquisition:
               ImagedChannels[1]='Ch2Green'
       
            # create necessary folders     
-          if ChannelRedExists or ChannelGreenExists:     
+          if (ChannelRedExists or ChannelGreenExists) and PlaneNumber<6:     
               all_image_sequence_paths=[]
               PlanePaths=[os.sep +'plane'+str(i+1) for i in range(PlaneNumber)]       
               for ch in ImagedChannels:
@@ -364,7 +408,44 @@ class Aquisition:
               else:       
                   move_files(self.Prairireaqpath,ChannelPaths,PlanePaths, Multiplane,aq_info[-1]) 
       
-              return  [ImagedChannels, PlaneNumber, all_image_sequence_paths]      
+              return  [ImagedChannels, PlaneNumber, all_image_sequence_paths]     
+          
+          elif (ChannelRedExists or ChannelGreenExists) and PlaneNumber>6:    
+                all_image_sequence_paths=[]
+
+                CyclesPaths=[os.sep +'Volume'+str(i+1) for i in range(last_cycle)]       
+                for ch in ImagedChannels:
+                    for i, channel_path in enumerate(ChannelPaths):
+                          if ch in channel_path :
+                              for n,j in enumerate(CyclesPaths):
+                                  all_image_sequence_paths.append(ChannelPaths[i]+CyclesPaths[n])
+                                  if not os.path.exists(ChannelPaths[i]+CyclesPaths[n]):
+                                      os.makedirs(ChannelPaths[i]+CyclesPaths[n])
+                             
+                Multiplane=aq_info[8]
+                if correction:
+                    if glob.glob(self.Prairireaqpath+'\\**.tif', recursive=False):             
+                        move_files(self.Prairireaqpath,ChannelPaths,CyclesPaths, Multiplane,aq_info[-1] ) 
+                    for channel_folder in ChannelPaths:
+                        if os.path.isdir(channel_folder):
+                            file_list_channel = os.listdir(channel_folder)
+                            
+                            if len (file_list_channel)>last_cycle:
+                                  move_files(channel_folder,ChannelPaths,CyclesPaths, Multiplane, aq_info[-1]) 
+                            elif len(file_list_channel)<3:  
+                                  for volume_folder in file_list_channel:
+                                      if os.path.isdir(os.path.join(channel_folder, volume_folder)):
+                                          # file_list_plane=os.listdir(plane_folder)
+                                          pass
+                                          # move_files(os.path.join(channel_folder, volume_folder),ChannelPaths,CyclesPaths, Multiplane,aq_info[-1] ) 
+                      
+                else:       
+                    move_files(self.Prairireaqpath, ChannelPaths, CyclesPaths, Multiplane, aq_info[-1],  is_highstack=True) 
+                
+                VolumeNumber=last_cycle
+        
+                return  [ImagedChannels, VolumeNumber, all_image_sequence_paths]     
+            
           else:        
               return  [False, False, False]  
 #%%main processors     
@@ -384,9 +465,6 @@ class Aquisition:
                 module_logger.info('processing voltage recording')           
                 self.load_voltage_signals_object()
 
-                # module_logger.info('transfering csv')
-                # self.transfer_raw_csv()
-                
                 module_logger.info('transfering references')
                 self.transfer_ref_images()
                 
@@ -425,6 +503,7 @@ class Aquisition:
         self.load_voltage_signals_object()         
         self.read_working_vistim_info()
         self.read_face_camera()
+        self.read_reference_images()
         
         if self.subaq_object!='NonimagingAquisition': 
             
@@ -438,10 +517,10 @@ class Aquisition:
                                                                       selected_dataset_mmap_path=dataset_path) 
           
             
-    def load_all_datasets(self): 
+    def load_all_datasets(self, kalman=True): 
         if self.all_datasets:
             for dataset in self.all_datasets.values():
-                dataset.load_dataset()
+                dataset.load_dataset(kalman=kalman)
         
     def unload_all_datasets(self): 
         if self.all_datasets:
@@ -459,8 +538,26 @@ class Aquisition:
             self.acquisition_database_info= self.full_database_dictionary['Acq']
             self.imaging_database_info= self.full_database_dictionary['Imaging']
             
+        
+    def load_reference_images(self):
+        self.reference_image_dic={title:'' for title in self.reference_images_working_fullpaths}
+        for x in  self.reference_images_working_fullpaths:
+            with tifffile.TiffFile(x) as tffl:
+                 self.reference_image_dic[x] = tffl.asarray()
+                 
+    def unload_reference_images(self):
+        
+        if self.reference_image_dic:
+            del self.reference_image_dic
+            gc.collect()
+            # sys.stdout.flush()
+            self.reference_image_dic={}
 
-       
+    def read_reference_images(self):
+        
+        self.reference_images_working_fullpaths=glob.glob(self.slow_storage_all_paths['ref images']+'\\**', recursive=False)
+        
+    
     def transfer_ref_images(self):
         self.references_raw_files_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+'\\References\\**', recursive=False) if '.tif' in file  ]
         self.reference_images_working_fullpaths=[]
@@ -468,7 +565,7 @@ class Aquisition:
             if not os.path.isfile(os.path.join(self.slow_storage_all_paths['ref images'], os.path.split(file)[1])):
             
                 self.reference_images_working_fullpaths.append(shutil.copy(file, self.slow_storage_all_paths['ref images']))             
-        self.read_existing_datasets()     
+        # self.read_existing_datasets()     
         
         
     def load_metadata_raw(self):
@@ -485,8 +582,7 @@ class Aquisition:
 
 #%% dealing with voltage signals 
 
-    def load_voltage_signals_object(self):
-        
+    def load_voltage_signals_object(self):        
         self.voltage_signal_object=VoltageSignals(acquisition_object=self)
         
     def load_voltage_signals(self):
@@ -495,7 +591,11 @@ class Aquisition:
 
            self.voltage_signal_object.load_slow_storage_voltage_signals()
        else:
-           module_logger.info('no voltage signals')
+           try:
+               self.load_voltage_signals_object()
+               self.voltage_signal_object.load_slow_storage_voltage_signals()
+           except:
+               module_logger.info('no voltage signals to load')
 
        
     def unload_voltage_signals(self):
@@ -639,13 +739,15 @@ class Aquisition:
         pass
       
 #%% loading unloading all
-    def load_all(self):
+    def load_all(self, camera=True, kalman=True):
         self.load_vis_stim_info()
-        self.load_face_camera()
+        if camera:
+            self.load_face_camera()
         # self.load_voltage_signals()
         self.load_voltage_signals()
-        self.load_all_datasets()
+        self.load_all_datasets(kalman=kalman)
         self.load_metadata_slow_working_directories()
+        self.load_reference_images()
 
         # self.mouse_imaging_session_object.
 
@@ -654,8 +756,23 @@ class Aquisition:
         # self.unload_voltage_signals()
         self.unload_voltage_signals
         self.unload_all_datasets()
+        self.unload_reference_images()
+        
+    def load_results_analysis(self):
+        
+        self.analysis_object=ResultsAnalysis(acquisition_object=self)
+        
+ 
+    def get_associated_tomato_fov_datasets(self):
 
-
+        self.associated_fov_tomato_acquisition= self.FOV_object.all_existing_10503planetomato[list(self.FOV_object.all_existing_10503planetomato.keys())[0]]
+        self.associated_fov_tomato_acquisition.load_all_datasets()
+        
+        
+        
+        # dataset_object.summary_images_object.projection_dic['std_projection_path']
+        
+    
 #%% raw paths
 # aq.Prairireaqpath
 # aq.aquisition_path

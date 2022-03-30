@@ -125,6 +125,7 @@ class update_window_params(Tkinter.Toplevel):
         self.b.append(list())  
         self.values.append(list())
         col_labels=list(mixe_exp_extended[list(mixe_exp_extended.keys())[0]].keys())
+        col_labels.append('MovedRoom')
         self.col_labels=col_labels
         
         for j in range(len(col_labels)): #Columns
@@ -162,13 +163,18 @@ class update_window_params(Tkinter.Toplevel):
                     self.b[i][j].current(mice_exp[i-1][19]-1)
                 elif j in [10,11]:
                     self.b[i].append(Text(self, height=3, width=25, wrap=WORD)) # b[i][j]
+                    
+                elif j==12:
+                     self.b[i].append(ttk.Combobox( self, values=[0,1]) ) # b[i][j]
+                     self.b[i][j].current(0)    
+                    
                 else:
                     self.b[i].append(Entry(self, text="", width=8)) # b[i][j]
                     
 
                 self.b[i][j].grid(row=j, column=i+1)
                 
-                if j not in [2,3,4,5,6,7,8,10,11]:
+                if j not in [2,3,4,5,6,7,8,10,11,12]:
                     self.b[i][j].insert(0, row_defaults[j])
                 
                 if j in [10,11]:
@@ -199,6 +205,8 @@ class update_window_params(Tkinter.Toplevel):
         self.destroy()
         self.update()
         self.database_object.Experimental_class.update_performed_window(self.values, self.cage, self.selected_codes, self.date_performed )
+        # self.database_object.Experimental_class.update_performed_window(self.values, self.cage, self.selected_codes, self.date_performed )
+
 if __name__ == "__main__":
     cage=305
     selectedanimals=['SPJA','SPJC']

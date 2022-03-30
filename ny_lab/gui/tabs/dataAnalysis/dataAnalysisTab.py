@@ -28,15 +28,26 @@ class DataAnalysisTab(tk.Frame):
         
         
         """
+        select acquisition acq and 
+        # acq.load_results_analysis()
         
-        This is for
-            grating tuning
-            locomotion tuning
-            data plots
-            similarity 
-            ensemble anlaysis
-            patter completion cells
-            pupil tuning
-            whisker tuning
+        
+        # acq.analysis_object.signals_object.process_all_signals()
+
+        
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='MCMC', plane='All')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='dfdt', plane='All')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='MCMC', plane='Plane1')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='dfdt', plane='Plane1')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='MCMC', plane='Plane2')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='dfdt', plane='Plane2')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='MCMC', plane='Plane3')
+        # acq.analysis_object.load_jesus_analysis(binary_raster_to_proces='dfdt', plane='Plane3')
+
+        
+        #%% geting tomato identiti
+        # acq.analysis_object.identify_in_pyr()
             
         """
+        
+        

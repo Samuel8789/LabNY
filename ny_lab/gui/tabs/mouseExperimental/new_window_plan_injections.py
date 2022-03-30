@@ -49,10 +49,10 @@ class new_window_plan_injections(tk.Toplevel):
         self.number_of_injections_label=ttk.Label(self, text='Number of Injections', width=20)
         self.number_of_injections_label.grid(column=0, row=3)
         
-        
-        self.virus1_names=self.gui.MouseDat.allVirusstock[['VirusName']].values.tolist()
-        self.virus2_names=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['Recombinase']==3][['VirusName']].values.tolist()
-        self.virus3_names=self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==2) | (self.gui.MouseDat.allVirusstock['ID']==4) | (self.gui.MouseDat.allVirusstock['ID']==10)][['VirusName']].values.tolist()
+        self.gui.MouseDat.allVirusstock['VirusName'].tolist()
+        self.virus1_names=self.gui.MouseDat.allVirusstock['VirusName'].tolist()
+        self.virus2_names=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['Recombinase']==3]['VirusName'].tolist()
+        self.virus3_names=self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==2) | (self.gui.MouseDat.allVirusstock['ID']==4) | (self.gui.MouseDat.allVirusstock['ID']==10)| (self.gui.MouseDat.allVirusstock['ID']==21)]['VirusName'].tolist()
         self.virus1_label=ttk.Label(self, text='Virus 1', width=20)
         self.virus1_label.grid(column=0, row=5)
         self.virus2_label=ttk.Label(self, text='Virus 2', width=20)
@@ -89,8 +89,8 @@ class new_window_plan_injections(tk.Toplevel):
         self.virus3_dilution.set(0.2)
         
         
-        self.plan_injection_button= ttk.Button(self , text='Plan Injections', command=self.plan_injection_button)
-        self.plan_injection_button.grid(column=1, row=100)
+        self.plan_injection_button_but= ttk.Button(self , text='Plan Injections', command=self.plan_injection_button)
+        self.plan_injection_button_but.grid(column=1, row=100)
         
  
 
@@ -162,8 +162,6 @@ class new_window_plan_injections(tk.Toplevel):
             cage_selec.sort()
             self.cage_selection['values']=cage_selec
 
-             
-             
 
         
     def select(self):

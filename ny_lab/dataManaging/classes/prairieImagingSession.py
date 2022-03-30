@@ -45,7 +45,9 @@ class PrairieImagingSession():
             self.imaging_session_mice_path=os.path.join(self.imaging_session_raw_path,'Mice')
             self.imaging_session_calibration_path=os.path.join(self.imaging_session_raw_path, 'Calibrations')
             self.session_imaged_mice_paths=glob.glob(self.imaging_session_mice_path+'\\*\\')
-            self.session_imaged_mice_codes=[mouse_path[-5:-1] for mouse_path in self.session_imaged_mice_paths]
+            self.cleaning_up_empty_mouse()
+            # self.cleaning_up_calibrations()
+            self.session_imaged_mice_codes=[mouse_path[-5:-1] for mouse_path in self.session_imaged_mice_paths if '_' not in mouse_path]
             
 
         # Case building prairie session from database
@@ -74,7 +76,7 @@ class PrairieImagingSession():
             self.session_imaged_mice_codes=self.session_imaged_mice_info.Code
             self.session_imaged_mice_codes=self.session_imaged_mice_codes.values.tolist()
      
-            
+#%%            
     def load_all_yet_to_database_mice(self):
         module_logger.info('Loading mice not in database ' +self.imaging_session_name)
         for mouse_code in self.session_imaged_mice_codes:
@@ -90,7 +92,12 @@ class PrairieImagingSession():
         for mouse_code in self.session_imaged_mice_codes:
             if mouse_code!='SPHQ':
              self.datamanagingobject.all_experimetal_mice_objects[mouse_code].add_prairie_session(self.imaging_session_raw_path, self.imaging_session_name)
-              
+           
+             #%%
+    def cleaning_up_empty_mouse(self):
+       removed_mice_codes=[recursively_eliminate_empty_folders(mouse_path) for mouse_path in self.session_imaged_mice_paths if '_'  in mouse_path]
+            
+        
           
     # def deal_with_calibrations(self)
     def cleaning_up_raw_mouse_acquisitions(self):

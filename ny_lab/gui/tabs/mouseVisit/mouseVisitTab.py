@@ -9,7 +9,7 @@ import tkinter as tk
 from tkinter import ttk
 from tkcalendar import Calendar
 import datetime
-
+import os
 from .new_window_add_separations import new_window_add_separations
 from .new_window_add_weanings import new_window_add_weanings
 from .new_window_add_rebreedings import new_window_add_rebreedings
@@ -65,12 +65,15 @@ class MouseVisitTab(tk.Frame):
                                    'New Mouse Previsit', 
                                    'New Mouse Postvisit', 
                                    'Accept_death',
+                                   'Open Mouse Visit Dir'
                                    ]
         self.frame1.buttons_commands=[self.mouse_previsit_button,
                                       self.mouse_postvisit_button, 
                                       self.mouse_new_previsit_button,
                                       self.mouse_new_postvisit_button,
                                       self.female_breeder_death_button,
+                                      self.open_mouse_visits_button
+
                                       ]
         for i in range(len(self.frame1.buttons_names)):
               self.frame1.buttons[self.frame1.buttons_names[i]]= ttk.Button(self.frame1 , text=self.frame1.buttons_names[i], command=self.frame1.buttons_commands[i])
@@ -97,6 +100,8 @@ class MouseVisitTab(tk.Frame):
         self.frame1.buttons[self.frame1.buttons_names[3]].grid(column=0, row=4)
         self.frame1.entries[self.frame1.entries_names[0]].grid(column=1, row=1)
         self.frame1.entries[self.frame1.entries_names[0]].insert(0, self.gui_ref.todays_date)
+        self.frame1.buttons[self.frame1.buttons_names[5]].grid(column=1, row=0)
+
 
         self.frame1.buttons[self.frame1.buttons_names[4]].grid(column=0, row=7)
         self.frame1.entries[self.frame1.entries_names[1]].grid(column=0, row=5)
@@ -303,6 +308,12 @@ class MouseVisitTab(tk.Frame):
    
         
 #%% button funcrions
+    def open_mouse_visits_button(self):
+        
+        os.startfile(r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\MouseVisits')
+
+        
+        
     def mouse_previsit_button(self) :
          self.gui_ref.MouseDat.mouse_previsit()
          print('previsit printed')

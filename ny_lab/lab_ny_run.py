@@ -48,13 +48,15 @@ class RunNYLab(Project):
             
             
         module_logger.info('Starting Data Managing')
-        self.datamanaging=DataManaging(self)
-        
+        self.datamanaging=None
         self.gui=[]
         if gui:
             self.gui = Gui(self)
             self.gui.mainloop()
-        
+    
+    def do_datamanaging(self):
+        self.datamanaging=DataManaging(self)
+    
     def change_and_save_selected_paths_roots(self): 
                         
         self.define_path_roots()           

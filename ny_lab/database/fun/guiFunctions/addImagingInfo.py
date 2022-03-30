@@ -16,7 +16,8 @@ class AddImagingInfo(tk.Toplevel):
         tk.Toplevel.__init__(self, gui) #inst     
         
         self.geometry("+2555+0")
-        row_labels=['GreenFilter','RedFilter','DichroicBeamsplitter','IsBlockingDichroic','IsGoodObjective', 'ExcitationWavelength','CoherentPower', 'Comments', 'AtlasOverlap',' AtlasZStructure', 'AtlasSequenceMode' ]
+        row_labels=['GreenFilter','RedFilter','DichroicBeamsplitter','IsBlockingDichroic','IsGoodObjective', 'ExcitationWavelength',
+                    'CoherentPower', 'Comments', 'AtlasOverlap',' AtlasZStructure', 'AtlasSequenceMode', 'DoDeepCaiman?' ]
         self.total_rows=len(row_labels)+1
         self.values=list()
         self.b = list()
@@ -39,7 +40,7 @@ class AddImagingInfo(tk.Toplevel):
                     self.values[i].append(texts)  
                     
                 elif j>0:
-                    if i not in [1,2,3,4,5,11]:
+                    if i not in [1,2,3,4,5,11,12]:
                         self.b[i].append(Text(self, height=5, width=150, wrap=WORD)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)                              
                         self.values[i].append(self.b[i][j].get("1.0",END))  
@@ -84,6 +85,12 @@ class AddImagingInfo(tk.Toplevel):
                         self.b[i].append(ttk.Combobox(self, values=values, width=30)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)   
                         self.b[i][j].current(0)     
+                        self.values[i].append(self.b[i][j].get())                      
+                    elif i==12:
+                        values=['Yes','No'] 
+                        self.b[i].append(ttk.Combobox(self, values=values, width=30)) # b[i][j]
+                        self.b[i][j].grid(row=i+1, column=j)   
+                        self.b[i][j].current(1)     
                         self.values[i].append(self.b[i][j].get())  
                         
         enter_button = Button(self, text="Enter", command=self.retrieve_input)
@@ -91,11 +98,11 @@ class AddImagingInfo(tk.Toplevel):
 
     def retrieve_input(self):
         for i in range(1,self.total_rows,1): #Rows
-                if i not in [1,2,3,4,5,11]:
+                if i not in [1,2,3,4,5,11,12]:
                     self.values[i][1]=self.b[i][1].get("1.0",END)
                     while  self.values[i][1].endswith('\n'):
                         self.values[i][1]=self.values[i][1][:-1]
-                elif i in [1,2,3,4,5,11]:
+                elif i in [1,2,3,4,5,11,12]:
                     self.values[i][1]=self.b[i][1].get()
         self.destroy()
         self.update() 

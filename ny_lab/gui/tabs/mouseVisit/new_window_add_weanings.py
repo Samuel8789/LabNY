@@ -64,6 +64,7 @@ class new_window_add_weanings:
             self.sep_male_cage_entries.append(ttk.Entry(self.tableWindow , text='', width=5))
             self.sep_female_cage_entries.append(ttk.Entry(self.tableWindow , text='', width=5))
             self.saced.append(ttk.Entry(self.tableWindow , text='', width=5))
+            self.saced[i].insert(END,'0')
             
             
             self.sep_boxes[i].grid(row=2*i, column=0)  

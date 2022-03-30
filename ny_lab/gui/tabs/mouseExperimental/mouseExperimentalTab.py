@@ -17,7 +17,7 @@ from .new_window_update_done_injections import  new_window_update_done_injection
 from .new_window_update_done_windows import  new_window_update_done_windows
 from .new_window_post_op_injections import  new_window_post_op_injections
 from ....database.fun.guiFunctions.plan_window_parameters import plan_window_parameters
-
+from .new_window_move_to_exp_room import new_window_move_to_exp_room
 
 from ..mouseVisit.widgetSelectStockCageMice import WidgetSelectStockCageMice
 from .processBrainWindow import ProcessBrain
@@ -33,6 +33,8 @@ class MouseExperimentalTab(tk.Frame):
         self.grid_columnconfigure(2, weight=1)
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=3)
+
                
         self.frames_names=['Injections',
                            'Windows' , 
@@ -84,11 +86,15 @@ class MouseExperimentalTab(tk.Frame):
         self.frame2.buttons={}
         self.frame2.buttons_names=['Plan Windows No Injection', 
                                    'Prepare Window Templates',
-                                   'Update Done Windows'
+                                   'Update Done Windows',
+                                   'Caged Moved To Experimental',
+                                   
                                    ]
         self.frame2.buttons_commands=[self.plan_window_button, 
                                       self.prepare_window_templates_button,
-                                      self.update_done_window_button                                      
+                                      self.update_done_window_button   ,
+                                      self.move_to_experimental_button,
+                                      # self.no_injection_exp_button,
                                       ]
         for i in range(len(self.frame2.buttons_names)):
               self.frame2.buttons[self.frame2.buttons_names[i]]= ttk.Button(self.frame2 , text=self.frame2.buttons_names[i], command=self.frame2.buttons_commands[i])
@@ -248,6 +254,15 @@ class MouseExperimentalTab(tk.Frame):
             self.update_injection_window.wait_window()
             button_update_database(self.gui_ref)
                             
+    def move_to_experimental_button(self):    
+        self.move_to_exp_window=new_window_move_to_exp_room(self.gui_ref)
+        self.move_to_exp_window.wait_window()
+        button_update_database(self.gui_ref)  
+        print('caged moved to exp')
+
+            
+    def no_injection_exp_button(self):        
+          pass
 #%% windows       
     def plan_window_button(self):
         

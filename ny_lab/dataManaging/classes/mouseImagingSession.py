@@ -87,8 +87,10 @@ class MouseImagingSession():
 
 
 
-
+            # this organizez folders in permanent directiory
             self.raw_session_preprocessing()
+            print('Finished Session Preprocessing')
+            #then create acquisitoin objects and copy to slow , this is slow because of metadta read
             
             try:
                 module_logger.info('adding raw fovs')
@@ -135,9 +137,7 @@ class MouseImagingSession():
             module_logger.info('adding prairie session '+ self.mouse_code+' '+self.imaging_session_name)
             # if self.imaging_session_name=='20210522':
             #     module_logger.info('wait')
-            
-     
-            
+
             self.load_existing_FOVs()
             self.load_existing_Test_Aquisitions()
             self.load_existing_widefield_image()
@@ -150,44 +150,17 @@ class MouseImagingSession():
    
     
 #%% methods   
+
+
+   
+        
+        
     def raw_session_preprocessing(self):
         try:
-    
-            self.UnprocessedFaceCameras=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedFaceCameras')   
-            self.UnprocessedVisStim=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedVisStim')   
-    
-            self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-            self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
-            
-            self.UnprocessedFaceCamerasnames=[os.path.split(self.UnprocessedFaceCameraspath)[1] for self.UnprocessedFaceCameraspath in self.UnprocessedFaceCameraspaths]
-            self.UnprocessedFaceCamerasnames=['None']+self.UnprocessedFaceCamerasnames
-            self.UnprocessedVisStimnames=[os.path.split(self.UnprocessedVisStimpaths)[1] for self.UnprocessedVisStimpaths in self.UnprocessedVisStimpaths]
-            self.UnprocessedVisStimnames=['None']+self.UnprocessedVisStimnames
-    
-            
-            if glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False) :
-                for mat in glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False):      
-                    os.rename(mat,mat[:-4])
-     
-            self.organize_acquisition_folders()       
-                  
-                         
-    
-            self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-            self.UnprocessedFaceCamerasnames=[os.path.split(self.UnprocessedFaceCameraspath)[1] for self.UnprocessedFaceCameraspath in self.UnprocessedFaceCameraspaths]
-            self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
-            self.UnprocessedVisStimnames=[os.path.split(self.UnprocessedVisStimpaths)[1] for self.UnprocessedVisStimpaths in self.UnprocessedVisStimpaths]
-            
-            if not self.UnprocessedFaceCameraspaths:
-                if os.path.isdir(self.UnprocessedFaceCameras):
-                    recursively_eliminate_empty_folders(self.UnprocessedFaceCameras)
-            if not self.UnprocessedVisStimpaths:
-                if os.path.isdir(self.UnprocessedVisStim):
-                    recursively_eliminate_empty_folders(self.UnprocessedVisStim) 
+            self.organize_acquisition_folders()  
         except:
             module_logger.exception('Something wrong with raw session preprocessing ' +   self.mouse_raw_imaging_session_path)
-        
-            
+                   
     def organize_acquisition_folders(self):
         module_logger.info('organizing folders slow')
 
@@ -239,10 +212,7 @@ class MouseImagingSession():
                 self.process_aquisition_folder(aq)
             recursively_eliminate_empty_folders(aq_folder) 
 
-
-
     def correctComplexacquisitonsNames(self, ComplexAcqname):
-        
         
         # no detect fovs with fov number highr thant totAL NIMBER OF FOVS AND CHANGE IT        
         all_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname+'**', recursive=False) 
@@ -272,7 +242,7 @@ class MouseImagingSession():
                        to_change_to.remove(to_change_to[0])
            
         for compacq in unnumbered_compacqs:
-            if not glob.glob( compacq+'\\**\\**.env', recursive=True) :
+            if not glob.glob( compacq+'\\**\\**.env', recursive=True) and not glob.glob( compacq+'\\**\\**.xy', recursive=True) :
 
                 recursively_eliminate_empty_folders(compacq) 
             else:
@@ -284,6 +254,7 @@ class MouseImagingSession():
                 #this will change empty fov to the minimum fov number avilabel  
                     os.rename(compacq, compacq+str(to_change_to[0]))    
                                            
+    
     def createAqFolders(self, generic_aq):
         generic_aq_folder_prairieaq=glob.glob(generic_aq +'\\**\\**.env', recursive=False) 
                        
@@ -300,85 +271,126 @@ class MouseImagingSession():
                 os.mkdir(destination) 
                 shutil.move(os.path.split(aq_path)[0],destination)
                 
-    def addFaceCamsVisStim(self, aq):  
-        
-        self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-        self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
-        
-        self.UnprocessedFaceCamerasnames=[os.path.split(FaceCameraspath)[1] for FaceCameraspath in self.UnprocessedFaceCameraspaths]
-        self.UnprocessedFaceCamerasnames=['None']+self.UnprocessedFaceCamerasnames
-        self.UnprocessedVisStimnames=[os.path.split(VisStimpaths)[1] for VisStimpaths in self.UnprocessedVisStimpaths]
-        self.UnprocessedVisStimnames=['None']+self.UnprocessedVisStimnames
-        
-        if not self.UnprocessedFaceCameraspaths:
-            if os.path.isdir(self.UnprocessedFaceCameras):
-                recursively_eliminate_empty_folders(self.UnprocessedFaceCameras)
-        if not self.UnprocessedVisStimpaths:
-            if os.path.isdir(self.UnprocessedVisStim):
-                recursively_eliminate_empty_folders(self.UnprocessedVisStim) 
-
-        if self.UnprocessedFaceCamerasnames or  self.UnprocessedVisStimnames:   
-            if not  self.UnprocessedFaceCamerasnames:
-                self.UnprocessedFaceCamerasnames=['None']
-            if not  self.UnprocessedVisStimnames:
-                self.UnprocessedVisStimnames=['None']
                 
-        if not  self.mouse_object.data_managing_object.LabProjectObject.gui:
+    def read_unprocessed_extra_data(self):
+         
+         self.UnprocessedFaceCameras=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedFaceCameras')   
+         self.UnprocessedVisStim=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedVisStim')   
+         self.UnprocessedDaqRecording=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedDaq')   
+
+         self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
+         self.UnprocessedFaceCameraspaths2=glob.glob(self.UnprocessedFaceCameras +'\\**\\Default\\**000000000_z000.tif', recursive=False)
+
+         self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
+         self.UnprocessedDaqRecordingpaths=glob.glob(self.UnprocessedDaqRecording +'\\**.mat', recursive=False)
+         self.UnprocessedFaceCamerasnames=[]
+         self.UnprocessedVisStimnames=[]
+         self.UnprocessedDaqRecordingnames=[]
+                     
+         if not self.UnprocessedFaceCameraspaths and not self.UnprocessedFaceCameraspaths2:
+             if os.path.isdir(self.UnprocessedFaceCameras):
+                 recursively_eliminate_empty_folders(self.UnprocessedFaceCameras)
+         elif self.UnprocessedFaceCameraspaths:
+             self.UnprocessedFaceCamerasnames=[os.path.split(self.UnprocessedFaceCameraspath)[1] for self.UnprocessedFaceCameraspath in self.UnprocessedFaceCameraspaths]
+             self.UnprocessedFaceCamerasnames=['None']+self.UnprocessedFaceCamerasnames
+         elif self.UnprocessedFaceCameraspaths2:
+             self.UnprocessedFaceCamerasnames=[os.path.split(os.path.split(os.path.split(self.UnprocessedFaceCameraspath)[0])[0])[1] for self.UnprocessedFaceCameraspath in self.UnprocessedFaceCameraspaths2]
+             self.UnprocessedFaceCamerasnames=['None']+self.UnprocessedFaceCamerasnames
+             
+             
+             
+         if not self.UnprocessedVisStimpaths:
+             if os.path.isdir(self.UnprocessedVisStim):
+                 recursively_eliminate_empty_folders(self.UnprocessedVisStim) 
+         else:
+             self.UnprocessedVisStimnames=[os.path.split(self.UnprocessedVisStimpath)[1] for self.UnprocessedVisStimpath in self.UnprocessedVisStimpaths]
+             self.UnprocessedVisStimnames=['None']+self.UnprocessedVisStimnames
+             if glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False) :
+                 for mat in glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False):      
+                     os.rename(mat,mat[:-4])
+
+         if not self.UnprocessedDaqRecordingpaths:
+             if os.path.isdir(self.UnprocessedDaqRecording):
+                 recursively_eliminate_empty_folders(self.UnprocessedDaqRecording) 
+         else:
+             self.UnprocessedDaqRecordingnames=[os.path.split(self.UnprocessedDaqRecordingpath)[1] for self.UnprocessedDaqRecordingpath in self.UnprocessedDaqRecordingpaths]
+             self.UnprocessedDaqRecordingnames=['None']+self.UnprocessedDaqRecordingnames
+             if glob.glob(self.UnprocessedDaqRecording +'\\**.mat.mat', recursive=False) :
+                 for mat in glob.glob(self.UnprocessedDaqRecording +'\\**.mat.mat', recursive=False):      
+                     os.rename(mat,mat[:-4])            
+                
+    def process_aquisition_folder(self, aq):
+        
+        self.read_unprocessed_extra_data()
+        if self.UnprocessedFaceCameraspaths or self.UnprocessedVisStimpaths or self.UnprocessedDaqRecordingpaths or self.UnprocessedFaceCameraspaths2: 
+            self.addFaceCamsVisStim(aq)
+        self.read_unprocessed_extra_data()
+
+        recursively_eliminate_empty_folders(aq) 
+                         
+        
+    def addFaceCamsVisStim(self, aq): 
+        
+        if not  self.UnprocessedFaceCamerasnames:
+            self.UnprocessedFaceCamerasnames=['None']
+        if not  self.UnprocessedVisStimnames:
+            self.UnprocessedVisStimnames=['None']
+        if not  self.UnprocessedDaqRecordingnames:
+            self.UnprocessedDaqRecordingnames=['None']
+    
+                
+        if not self.mouse_object.data_managing_object.LabProjectObject.gui:
            self.guiref=tk.Tk()
         else:
            self.guiref=self.mouse_object.data_managing_object.LabProjectObject.gui
                 
-            
-        self.select_face_camera_window=select_face_camera(self.guiref, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], self.UnprocessedFaceCamerasnames, self.UnprocessedVisStimnames)
+        print('Openeing extra data selection')   
+        self.select_face_camera_window=select_face_camera(self.guiref, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], self.UnprocessedFaceCamerasnames, self.UnprocessedVisStimnames, self.UnprocessedDaqRecordingnames)
         self.select_face_camera_window.wait_window()
         get_values= self.select_face_camera_window.values
-        self.guiref.destroy()
+        self.select_face_camera_window.destroy()
 
         if get_values[1][1] and get_values[1][1]!='None':
-            facecameradir=os.path.join(aq, 'FaceCamera')   
-            # unprocessedfacecameraname= os.path.split(os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0])[1]
-            unprocessedfacecamerafullpath=os.path.split([name for name in self.UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0]
-
+            facecameradir=os.path.join(aq, 'FaceCamera')  
             if not os.path.isdir(facecameradir):
                 os.mkdir(facecameradir)
+            # unprocessedfacecameraname= os.path.split(os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0])[1]
+            if self.UnprocessedFaceCameraspaths:
+                unprocessedfacecamerafullpath=os.path.split([name for name in self.UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0]
+                files = glob.glob(unprocessedfacecamerafullpath+'\\**' )
+                for f in files:
+                      shutil.move(f, facecameradir)               
             
-            files = glob.glob(unprocessedfacecamerafullpath+'\\**' )
-            for f in files:
-                  shutil.move(f, facecameradir)               
+            elif self.UnprocessedFaceCameraspaths2:
+                unprocessedfacecamerafullpath2=os.path.split(os.path.split([name for name in self.UnprocessedFaceCameraspaths2 if get_values[1][1] in name][0])[0])[0]
+                files2 = glob.glob(unprocessedfacecamerafullpath2+'\\**' )
+                for f in files2:
+                    if os.path.isfile(f):
+                        shutil.move(f, facecameradir)       
+                    elif os.path.isdir(f):
+                        shutil.move(f, os.path.join(facecameradir, 'Default'))       
+
+
+
             
         if get_values[2][1] and get_values[2][1]!='None':
             visstimdir=os.path.join(aq, 'VisStim')   
-            unprocessedvisstim= os.path.split([name for name in self.UnprocessedVisStimpaths if get_values[2][1] in name][0])[0]
+            unprocessedvisstim= [name for name in self.UnprocessedVisStimpaths if get_values[2][1] in name][0]
             if not os.path.isdir(visstimdir):
                 os.mkdir(visstimdir)
+            file = unprocessedvisstim
+            shutil.move(file, visstimdir)   
+                    
+        if get_values[3][1] and get_values[3][1]!='None':
+            daqdir=os.path.join(aq, 'ExtraDaq')   
+            unprocesseddaq= [name for name in self.UnprocessedDaqRecordingpaths if get_values[3][1] in name][0]
+            if not os.path.isdir(daqdir):
+                os.mkdir(daqdir)
             
-            files = glob.glob(unprocessedvisstim+'\\**' )
-            for f in files:
-                    shutil.move(f, visstimdir)   
-      
-    def process_aquisition_folder(self, aq):
-        if self.UnprocessedFaceCameraspaths or  self.UnprocessedVisStimpaths: 
-        
-            self.addFaceCamsVisStim(aq)
-        
-        self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-        self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
-        
-        self.UnprocessedFaceCamerasnames=[os.path.split(self.UnprocessedFaceCameraspath)[1] for self.UnprocessedFaceCameraspath in self.UnprocessedFaceCameraspaths]
-        self.UnprocessedFaceCamerasnames=['None']+self.UnprocessedFaceCamerasnames
-        self.UnprocessedVisStimnames=[os.path.split(self.UnprocessedVisStimpaths)[1] for self.UnprocessedVisStimpaths in self.UnprocessedVisStimpaths]
-        self.UnprocessedVisStimnames=['None']+self.UnprocessedVisStimnames
-        
-        if not self.UnprocessedFaceCameraspaths:
-            if os.path.isdir(self.UnprocessedFaceCameras):
-                recursively_eliminate_empty_folders(self.UnprocessedFaceCameras)
-        if not self.UnprocessedVisStimpaths:
-            if os.path.isdir(self.UnprocessedVisStim):
-                recursively_eliminate_empty_folders(self.UnprocessedVisStim) 
-        
-                
-        recursively_eliminate_empty_folders(aq) 
-             
+            file = unprocesseddaq
+            shutil.move(file, daqdir)   
+  
+
     
 #%% raw loading functions 
 
