@@ -9,9 +9,6 @@
 *.mat
 *.png
 *.svg
-nATURALmOVIE1.mat
-naturalmovie3.mat
-mov.mat
 *.hdf5
 
 # OSX / *nix default autosave extension
