@@ -166,8 +166,8 @@ class VoltageSignalsExtractions():
                 self.vis_stim_protocol='AllenC'
                 self.vis_stim_protocol_version='Version A'
 
-      
-    
+        else:
+            self.vis_stim_protocol=None
  
     def process_locomotion(self):
         locomotion_df=self.voltage_signals['Locomotion'].T
