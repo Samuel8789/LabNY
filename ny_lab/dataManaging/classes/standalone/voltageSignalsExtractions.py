@@ -105,9 +105,9 @@ class VoltageSignalsExtractions():
             self.check_vis_stim_stimuli_in_database()
             self.process_visstim_signal()
             self.process_locomotion()
-            self.process_all_signals()
-            self.plotting_paradigm_transitions()
-            self.plotting_grating_transitions()
+            # self.process_all_signals()
+            # self.plotting_paradigm_transitions()
+            # self.plotting_grating_transitions()
             
             
         
