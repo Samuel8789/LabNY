@@ -110,7 +110,7 @@ def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type,
             file_path=os.path.join(current_directory,fname)
             if os.path.isfile(file_path):
                 if file_path.endswith('.tif'):
-                    Ch, Plane = channel_and_plane_of_image(current_directory + os.sep + fname, Multiplane, aq_type)
+                    Ch, Plane,_ = channel_and_plane_of_image(current_directory + os.sep + fname, Multiplane, aq_type)
                     if Ch:
                         ChannelPath = [i for i in ChannelPaths if Ch in i] 
                         
@@ -181,8 +181,6 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     if cleaneduplist:
         for channel in range(1,possible_channels+1):
             chlist=[file_name for file_name in cleaneduplist if  '_Ch{}_'.format(str(channel)) in file_name]
-            
-   
             if chlist:
                 moviestructure['Ch'+str(channel)]={}
             
@@ -249,8 +247,7 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
                 #     moviestructure['Ch'+str(channel)]['aqs']['firstaq']='Ch{}_{}'.format(str(channel),str(1).zfill(6))
                 #     moviestructure['Ch'+str(channel)]['aqs']['lastaq']='Ch{}_{}'.format(str(channel),str(sq_type[2]).zfill(6))
         
-        
-        
+
         
         if correction:
             if sq_type[0]=='TSeries ZSeries Element' or sq_type[0]=='ZSeries':    
@@ -307,14 +304,14 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
                     RedLastFrame='Cycle{}'.format(str(sq_type[1]).zfill(5))
 
 
-             
-                    
                     
         return [ChannelRedExists, ChannelGreenExists,
                 RedFrameNumber, RedFirstFrame, RedLastFrame ,
                 GreenFrameNumber, GreenFirstFrame, GreenLastFrame  ,
                 Multiplane, RedPlaneNumber, GreenPlaneNumber, 
                 FirstRedPlane, LastRedPlane, FirstGreenPlane, LastGreenPlane, sq_type[0]]
+    
+    
     else:        
         return [False, False, 
                 0, False, False, 

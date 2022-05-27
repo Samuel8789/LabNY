@@ -12,6 +12,7 @@ import pandas as pd
 import gc
 import sys
 import tifffile
+import time
 
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .dataset import ImageSequenceDataset
@@ -315,25 +316,28 @@ class Aquisition:
           ChannelGreenExists=False
           PlaneNumber=False
           
-          if os.path.exists(directory_red) or os.path.exists(directory_green):            
-                aq_info=check_channels_and_planes(self.Prairireaqpath, correction)
+          # IF Already have done some processing it can be a numbe rof things
+          
+          if os.path.exists(directory_red) or os.path.exists(directory_green):   
                 correction=True  
+                #here is soem what probmelatic
+                aq_info=check_channels_and_planes(self.Prairireaqpath, correction)
+                
                 if os.path.exists(directory_red):
                     ChannelRedExists=True            
                     folder_selected_list_red = os.listdir(directory_red)
                     if any('plane' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
                         
-                        PlaneNumber=len(folder_selected_list_red) + aq_info[9]
-                        Multiplane=False
-                        if PlaneNumber>1:
-                            Multiplane=True
+                        if aq_info[9]:
+                            PlaneNumber= aq_info[9]
+                        else:
+                            PlaneNumber=len(folder_selected_list_red) + aq_info[9]
+
                     elif any('Volume' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
                         last_cycle=len(folder_selected_list_red) + aq_info[9]
                         PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+'\\**'))     
                         Multiplane=False
-                        if PlaneNumber>1:
-                            Multiplane=True
-
+        
                     else:
                         aq_info =check_channels_and_planes(directory_red, correction)
                     
@@ -342,17 +346,18 @@ class Aquisition:
                     folder_selected_list_green = os.listdir(directory_green)  
       
                     if any('plane' in file_name  for file_name in folder_selected_list_green if os.path.isdir(directory_green + os.sep + file_name)):
-                        PlaneNumber=len(folder_selected_list_green) + aq_info[10]
-                        Multiplane=False
-                        if PlaneNumber>1:
-                            Multiplane=True
+                        # PlaneNumber=len(folder_selected_list_green) + aq_info[10]
+                        
+                        if aq_info[10]:
+                            PlaneNumber= aq_info[10]
+                        else:
+                            PlaneNumber=len(folder_selected_list_green) + aq_info[9]
+                
                             
                     elif any('Volume' in file_name  for file_name in folder_selected_list_green if os.path.isdir(os.path.join(directory_green , file_name))):
-                        last_cycle=len(folder_selected_list_green) + aq_info[9]
+                        last_cycle=len(folder_selected_list_green) + aq_info[10]
                         PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+'\\**'))     
-                        Multiplane=False
-                        if PlaneNumber>1:
-                            Multiplane=True        
+                    
                     else:
                        aq_info=check_channels_and_planes(directory_green, correction)
       
@@ -361,14 +366,18 @@ class Aquisition:
               if aq_info[0]:
                   ChannelRedExists=1
                   PlaneNumber=aq_info[9]     
-                  first_cycle=  int(aq_info[6] [5:]    ) 
-                  last_cycle=  int(aq_info[7]   [5:]   )
+                  first_cycle=  int(aq_info[3][5:] ) 
+                  last_cycle=  int(aq_info[4][5:]   )
 
               if aq_info[1]:
                   ChannelGreenExists=1
                   PlaneNumber=aq_info[10]
                   first_cycle=  int(aq_info[3][5:])
-                  last_cycle=  int(aq_info[4] [5:]   )  
+                  last_cycle=  int(aq_info[4] [5:]  )  
+                  
+          Multiplane=False
+          if PlaneNumber>1:
+              Multiplane=True     
 
           ImagedChannels=['No','No']
           if ChannelRedExists:
@@ -388,8 +397,8 @@ class Aquisition:
                               if not os.path.exists(ChannelPaths[i]+PlanePaths[n]):
                                   os.makedirs(ChannelPaths[i]+PlanePaths[n])
               # move files  
-              # module_logger.info('Moving Files')     
-              Multiplane=aq_info[8]
+              # module_logger.info('Moving Files')   
+              time.sleep(10)
               if correction:
                   if glob.glob(self.Prairireaqpath+'\\**.tif', recursive=False):             
                       move_files(self.Prairireaqpath,ChannelPaths,PlanePaths, Multiplane,aq_info[-1] ) 
@@ -447,7 +456,12 @@ class Aquisition:
                 return  [ImagedChannels, VolumeNumber, all_image_sequence_paths]     
             
           else:        
-              return  [False, False, False]  
+              return  [[], False, []]  
+          
+            
+          
+    def break_up_clean_up(self):
+        pass
 #%%main processors     
 #%%  main raw loader
     def solve_all_datasets(self):
@@ -532,7 +546,7 @@ class Aquisition:
 
 
     def get_all_database_info(self):
-        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath'] ==     self.mouse_aquisition_path]['ID'].iloc[0]  
+        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]  
         if self.aq_ID:
             self.full_database_dictionary=self.mouse_imaging_session_object.mouse_object.Database_ref.ImagingDatabase_class.get_single_acquisition_database_info(self.aq_ID)
             self.acquisition_database_info= self.full_database_dictionary['Acq']
@@ -758,9 +772,9 @@ class Aquisition:
         self.unload_all_datasets()
         self.unload_reference_images()
         
-    def load_results_analysis(self):
+    def load_results_analysis(self,nondatabase=None, new_full_data=False):
         
-        self.analysis_object=ResultsAnalysis(acquisition_object=self)
+        self.analysis_object=ResultsAnalysis(acquisition_object=self, nondatabase=nondatabase, new_full_data=new_full_data)
         
  
     def get_associated_tomato_fov_datasets(self):

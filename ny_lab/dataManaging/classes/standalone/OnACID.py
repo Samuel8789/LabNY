@@ -52,8 +52,14 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     opts = cnmf.params.CNMFParams(params_dict=parameter_dict)
 
     # %% fit online
+    #stadard cnmf
+        # images = cm.load(fnamestemp)
+        # cnm = cnmf.CNMF(params_dict= opts)
+        # cnm.fit_file(include_eval=True)
+
+    
+    
     try:
-        # cnm = cnmf.online_cnmf.OnACID(path=path)
         cnm = cnmf.online_cnmf.OnACID(params=opts)
         module_logger.info('start processing')
         preprocetime=time.time()
@@ -73,7 +79,11 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
 
     mmap_directory, caiman_filename=os.path.split(fnamestemp)
     good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
-    MC_onacid_file_path='_'.join([os.path.join(mmap_directory, good_filename),'MC_OnACID'])
+    if initial_shallow:
+        MC_onacid_file_path='_'.join([os.path.join(mmap_directory, good_filename),'MC_OnACID'])
+    else:
+        MC_onacid_file_path='_'.join([os.path.join(mmap_directory, good_filename)])
+
     if mot_corretc:
         shifts = cnm.estimates.shifts[-cnm.estimates.C.shape[-1]:]   
         if save_mot_correct:

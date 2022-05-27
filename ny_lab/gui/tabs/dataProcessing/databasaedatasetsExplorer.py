@@ -47,6 +47,8 @@ class MouseDatasetsPanel(tk.Toplevel):
             self.gui_ref=gui 
             self.datamanaging=self.gui_ref.datamanaging
         self.geometry("+2555+0")
+        self.selected_acquisition_object=None
+        
 #%%'Imaging Session' 
         # self.vmax_default=1
         # self.vmax=self.vmax_default
@@ -110,8 +112,8 @@ class MouseDatasetsPanel(tk.Toplevel):
         self.frame1.frame1.listboxes={}
         self.frame1.frame1.listbox_variables={}
         self.frame1.frame1.scrollbar ={}
+        
         for i, litbox_name in enumerate(self.frame1.frame1.litbox_names):
-     
             self.frame1.frame1.listbox_variables[litbox_name]=StringVar()  
             self.frame1.frame1.listboxes[litbox_name]=Listbox(self.frame1.frame1, listvariable=self.frame1.frame1.listbox_variables[litbox_name], width=10, height=10, exportselection=0)
             self.frame1.frame1.scrollbar [litbox_name]= Scrollbar(self.frame1.frame1) 
@@ -122,8 +124,6 @@ class MouseDatasetsPanel(tk.Toplevel):
         self.get_all_objects()
 
         
-
-    
         self.frame1.frame1.listboxes[ self.frame1.frame1.litbox_names[0]].bind('<<ListboxSelect>>', self.get_mouse_info_and_data)
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].bind('<<ListboxSelect>>', self.get_acquisition_info)
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[2]].bind('<<ListboxSelect>>', self.get_dataset_info)
@@ -215,6 +215,7 @@ class MouseDatasetsPanel(tk.Toplevel):
         for i in range(len(self.frame1.frame2.labels_names)):
             self.frame1.frame2.labels[self.frame1.frame2.labels_names[i]]=ttk.Label(self.frame1.frame2, text=self.frame1.frame2.labels_names[i], width=25)
                
+                
         for i, label in enumerate(self.frame1.frame2.labels_names):
             self.frame1.frame2.labels[label].grid(column=0, row=i)            
       
@@ -543,7 +544,6 @@ class MouseDatasetsPanel(tk.Toplevel):
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[1]].set(acquisitions)   
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].config(width=0,height=0)
         
-
     def get_acquisition_datasets(self):   
         selected_acq_datasets= list(self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'].keys())
         # for listbox_var in   self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[2:]]:
@@ -552,24 +552,18 @@ class MouseDatasetsPanel(tk.Toplevel):
            listbox_var.set(selected_acq_datasets)   
            self.frame1.frame1.listboxes[var_name].config(width=0,height=0)
 
-           
-           
         self.frame2.frame1.listbox_variables[list(self.frame2.frame1.listbox_variables.keys())[0]].set(selected_acq_datasets) 
         self.frame2.frame1.listboxes[list(self.frame2.frame1.listboxes.keys())[0]].config(width=0,height=0)
 
-
-                
     def get_dataset_objects(self):
         # self.selected_dataset_object=self.selected_acquisition_object.all_datasets[self.selected_dataset]
         self.selected_dataset_objects={}
         for key, val in  self.selected_datasets.items():
             self.selected_dataset_objects[key]=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'][val]['Object']
-            
-                   
+                     
     def load_selected_datasets(self):
         
         self.selected_acquisition_object.load_vis_stim_info()
-        self.selected_acquisition_object.load_voltage_signals()
         
         for key, val in   self.selected_dataset_objects.items():
             val.summary_images_object.load_projections()
@@ -578,23 +572,12 @@ class MouseDatasetsPanel(tk.Toplevel):
         for key, val in   self.selected_dataset_objects.items():
             val.unload_dataset()
             
-    def unload_all_metadata_button(self): 
-        self.unload_all_metadata()
-        
-    def unload_all_metadata(self):
-        self.selected_acquisition_object.unload_all()
-          
- 
     def get_mouse_object(self):
         
         self.selected_mouse_object= self.mice_objects[self.mouse_code]['Object']
         
-        
-        
     def get_acquisition_object(self):
         self.selected_acquisition_object=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Object']
-        
-
         
     def get_mouse_info_and_data(self, event):
         selection = self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[0]].curselection()
@@ -604,6 +587,8 @@ class MouseDatasetsPanel(tk.Toplevel):
             self.get_mouse_object()
             self.get_all_mouse_acquisitions()
             self.get_all_mouse_database_info()
+            self.plot_widefield()
+
         else:
             pass
              
@@ -617,6 +602,7 @@ class MouseDatasetsPanel(tk.Toplevel):
             self.get_mouse_imaging_session_from_acquisition()
             self.plot_widefield()
 
+
             # self.get_acq_metadata()
            
             # self.get_ac_facecam()
@@ -626,9 +612,6 @@ class MouseDatasetsPanel(tk.Toplevel):
         else:
             pass 
 
-    def get_acq_metdata_button(self):
-        self.get_acq_metadata()
-        
     def get_acq_metadata(self):
         # self.selected_acquisition_object.load_metadata_slow_working_directories()
         self.selected_acquisition_object.load_metadata_slow_working_directories()       
@@ -637,18 +620,10 @@ class MouseDatasetsPanel(tk.Toplevel):
         for i, label in enumerate(self.frame2.frame3.labels_names):  
             
             if self.metadata_dict[label] is not np.nan: 
-           
-            
                 self.frame2.frame3.labels_values_variables[label].set( self.metadata_dict[label])
             else:
                 self.frame2.frame3.labels_values_variables[label].set('NA')
 
-    def get_mouse_imaging_session_from_acquisition(self):
-        self.imaging_session=self.selected_acquisition_object.mouse_imaging_session_object
-        
-        
-
-        
     def get_dataset_info(self, event):
         self.selected_datasets={}
         
@@ -780,7 +755,6 @@ class MouseDatasetsPanel(tk.Toplevel):
             except:
                 print('kalman not transfered')
        
-
     def transfer_kalman_to_desktop_button(self):
         self.transfer_kalman_to_desktop()
 
@@ -797,9 +771,6 @@ class MouseDatasetsPanel(tk.Toplevel):
             except:
                 print('caiman not transfered')
      
-
-
-
     def transfer_caiman_to_desktop_button(self):
         self.transfer_caiman_to_desktop()
 
@@ -815,8 +786,6 @@ class MouseDatasetsPanel(tk.Toplevel):
 
             except:
                 print('facecam not transfered')
-      
-  
 
     def transfer_facecam_to_desktop_button(self):
         self.transfer_facecam_to_desktop()
@@ -838,11 +807,12 @@ class MouseDatasetsPanel(tk.Toplevel):
         
     def open_slow_mouse_directory_action(self):
         
-        os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging'))
+        os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging', self.imaging_session_name))
                
     def open_raw_acquisition_directory_action(self):
         
-        os.startfile(self.datamanaging.all_existing_sessions_not_database_objects[ self.imaging_session].imaging_session_mice_path+'\\'+self.mouse_code)
+        os.startfile(self.selected_acquisition_object.acquisition_database_info['AcquisitonRawPath'][0])
+        
     def open_dataset_directory_action(self):
         
         os.startfile(self.selected_dataset_to_copy_object.selected_dataset_mmap_path)
@@ -855,27 +825,34 @@ class MouseDatasetsPanel(tk.Toplevel):
 
     def switch_red_button(self):
         pass
-    
-     
+
     def plot_widefield(self, *a):
+        
+        widefieldob=self.selected_mouse_object.all_mouse_acquisitions[list(self.selected_mouse_object.all_mouse_acquisitions.keys())[-1]].mouse_imaging_session_object.\
+                widefield_image[list(self.selected_mouse_object.all_mouse_acquisitions[list(self.selected_mouse_object.all_mouse_acquisitions.keys())[-1]].mouse_imaging_session_object.\
+                        widefield_image.keys())[0]]      
+        
+        if self.selected_acquisition_object:
                                                                                                     
-        widefieldob=self.selected_acquisition_object.mouse_imaging_session_object.\
-                widefield_image[list(self.selected_acquisition_object.mouse_imaging_session_object.\
-                        widefield_image.keys())[0]]
-        widefieldob.load_image()
-        self.frame1.frame3_widefield=widefieldob.widefield_image
-                
+            widefieldob=self.selected_acquisition_object.mouse_imaging_session_object.\
+                    widefield_image[list(self.selected_acquisition_object.mouse_imaging_session_object.\
+                            widefield_image.keys())[0]]
+             
+                    
+        widefieldob.load_all()
         self.frame1.frame3.ax.clear()
-        self.frame1.frame3.ax.imshow(self.frame1.frame3_widefield, cmap='inferno')
+        widefieldob.plot_image(self.frame1.frame3.ax)
+        widefieldob.plot_rois(self.frame1.frame3.ax)
+        
         self.frame1.frame3.canvas.draw()   
-        
-        
-        
-        
         
     def plot_signals_button(self):
         t=time.time()
         print('Plotting signals')
+        self.selected_acquisition_object.load_voltage_signals()
+        self.selected_acquisition_object.voltage_signal_object.signal_extraction_object()
+
+
         self.plot_signals()
         elapsed=time.time()-t
 
@@ -883,36 +860,32 @@ class MouseDatasetsPanel(tk.Toplevel):
         pass
         
     def plot_signals(self):
-        
 
         for i in self.frame2.frame2.axs:
             i.clear()
             
         self.frame2.frame2.canvas.draw()  
-
         dats=[]
         if not self.selected_acquisition_object.voltage_signal_object.no_voltage_signals:
             if hasattr(self.selected_acquisition_object.voltage_signal_object.extraction_object, 'rectified_speed_array'):               
-                dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.rectified_speed_array)
+                dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.rectified_speed_array['Prairire']['Locomotion'])
             else:
                dats.append(np.array([False]) )
                
             for signal in self.selected_acquisition_object.voltage_signal_object.voltage_signals_dictionary.keys():
-                dats.append(self.selected_acquisition_object.voltage_signal_object.voltage_signals_dictionary[signal])
+                if signal!= 'Time':
+                    dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.get_specific_signal(signal)['Prairire'][signal])
 
             # for n, ax in  enumerate(self.frame2.frame2.axs):
             for n, dat in  enumerate(dats):
                     self.frame2.frame2.axs[n].clear()
                     self.frame2.frame2.canvas.draw()  
                     self.frame2.frame2.axs[n].plot(dat)
-
-        else:
-       
+        else:      
            dats.append(np.array([False]))
            self.frame2.frame2.axs[0].clear()
            self.frame2.frame2.axs[0].plot(dats[0])
-        
-        
+           
         self.frame2.frame2.canvas.draw()   
    
     def plot_dataset_projections(self, *a):
@@ -1006,6 +979,23 @@ class MouseDatasetsPanel(tk.Toplevel):
                     image_frame.ax.clear()
                     image_frame.ax.imshow(dataset_final, cmap='inferno', aspect='equal')
                     image_frame.canvas.draw()   
+                    
+                    
+                    
+    def get_acq_metdata_button(self):
+        self.get_acq_metadata()
+
+
+    def get_mouse_imaging_session_from_acquisition(self):
+        self.imaging_session=self.selected_acquisition_object.mouse_imaging_session_object
+        self.imaging_session_name=self.imaging_session.imaging_session_name
+        
+        
+    def unload_all_metadata_button(self): 
+        self.unload_all_metadata()
+        
+    def unload_all_metadata(self):
+        self.selected_acquisition_object.unload_all()    
                     
 #%% main startup
 if __name__ == "__main__":

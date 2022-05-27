@@ -18,6 +18,8 @@ class WidgetSelectStockCageMice(tk.Frame):
             self.exp_code=exp_code
             self.cage_list=cage_list
             self.parent=frame
+            self.parent.selected_mice=None
+
             self.dat_ref=MouseDat
             
             self.cage=IntVar()   

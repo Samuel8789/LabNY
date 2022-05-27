@@ -713,7 +713,7 @@ class ExperimentalDatabase():
             if codes_selected:
                 current_max_window=self.plan_new_single_window( mouse_window_parameters, lab_number_selected=False, codes_selected=mouse_window_parameters[0], max_window=current_max_window )
             elif lab_number_selected:
-                current_max_window=self.plan_new_single_window( mouse_window_parameters, lab_number_selected=mouse_window_parameters[0], codes_selected=False, max_window=current_max_window )
+                current_max_window=self.plan_new_single_window( mouse_window_parameters, lab_number_selected=int(mouse_window_parameters[0]), codes_selected=False, max_window=current_max_window )
 
         self.databse_ref.independent_commit()    
 

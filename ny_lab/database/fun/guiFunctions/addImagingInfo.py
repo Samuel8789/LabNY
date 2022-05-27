@@ -48,6 +48,8 @@ class AddImagingInfo(tk.Toplevel):
                             self.b[i][j].insert("1.0",('920'))
                         elif i==7:
                             self.b[i][j].insert("1.0",('2000'))
+                        else:
+                            self.b[i][j].insert("1.0",('TO DO'))
                         
                     elif i==1:
                         values=['HQ525/70 M-2P 243899','BrightLine Fluorescent Filter 500/24','S510/20 XP 269755','D510/40 M 5633'] 

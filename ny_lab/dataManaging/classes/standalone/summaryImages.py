@@ -19,9 +19,11 @@ import sys
 module_logger = logging.getLogger(__name__)
 
 # from save_imagej_hdf5_tiff import save_imagej_hdf5
-from .save_imagej_hdf5_tiff import save_imagej_hdf5
-from ...functions.transform_path import transform_path
-
+try:
+    
+    from .save_imagej_hdf5_tiff import save_imagej_hdf5
+except:
+    from save_imagej_hdf5_tiff import save_imagej_hdf5
 
 
 

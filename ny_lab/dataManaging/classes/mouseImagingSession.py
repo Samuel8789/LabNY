@@ -89,7 +89,8 @@ class MouseImagingSession():
 
             # this organizez folders in permanent directiory
             self.raw_session_preprocessing()
-            print('Finished Session Preprocessing')
+            print('Finished Folder Organization')
+           
             #then create acquisitoin objects and copy to slow , this is slow because of metadta read
             
             try:
@@ -106,6 +107,7 @@ class MouseImagingSession():
                 # self.load_raw_atlas()
             except:
                 module_logger.exception('Something wrong with loading acquisitions ' +   self.mouse_raw_imaging_session_path)
+            print('Finished Session Preprocessing')
 
 
         elif self.imaging_session_ID:
@@ -165,14 +167,14 @@ class MouseImagingSession():
         module_logger.info('organizing folders slow')
 
         self.raw_Coordinate0path=os.path.join(self.mouse_raw_imaging_session_path,'0CoordinateAcquisiton')   
-        self.raw_Coordinate0path=os.path.join(self.mouse_raw_imaging_session_path,'NonImagingAcquisitions')  
+        self.raw_Noniima=os.path.join(self.mouse_raw_imaging_session_path,'NonImagingAcquisitions')  
         self.Testacquisitionspath=os.path.join(self.mouse_raw_imaging_session_path,'TestAcquisitions') 
         self.correctComplexacquisitonsNames('FOV_')
         self.correctComplexacquisitonsNames('Atlas_')
         self.all_fovs=glob.glob(self.mouse_raw_imaging_session_path +'\\FOV_**', recursive=False) 
         self.all_atlases=glob.glob(self.mouse_raw_imaging_session_path +'\\Atlas_**', recursive=False) 
         
-        self.all_simple_Aq_folders=[self.raw_Coordinate0path, self.raw_Coordinate0path, self.Testacquisitionspath]
+        self.all_simple_Aq_folders=[self.raw_Coordinate0path, self.raw_Noniima, self.Testacquisitionspath]
         
         self.all_FOVs_all_Aq_folders={}       
         for fov_path in self.all_fovs:

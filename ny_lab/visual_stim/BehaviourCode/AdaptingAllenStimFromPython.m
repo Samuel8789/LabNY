@@ -1,4 +1,4 @@
-allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\';
+allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\HakimMonitor';
 load(fullfile(allenpath,'locally_sparse_noise_1.mat'));
 locally_sparse_noise_all_warped_frames_1=locally_sparse_noise_all_warped_frames;
 load(fullfile(allenpath,'locally_sparse_noise_2.mat'));
@@ -10,6 +10,8 @@ locally_sparse_noise_all_warped_frames_4=locally_sparse_noise_all_warped_frames;
 load(fullfile(allenpath,'locally_sparse_noise_5.mat'));
 locally_sparse_noise_all_warped_frames_5=locally_sparse_noise_all_warped_frames;
 locally_sparse_noise_all_warped_frames_full=cat(1,locally_sparse_noise_all_warped_frames_1, locally_sparse_noise_all_warped_frames_2, locally_sparse_noise_all_warped_frames_3, locally_sparse_noise_all_warped_frames_4, locally_sparse_noise_all_warped_frames_5);
+% locally_sparse_noise_all_warped_frames_full=cat(1,locally_sparse_noise_all_warped_frames_1, locally_sparse_noise_all_warped_frames_2, locally_sparse_noise_all_warped_frames_3);
+
 locally_sparse_noise_all_warped_frames_full=permute(locally_sparse_noise_all_warped_frames_full,[2,3,1]);
 save( 'locally_sparse_noise_full.mat','locally_sparse_noise_all_warped_frames_full','-v7.3');
 clear all
@@ -18,7 +20,7 @@ locally_sparse_noise_all_warped_frames_full(locally_sparse_noise_all_warped_fram
 save( 'locally_sparse_noise_full_135.mat','locally_sparse_noise_all_warped_frames_full','-v7.3');
 clear all
 % 
-allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\';
+allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\HakimMonitor';
 
 load(fullfile(allenpath,'natural_movie_one_1.mat'));
 natural_movie_one_all_warped_frames=permute(natural_movie_one_all_warped_frames,[2,3,1]);
@@ -34,7 +36,7 @@ natural_scenes_all_warped_frames=permute(natural_scenes_all_warped_frames,[2,3,1
 imshow(squeeze(natural_scenes_all_warped_frames(:,:,1)))
 save('natural_scenes.mat','natural_scenes_all_warped_frames');
 clear all
-allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\';
+allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\HakimMonitor';
 
 % % 
 load(fullfile(allenpath,'natural_movie_three_1.mat'));
@@ -46,10 +48,12 @@ natural_movie_three_all_warped_frames_3=natural_movie_three_all_warped_frames;
 load(fullfile(allenpath,'natural_movie_three_4.mat'));
 natural_movie_three_all_warped_frames_4=natural_movie_three_all_warped_frames;
 natural_movie_three_all_warped_frames_full=cat(1,natural_movie_three_all_warped_frames_1, natural_movie_three_all_warped_frames_2,natural_movie_three_all_warped_frames_3,natural_movie_three_all_warped_frames_4);
+% natural_movie_three_all_warped_frames_full=cat(1,natural_movie_three_all_warped_frames_1, natural_movie_three_all_warped_frames_2);
+
 natural_movie_three_all_warped_frames_full=permute(natural_movie_three_all_warped_frames_full,[2,3,1]);
 save('natural_movie_three_full.mat','natural_movie_three_all_warped_frames_full','-v7.3');
 clear all
-allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\';
+allenpath='C:\Users\sp3660\Documents\Projects\AllenBrainObservatory\HakimMonitor';
 
 
 % load('locally_sparse_noise_full.mat');

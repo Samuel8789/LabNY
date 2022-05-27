@@ -14,7 +14,7 @@ from project_manager.ProjectsCLass import Project
 from .database import MouseDatabase
 from .dataManaging.data_managing import DataManaging
 from .gui.gui import Gui
-from ny_lab.AllFunctions.select_values_gui import select_values_gui
+from .AllFunctions.select_values_gui import select_values_gui
 import logging 
 module_logger = logging.getLogger(__name__)
 
@@ -25,7 +25,9 @@ class RunNYLab(Project):
         #loadmicedatabase     
         
         self.databasefile=os.path.join(Project.all_paths_for_this_system['Dropbox'],'LabNY', 'MouseDatabase.db')
-        self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
+        # self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
+        self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others']    
+
 
         module_logger.info('Loading Mouse Database')
         self.database=MouseDatabase(self.databasefile, self)   

@@ -10,30 +10,45 @@ import os
 import glob
 import gc
 import sys
+import shutil
 
 # from OnACID import run_on_acid
 # from metadata import Metadata
 # from motionCorrectedKalman import MotionCorrectedKalman
 # from summaryImages import SummaryImages
 # import caiman as cm
-from .OnACID import run_on_acid
-from .metadata import Metadata
-from .caimanResults import CaimanResults
-from ...functions.transform_path import transform_path
-
+try:
+    from .OnACID import run_on_acid
+    from .metadata import Metadata
+    from .caimanResults import CaimanResults
+except:
+    from standalone.OnACID import run_on_acid
+    from standalone.metadata import Metadata
+    from standalone.caimanResults import CaimanResults
+    
 
 # from .motionCorrectedKalman import MotionCorrectedKalman
 # from .summaryImages import SummaryImages
 import logging 
 module_logger = logging.getLogger(__name__)
 from caiman.source_extraction import cnmf as cnmf
-
+import paramiko
+import pickle
+import time
+from datetime import datetime
 
 class CaimanExtraction():
     
     def __init__(self, bidishifted_movie_path=None, metadata_file_path=None, temporary_path=None, first_pass_mot_correct=False, 
-                 save_mot_correct=False, metadata_object=None, force_run=False, dataset_object=None, deep=False):
+                 save_mot_correct=False, metadata_object=None, force_run=False, dataset_object=None, 
+                 deep=False,
+                 new_parameters: dict=False,
+                 galois=False):
+        
         module_logger.info('Instantiating ' +__name__)
+        self.temp_path=r'C:\Users\sp3660\Desktop\CaimanTemp'
+        self.galoistempdir='/home/sp3660/Desktop/caiman_temp'
+        
         self.dataset_object=dataset_object
         self.deep=deep
         self.metadata_object=metadata_object
@@ -53,19 +68,28 @@ class CaimanExtraction():
         if self.bidishifted_movie_path:
             self.get_info_from_metadata()
             self.set_caiman_parameters()
+            
+            if new_parameters:
+                self.change_set_parameters(**new_parameters)
 
             if first_pass_mot_correct: 
                 self.dataset_caiman_parameters['epochs']=1
                 self.save_mot_correct=True
                 self.dataset_caiman_parameters['use_cnn']=False
-            else:
-                self.dataset_caiman_parameters['motion_correct']=False
-
-            self.apply_caiman()
-            self.check_motion_corrected_on_acid()
-            self.check_caiman_files()
-            self.check_shifts_files()
-            self.remove_unclipped_issue_shifted_movies()
+                
+            if not galois:
+                self.apply_caiman()
+                self.check_motion_corrected_on_acid()
+                self.check_caiman_files()
+                self.check_shifts_files()
+                self.remove_unclipped_issue_shifted_movies()
+                
+            elif galois:
+                self.run_galois_caiman()
+                self.check_motion_corrected_on_acid()
+                self.check_caiman_files()
+                self.check_shifts_files()
+                self.remove_unclipped_issue_shifted_movies()
             
         elif self.temporary_path:
             self.check_motion_corrected_on_acid()
@@ -73,6 +97,22 @@ class CaimanExtraction():
             self.check_shifts_files()
             # self.load_cnmf_object()
             # self.unload_cnmf_object()
+            
+            
+    def temp_file_to_fast_disk(self):
+        self.original_path= self.dataset_caiman_parameters['fnames']
+        shutil.copyfile(self.dataset_caiman_parameters['fnames'],os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1]))
+        self.dataset_caiman_parameters['fnames']=os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1])
+        
+        
+    def copy_fast_results_remove_all(self):
+        
+        caiman_file=glob.glob(self.temp_path+'\**.hdf5')[0]
+        shutil.copyfile(caiman_file,os.path.join(os.path.split(self.original_path)[0],os.path.split(caiman_file)[1]))
+        
+        filelist = glob.glob(os.path.join(self.temp_path, "*"))
+        for f in filelist:
+            os.remove(f)
 
     def eliminate_caiman_extra_from_mmap(self) :   
         caiman_filename=None
@@ -130,6 +170,14 @@ class CaimanExtraction():
             module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
 
                 # 1/(float(datasetmeta[2][1][0]['absoluteTime'])-float(datasetmeta[2][0][0]['absoluteTime']))
+                
+    def change_set_parameters(self,**kwargs):
+        
+        for param,value in kwargs.items():
+            self.dataset_caiman_parameters[param]=value
+       
+                
+                
     def set_caiman_parameters(self):
   
         fr = 1/self.volume_period  # frame rate (Hz) 3pl + 4ms = 15.5455
@@ -140,7 +188,7 @@ class CaimanExtraction():
         ds_factor = 1  # spatial downsampling factor (increases speed but may lose some fine structure)
         gnb = 2  # number of background components
         gSig = tuple(np.ceil(np.array(gSig) / ds_factor).astype('int')) # recompute gSig if downsampling is involved
-        mot_corr = True  # flag for online motion correction
+        mot_corr = False  # flag for online motion correction
         pw_rigid = False  # flag for pw-rigid motion correction (slower but potentially more accurate)
         max_shifts_online = 10  # maximum allowed shift during motion correction
         sniper_mode = True  # use a CNN to detect new neurons (o/w space correlation)
@@ -194,11 +242,13 @@ class CaimanExtraction():
                     module_logger.info('Caiman not run, files already there with custom file' + self.bidishifted_movie_path )
                     self.load_cnmf_object()
                 
-                elif self.force_run and self.caiman_path==self.caiman_full_path and self.mc_onacid_path==self.mc_onacid_full_path :
+                elif self.force_run and self.caiman_path==self.caiman_full_path and self.mc_onacid_path==self.mc_onacid_full_path and not self.deep:
                     module_logger.info('Rerunning caiman with custom length movie ' + self.bidishifted_movie_path )
         
                     try:
+                        self.temp_file_to_fast_disk()
                         self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
+                        self.copy_fast_results_remove_all()
                         # self.remove_unclipped_issue_shifted_movies()
                     except:
                             module_logger.exception('Something wrong with On Acid processing ' + self.bidishifted_movie_path )
@@ -208,14 +258,19 @@ class CaimanExtraction():
                     self.dataset_caiman_parameters['fnames']=self.mc_onacid_path
         
                     try:
+                        self.temp_file_to_fast_disk()
                         self.cnm_object_deep=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct)
+                        self.copy_fast_results_remove_all()
                         # self.remove_unclipped_issue_shifted_movies()
                     except:
                             module_logger.exception('Something wrong with deep On Acid ' + self.bidishifted_movie_path )
                     
         else:  
             try:
+                self.temp_file_to_fast_disk()
                 self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
+                self.copy_fast_results_remove_all()
+
             except:
                     module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
 
@@ -325,8 +380,83 @@ class CaimanExtraction():
         if not caiman_file_path:
             caiman_file_path=self.caiman_path       
         self.CaimanResults_object=CaimanResults(caiman_file_path,  dataset_object=self.dataset_object, caiman_object=self)
+        
+        
+    def run_galois_caiman(self):
+        
+        self.cnm_object=None
+       
+        filetocopy= self.dataset_caiman_parameters['fnames']
+        scripttocoy=r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_pre_processing\galois_caiman.py'
+        paramstocopy= os.path.join( self.temp_path,'parameter_dict.pkl' )
 
-                                      
+        destination=self.galoistempdir+'/'+ os.path.split(filetocopy)[1]
+        scriptdest= self.galoistempdir+'/'+ os.path.split(scripttocoy)[1]
+        paramsdest= self.galoistempdir+'/'+ os.path.split(paramstocopy)[1]
+        
+        dirosavehdf5=os.path.split(filetocopy)[0]
+        
+        self.dataset_caiman_parameters['fnames']=destination
+        self.dataset_caiman_parameters['pipeline']='onacid'#'cnmf' 'onacid'
+        self.dataset_caiman_parameters['refit']=False
+
+        with open(paramstocopy, 'wb') as f:
+            # Pickle the 'data' dictionary using the highest protocol available.
+            pickle.dump( self.dataset_caiman_parameters, f, pickle.HIGHEST_PROTOCOL)
+               
+
+        with paramiko.SSHClient() as ssh:
+            
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect("192.168.0.244", username="sp3660",
+                        key_filename=os.path.join(os.path.expanduser('~'), ".ssh", "galois"))
+
+            start_transfer=time.time()
+            sftp = ssh.open_sftp() 
+            # sftp.put(filetocopy, destination)
+            sftp.put(scripttocoy, scriptdest)
+            sftp.put(paramstocopy, paramsdest)
+            sftp.close()
+            transfer_duration = time.time() - start_transfer
+            print('Transfer Finsihed: {}'.format(transfer_duration/60))
+            
+            start_processing=time.time()
+            
+            now = datetime.now()
+            current_time = now.strftime("%H:%M:%S")
+            print('Start Processing: {}'.format(current_time))
+            cmd_run_caiman="source ~/miniconda3/bin/activate caiman; cd Desktop/caiman_temp ;python galois_caiman.py" 
+            stdin, stdout, stderr = ssh.exec_command(cmd_run_caiman)
+            channel = stdout.channel
+            status = channel.recv_exit_status()
+            err=stderr.readlines()
+
+            processing_duration = time.time() - start_processing
+            print('Processing Finsihed: {}'.format(processing_duration/60))
+            
+            cmd="ls  '/home/sp3660/Desktop/caiman_temp' | grep \.hdf5" 
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            channel = stdout.channel
+            status = channel.recv_exit_status()
+            file=stdout.readlines()
+            fullfilepath=self.galoistempdir+'/'+ file[0][:-1]
+            hdf5destination=os.path.join(dirosavehdf5, os.path.split(fullfilepath)[1])
+            
+            sftp = ssh.open_sftp() 
+            sftp.get(fullfilepath, hdf5destination)
+            sftp.close()
+            
+            self.cnm_object=cnmf.cnmf.load_CNMF(hdf5destination)
+            
+            
+            cmd="rm -rf '/home/sp3660/Desktop/caiman_temp/*' " 
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            
+            filelist = glob.glob(os.path.join(self.temp_path, "*"))
+            for f in filelist:
+                os.remove(f)
+    
+       
 
 if __name__ == "__main__":
     # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIK3planeallen\Plane3'

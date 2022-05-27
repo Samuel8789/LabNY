@@ -18,16 +18,15 @@ import json
 import copy
 from dateutil import parser
 module_logger = logging.getLogger(__name__)
-# from recursively_read_metadata import recursively_read_metadata
-# from select_values_gui import select_values_gui
-# from manually_get_some_metadata import manually_get_some_metadata
 
-
-from .recursively_read_metadata import recursively_read_metadata
-from .select_values_gui import select_values_gui
-from .manually_get_some_metadata import manually_get_some_metadata
-
-
+try :
+    from .recursively_read_metadata import recursively_read_metadata
+    from .select_values_gui import select_values_gui
+    from .manually_get_some_metadata import manually_get_some_metadata
+except:
+    from recursively_read_metadata import recursively_read_metadata
+    from select_values_gui import select_values_gui
+    from manually_get_some_metadata import manually_get_some_metadata
 
 #%%
 class Metadata():
@@ -39,7 +38,9 @@ class Metadata():
                  voltageoutput_metadataPath=False, 
                  imaging_database_row=None,
                  temporary_path=None,
-                 acquisition_directory_raw=None, aquisition_object=None, from_database=False):
+                 acquisition_directory_raw=None, 
+                 aquisition_object=None,
+                 from_database=False):
         module_logger.info('Processing Metadata')
         
         self.temporary_path=temporary_path
@@ -47,30 +48,33 @@ class Metadata():
         self.full_mark_points_metadata=None
         self.acquisition_directory_raw=acquisition_directory_raw
         self.full_voltage_recording_metadata=None
-        self.all_frames=[]
-        self.all_volumes=[]
-        self.video_params=[]
-        self.timestamps={}
-        self.params=[]
         self.imaging_metadata_file=aq_metadataPath
         self.photostim_file=photostim_metadataPath
         self.voltage_file=voltagerec_metadataPath
         self.voltage_output=voltageoutput_metadataPath
-        self.check_metadata_in_folder()
         self.full_metadata=None
         self.full_voltage_recording_metadata=None
         self.imaging_metadata=None
         self.translated_imaging_metadata=None
         self.recorded_signals_csv=None
         self.recorded_signals=None
+        self.all_frames=[]
+        self.all_volumes=[]
+        self.video_params=[]
+        self.timestamps={}
+        self.params=[]
+
+        self.check_metadata_in_folder()
+  
 
         if self.aquisition_object:
+            self.read_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'imaging_metadata.json')
+            self.timestamps_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'timestamps.json')
+            self.read_voltage_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'voltage_metadata.json')
+            
             if from_database:
                 self.get_all_metadata_from_database()
             else:
-                self.read_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'imaging_metadata.json')
-                self.timestamps_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'timestamps.json')
-                self.read_voltage_metadata_path=os.path.join(self.aquisition_object.slow_storage_all_paths['metadata'],'voltage_metadata.json')
                 module_logger.info('readig metdata from json')
                 self.read_json_metadata()
                 
@@ -102,7 +106,6 @@ class Metadata():
             if self.aquisition_object:
                 self.save_metadata_as_json()  
                 
-        
     
         # if self.video_params:    
         #     self.plotting()    
@@ -132,7 +135,8 @@ class Metadata():
             tree = ET.parse( self.photostim_file)
             root = tree.getroot()
             self.full_mark_points_metadata=recursively_read_metadata(root)  
-
+            self.process_photostim_metadata()
+            
     def process_voltage_recording(self):
        
         if not self.full_voltage_recording_metadata:
@@ -289,6 +293,8 @@ class Metadata():
                     self.video_params['StageGridNumXPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumXPositions']
                 
                 for i, volume in enumerate(volumes.values()):
+                    if i==len(volumes.values()):
+                        print('x')
                     all_planes={}
                     planes={ key:plane for key, plane in volume['Childs'].items() if 'Frame' in key}
                     for i, plane in enumerate(planes.values()):
@@ -348,8 +354,11 @@ class Metadata():
         
                          all_planes[i]=iplane
                     # this is because sometime sthe first xy positions were workng     
-                    all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
-                    all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
+                    
+                    if i!=len(volumes.values()):
+                        if len(all_planes.keys())>1:
+                            all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
+                            all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
                     self.all_volumes.append(all_planes)  
 
                     # this is because i had metadata with 1 extra volume with 2 planes only
@@ -662,40 +671,47 @@ class Metadata():
         
     def process_photostim_metadata(self):
 
-        tree = ET.parse(self.photostim_file)
-        root = tree.getroot()
-
-        Experiment={ 'Iterations': root.attrib['Iterations'],
-                               'Iteration Delay': root.attrib['IterationDelay'],
+        Experiment={ 'Iterations': int(self.full_mark_points_metadata['Iterations']),
+                               'Iteration Delay': self.full_mark_points_metadata['IterationDelay'],
+                               
+                               
                               'PhotoStimSeries':{}}
-        
-        i=0
-        
-        for photostim in root:   
-            Experiment['PhotoStimSeries']['PhotostimExperiment'+str(i+1)]={}
-            sequence={'Point Order': photostim[0].attrib['Indices'],
-                        'StimDuration':photostim[0].attrib['Duration'],
-                        'InterpointDuration':photostim[0].attrib['InterPointDelay'],
-                        'Repetitions':photostim.attrib['Repetitions'],                                                                        
-                        'RelativeDelay':photostim[0].attrib['InitialDelay'],
-                        'SpiralRevolutions':photostim[0].attrib['SpiralRevolutions'],
-                        }
-            Experiment['PhotoStimSeries']['PhotostimExperiment'+str(i+1)]['sequence']=sequence
-            points=[] 
+        experiment_count=1
+        for  name, photstim_inf in self.full_mark_points_metadata.items():  
             
-            for point in photostim[0]:
-                points.append({'index':point.attrib['Index'],
-                             'x_pos':point.attrib['X'],
-                             'y_pos':point.attrib['Y'],
-                             'spiral':point.attrib['IsSpiral'],
-                             'spiral_width':point.attrib['SpiralWidth'],
-                             'spiral_height':point.attrib['SpiralHeight'],
-                             'spiral_size_microns':point.attrib['SpiralSizeInMicrons']})
-                Experiment['PhotoStimSeries']['PhotostimExperiment'+str(i+1)]['points']=points
-            i=i+1   
-            points=[]    
-          
-        return Experiment                                       
+            if 'PVMarkPointElement'in name and ('Indices' in photstim_inf['Childs']['PVGalvoPointElement'].keys()):
+                
+                
+                Experiment['PhotoStimSeries']['PhotostimExperiment_'+str(experiment_count)]={}
+                sequence={'TriggerFrequency': photstim_inf['TriggerFrequency'],
+                          'TriggerSelection': photstim_inf['TriggerSelection'],
+                          'Repetitions':float(photstim_inf['Repetitions']),        
+                          'Point Order': photstim_inf['Childs']['PVGalvoPointElement']['Indices'],                                                                
+                          'StimDuration':float(photstim_inf['Childs']['PVGalvoPointElement']['Duration']),
+                          'InterpointDuration':float(photstim_inf['Childs']['PVGalvoPointElement']['InterPointDelay']),
+                          'RelativeDelay':float(photstim_inf['Childs']['PVGalvoPointElement']['InitialDelay']),
+                          'SpiralRevolutions':float(photstim_inf['Childs']['PVGalvoPointElement']['SpiralRevolutions']),
+                          'AllPointsAtOnce':photstim_inf['Childs']['PVGalvoPointElement']['AllPointsAtOnce'],
+                          'RepTime': float(photstim_inf['Childs']['PVGalvoPointElement']['InterPointDelay'])+   float(photstim_inf['Childs']['PVGalvoPointElement']['Duration']),
+                          'FullTrialDuration': (float(photstim_inf['Childs']['PVGalvoPointElement']['InterPointDelay'])+    float(photstim_inf['Childs']['PVGalvoPointElement']['Duration']))*float(photstim_inf['Repetitions']),
+                          'RepFrequency':1/(float(photstim_inf['Childs']['PVGalvoPointElement']['InterPointDelay'])+    float(photstim_inf['Childs']['PVGalvoPointElement']['Duration']))
+                            }
+                Experiment['PhotoStimSeries']['PhotostimExperiment_'+str(experiment_count)]['sequence']=sequence
+                Experiment['PhotoStimSeries']['PhotostimExperiment_'+str(experiment_count)]['points']={}
+                point_count=1
+                for name, point in photstim_inf['Childs']['PVGalvoPointElement'].items():
+                    if isinstance(point, dict):
+                        point={'index':point['Index'],
+                                     'x_pos':point['X'],
+                                     'y_pos':point['Y'],
+                                     'spiral':point['IsSpiral'],
+                                     'spiral_width':point['SpiralWidth'],
+                                     'spiral_height':point['SpiralHeight'],
+                                     'spiral_size_microns':point['SpiralSizeInMicrons']}
+                        Experiment['PhotoStimSeries']['PhotostimExperiment_'+str(experiment_count)]['points']['Point_'+str(point_count)]=point
+                        point_count=point_count+1   
+                experiment_count=experiment_count+1   
+        self.mark_points_experiment=Experiment
 
     def create_photostim_sequence(photmet, aqumet, pokels_signal=[]):
                                                                 
@@ -823,7 +839,6 @@ class Metadata():
                 #     face_camera_metadata_path=xml 
                 if 'VoltageOutput' in xml:
                     self.voltage_output=xml 
-
     
     def save_metadata_as_json(self):
         if not os.path.isfile(self.read_voltage_metadata_path):
@@ -1038,44 +1053,27 @@ class Metadata():
         if self.full_voltage_recording_metadata:
             self.translated_imaging_metadata['IsVoltageRecording']=1
             self.translated_imaging_metadata['VoltageRecordingChannels']=str((self.recorded_signals and self.recorded_signals_csv))
-            self.translated_imaging_metadata['VoltageRecordingFrequency']=1000
+            self.translated_imaging_metadata['VoltageRecordingFrequency']=int(self.full_voltage_recording_metadata['Experiment']['Childs']['Rate']['Description'])
 
           
 #%%    
 if __name__ == "__main__":
-    # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\SPIFFrameNumberK3planeallen\Plane3'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211007\Mice\SPIK\FOV_1\Aq_1\211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000'   
-    # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane3'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKG\FOV_1\Aq_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
-    # temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210917\Mice\SPGT\Atlas_1\Volumes\Aq_1\20210917_SPGT_Atlas_1050_50024_607_without_105_135z_5z_1ol-005'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210930\Mice\SPKI\FOV_1\Aq_1\210930_SPKI_FOV1_AllenA_920_50024_narrow_without-000'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211022\Mice\SPKS\FOV_1\Aq_1\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
-
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210929\Mice\SPIC\TestAcquisitions\Aq_1\210929_SPIC_TestVideo5min_920_50024_narrow_without-000'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210916\Mice\SPGT\Atlas_1\Preview\Aq_1\20210916_SPGT_Atlas_920_50024_607_without-Preview-000'
-    # path='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20210914\Mice\SPGT\Atlas_1\Overview\Aq_1\20210914_SPGT_AtlasOverview_930_50024_607_without-Overview-000'
-    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000'
-    # temporary_path1='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211022_SPKS_FOV1_AllenA_20x_920_50024_narrow_with-000'
-    # temporary_path1='\\\\?\\'+r'F:\Projects\LabNY\Imaging\2021\20211015\Mice\SPKJ\FOV_1\1050_3PlaneTomato\Aq_1\211015_SPKJ_FOV1_1050tomato3plane_990_50024_narrow_without-000'
-    # temporary_path1=path
-
-    
-    # xmlfile_voltage=[]
-    # xmlfiles=glob.glob(path+'\\**.xml')
-    # xmlfile_imaging=xmlfiles[0]
-    # for xml in xmlfiles:
-    #     if 'VoltageRecording' in xml:
-    #         xmlfile_voltage=xml
-
-    temporary_path1='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPJA\imaging\20210702\data aquisitions\FOV_1\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\metadata'
-    
-    # meta =Metadata(aq_metadataPath=image_sequence_directory_full_path, temporary_path=temporary_path)
-    # meta =Metadata(aq_metadataPath=xmlfile_imaging, voltagerec_metadataPath=xmlfile_voltage)
-    # meta =Metadata(voltagerec_metadataPath=xmlfile_voltage)
+   
+    temporary_path1=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000'
     meta =Metadata(acquisition_directory_raw=temporary_path1)
-    # meta =Metadata(acquisition_directory_raw=path, temporary_path=temporary_path1)
+    markpoints=meta.full_mark_points_metadata
+    
+    
 
+
+    
+
+
+   
+
+
+
+    
 
 
   

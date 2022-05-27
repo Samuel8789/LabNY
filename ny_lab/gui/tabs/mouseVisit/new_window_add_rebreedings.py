@@ -41,7 +41,7 @@ class new_window_add_rebreedings:
     def button_accept_rebreedings(self):
         for i in range(self.number_of_rebreedings): 
             self.gui.MouseDat.readd_male(int(self.sep_entries[i].var.get()), int(self.sep_boxes[i].get()))
-        self.tableWindow.destroy() 
+        self.destroy() 
         
     def update(self, *a):
         kyes_to_use=list(range(self.number_of_rebreedings))

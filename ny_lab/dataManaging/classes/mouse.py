@@ -75,7 +75,7 @@ class Mouse:
 
     def load_all_imaging_sessions_from_database(self):
         
-        self.imaging_sessions_objects={session[0].replace('-', ''):MouseImagingSession(session[0].replace('-', ''), imaging_session_ID=session[1], mouse_object=self)  for idx, session in self.imaging_sessions_database.iterrows()}       
+        self.imaging_sessions_objects={session[0].replace('-', ''):MouseImagingSession(session[0].replace('-', ''), imaging_session_ID=session[1], mouse_object=self)  for idx, session in self.imaging_sessions_database.iterrows()}  
     
     def add_prairie_session(self, raw_imaging_session_path, session_name):
         module_logger.info('Processing '+ self.mouse_name)

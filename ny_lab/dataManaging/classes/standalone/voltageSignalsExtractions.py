@@ -4,21 +4,21 @@ Created on Fri Sep 10 15:32:35 2021
 
 @author: sp3660
 """
-import os
-import numpy as np
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib as mpl
-import glob
+# lazy_import
 import mplcursors
-import pickle
 import math
 import shutil
 import scipy.io as sio
-from scipy.signal import medfilt
-from scipy import stats, interpolate
+from scipy import interpolate
+import os
+import pandas as pd
 
-
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import pickle
+import glob
+import scipy.signal as sg
 import gc
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
@@ -35,6 +35,11 @@ class VoltageSignalsExtractions():
         self.temporary_path=temporary_path
         self.acquisition_directory_raw=acquisition_directory_raw
         self.voltage_signals_object=voltage_signals_object
+        self.visualstim_array={}
+        self.vis_stim_protocol=None
+        self.rounded_vis_stim=np.empty([0])
+
+
 
 
         if just_copy and self.voltage_excel_path:
@@ -44,6 +49,7 @@ class VoltageSignalsExtractions():
         
         elif not just_copy and self.voltage_excel_path:
             self.check_csv_in_folder()
+            self.update_frame_rates_with_metadata(1000,1000)
 
             self.voltage_signals_raw = pd.read_csv(self.voltage_excel_path)    
             self.voltage_signals={signal:self.voltage_signals_raw[signal].to_frame() for signal in self.voltage_signals_raw.columns.tolist()[1:]}
@@ -51,20 +57,16 @@ class VoltageSignalsExtractions():
             self.transitions_dictionary={}
             [path, file_name]=os.path.split(self.voltage_excel_path)
             transition_index_file_name=os.path.splitext(file_name)[0]+'_transitions_indexes.pkl'
-            self.transition_index_to_save_path= os.path.join(path,transition_index_file_name)
+            self.indexes_full_file_paths_to_save[0]= os.path.join(path,transition_index_file_name)
             self.correct_signals_names()
     
             locomotion_df=self.voltage_signals['Locomotion'].T
             self.locomotion_aray=locomotion_df.to_numpy()
             visualstim_df=self.voltage_signals['VisStim'].T
-            self.visualstim_array=visualstim_df.to_numpy().squeeze()
-            self.voltage_rate=1000;
-            self.milisecondscale=np.arange(1,locomotion_df.size+1)
-            self.second_scale=self.milisecondscale/self.voltage_rate
-            self.minutes_scale=self.second_scale/60
+            self.visualstim_array['Prairire']['VisStim']=visualstim_df.to_numpy().squeeze()
             self.process_allenA_signals()
             
-            if os.path.isfile(self.transition_index_to_save_path):
+            if os.path.isfile(self.indexes_full_file_paths_to_save[0]):
                 self.load_indexes_from_file()
     
             # if not self.transitions_dictionary:       
@@ -80,66 +82,167 @@ class VoltageSignalsExtractions():
             # self.plotting_paradigm_transitions()
             # self.plotting_grating_transitions()
         elif self.voltage_signals_object:
-            
-            transition_index_file_name=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]+'_transitions_indexes.pkl'
-            drifting_gratings_index_file_name_on=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]+'_drifting_grating_indexes_on.pkl'
-            drifting_gratings_index_file_name_off=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]+'_drifting_grating_indexes_off.pkl'
-            drifting_gratings_sliced_index_file_name_on=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]+'_drifting_grating_sliced_indexes_on.pkl'
-            drifting_gratings_sliced_index_file_name_off=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]+'_drifting_grating_sliced_indexes_off.pkl'
-
-
-            self.transition_index_to_save_path= os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim'],transition_index_file_name)
-            self.drifting_gratings_index_to_save_path_on= os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim'],drifting_gratings_index_file_name_on)
-            self.drifting_gratings_index_to_save_path_off= os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim'],drifting_gratings_index_file_name_off)
-            self.drifting_gratings_sliced_index_to_save_path_on= os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim'],drifting_gratings_sliced_index_file_name_on)
-            self.drifting_gratings_sliced_index_to_save_path_off= os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim'],drifting_gratings_sliced_index_file_name_off)
-
 
             self.voltage_signals=self.voltage_signals_object.voltage_signals_dictionary
             self.voltage_signals_daq=self.voltage_signals_object.voltage_signals_dictionary_daq
-            self.voltage_rate=1000;
-            self.milisecondscale=np.arange(1,self.voltage_signals['Locomotion'].T.size+1)
-            self.second_scale=self.milisecondscale/self.voltage_rate
-            self.minutes_scale=self.second_scale/60
-            self.time_scale=self.milisecondscale
-            self.check_vis_stim_stimuli_in_database()
-            self.process_visstim_signal()
-            self.process_locomotion()
-            # self.process_all_signals()
-            # self.plotting_paradigm_transitions()
-            # self.plotting_grating_transitions()
+            self.all_signals={'Prairire':self.voltage_signals,
+                               'Daq':self.voltage_signals_daq
+                }
+            self.update_frame_rates_with_metadata(1000,1000)
+
             
             
+            
+            if self.voltage_signals_object.acquisition_object:
+                self.acquisition_name=os.path.splitext(self.voltage_signals_object.acquisition_object.aquisition_name)[0]
+                self.vis_stim_slow_storage_path=self.voltage_signals_object.acquisition_object.slow_storage_all_paths['visual stim']
+                self.path_managing()
+                self.check_vis_stim_stimuli_in_database()
+                self.process_visstim_signal()
+                self.process_locomotion()
+                # self.process_all_signals(self.vis_stim_protocol)
+                # self.plotting_paradigm_transitions()
+                # self.plotting_grating_transitions()
+            else:
+                self.acquisition_name=self.voltage_signals_object.acq_temp_name
+                self.vis_stim_slow_storage_path=self.voltage_signals_object.temporary_folder
+                self.path_managing()
+                self.vis_stim_protocol=None
+                self.process_visstim_signal()
+                self.process_locomotion()
+                self.process_LED()
+                self.process_photottrigger()
+                self.process_optopokels()
+                self.process_startend()
+                
+            
+            
+    def path_managing(self):
         
-    def process_all_signals(self):
+        filenames_suffixes=['_transitions_indexes.pkl', 
+         '_drifting_grating_indexes_on.pkl', '_drifting_grating_indexes_off.pkl',
+         '_drifting_grating_sliced_indexes_on.pkl', '_drifting_grating_sliced_indexes_off.pkl', 
+         '_drifting_grating_blank_sweeps_indexes_on.pkl',
+         '_drifting_grating_blank_sweeps_indexes_off.pkl',
+         '_drifting_grating_sliced_blank_sweeps_indexes_on.pkl',
+         '_drifting_grating_sliced_blank_sweeps_indexes_off.pkl', 
+         ]
+        indexes_full_file_names=[self.acquisition_name+i for i in filenames_suffixes]
+        self.indexes_full_file_paths_to_save=[os.path.join(self.vis_stim_slow_storage_path,i) for i in indexes_full_file_names]
+
         
+    def process_all_signals(self, vis_stim_protocol=None):
         
-        if 'Allen' in self.vis_stim_protocol:
-            self.transitions_dictionary={}
-            self.load_indexes_from_file()
-            self.process_paradigms()
-           
-            if self.vis_stim_protocol=='AllenA':
-              self.process_allenA_signals()
-           
-            if self.vis_stim_protocol=='AllenB':
-               self.process_allenB_signals()
+        if vis_stim_protocol:
+            protocol=vis_stim_protocol
+        else:
+            protocol=self.vis_stim_protocol
+
+        self.transitions_dictionary={}
+        if protocol :  
+            
+            if 'Allen' in protocol:        
+                self.load_indexes_from_file()
+                self.process_allen_paradigms()
                
-            if self.vis_stim_protocol=='AllenC':
-               self.process_allenC_signals()
-           
-        if self.vis_stim_protocol=='Mistmatch':
-           self.transitions_dictionary={}
-           self.load_indexes_from_file()
-           self.process_mistmatch_signals()
-           
-        if self.vis_stim_protocol=='Habituation':
-           self.transitions_dictionary={}
-           self.load_indexes_from_file()
-           self.process_habituation_signals()
+                if protocol=='AllenA':
+                  self.process_allenA_signals()
+               
+                if protocol=='AllenB':
+                   self.process_allenB_signals()
+                   
+                if protocol=='AllenC':
+                   self.process_allenC_signals()
+               
+            if protocol=='Mistmatch':
+               self.load_indexes_from_file()
+               self.process_mistmatch_signals()
+               
+            if protocol=='Habituation':
+               self.load_indexes_from_file()
+               self.process_habituation_signals()
         
         
 #%% common 
+
+    def get_specific_signal(self, selected_signal_name):
+        
+        signal_array_dict={}
+        for signal_name, signals in self.all_signals.items():
+            signal_array_dict[signal_name]={}
+            for signal, df in signals.items():
+                if selected_signal_name in signal:
+                    signal_array_dict[signal_name][signal]=df.T.to_numpy().squeeze()
+                
+        return signal_array_dict
+    
+    
+    
+    def process_signal(self, array_dict, function='raw', round_factor=1, new_function=None):
+        
+        process_dict={}
+        raw=lambda x:x
+        deriv=lambda x:np.diff(x,prepend=x[0] )
+        rectified=lambda x:np.absolute(x)
+        rounded=lambda x:np.round(x,round_factor)
+        median=lambda x:sg.medfilt(x, kernel_size=29)
+        functions={'raw':raw,
+                   'deriv':deriv,
+                   'rectified':rectified,
+                   'rounded':rounded,
+                   'median': median
+                       }
+        
+        for acq_name, signal in array_dict.items():
+            process_dict[acq_name]={}
+            for sig, array in signal.items():
+                if array.any():
+                    process_dict[acq_name][sig]=functions[function](array)
+                else:
+                    process_dict[acq_name][sig]=array
+
+        return process_dict
+        
+    def process_LED(self):
+        self.led_array=self.get_specific_signal('LED')
+        self.dfdt_rounded_led =self.process_signal(self.process_signal(self.get_specific_signal('LED'),'rounded'), 'deriv')
+        self.dfdt_rounded_led_median =self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('LED'),'median'),'rounded'), 'deriv')
+        
+        
+        self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-6.5).flatten()+1
+
+        
+    def process_photottrigger(self):
+        self.photottrigger_array=self.get_specific_signal('PhotoTrig')
+        self.dfdt_rounded_photottrigger =self.process_signal(self.process_signal(self.get_specific_signal('PhotoTrig'),'rounded'), 'deriv')
+        self.dfdt_rounded_photottrigger_median =self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('PhotoTrig'),'median'),'rounded'), 'deriv')
+
+        
+    def process_optopokels(self):
+        self.process_optopokels_array=self.get_specific_signal('PhotoStim')
+        self.dfdt_rounded_process_optopokels =self.process_signal(self.process_signal(self.get_specific_signal('PhotoStim'),'rounded'), 'deriv')
+        self.dfdt_rounded_process_optopokels_median =self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('PhotoStim'),'median'),'rounded'), 'deriv')
+
+        
+    def process_startend(self):
+        self.startend_array=self.get_specific_signal('AcqTrig')
+        self.dfdt_rounded_startend =self.process_signal(self.process_signal(self.get_specific_signal('AcqTrig'),'rounded'), 'deriv')
+        self.dfdt_rounded_startend_median =self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('AcqTrig'),'median'),'rounded'), 'deriv')
+
+            
+    def process_locomotion(self):
+        self.locomotion_array=self.get_specific_signal('Locomotion')
+        self.rectified_speed_array=self.process_signal(self.process_signal(self.get_specific_signal('Locomotion'), 'deriv'), 'rectified')
+        self.rectified_acceleration_array=self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('Locomotion'),'deriv'),'deriv'),'rectified')
+        
+    def process_visstim_signal(self):
+        if 'VisStim' in self.voltage_signals.keys():
+            self.visualstim_array=self.get_specific_signal('VisStim')
+            self.rounded_vis_stim= self.process_signal( self.visualstim_array, 'rounded')
+            self.dfdt_rounded_vis_stim =self.process_signal(self.process_signal(self.visualstim_array,'rounded'), 'deriv')
+            self.dfdt_rounded_vis_stim_median =self.process_signal(self.process_signal(self.process_signal(self.get_specific_signal('VisStim'),'median'),'rounded'), 'deriv')
+
+        
 
     def resample(self, x, factor, kind='linear'):
         n = int(np.ceil(x.size / factor))
@@ -149,62 +252,59 @@ class VoltageSignalsExtractions():
     def method_to_donwsample_all_signals_for_faster_plotting(self):
         self.all_downsampled_signals={}
         for key, signal in self.voltage_signals:
-            self.all_downsampled_signals[key]=self.resample( signal, factor=self.milisecondscale, kind='linear').squeeze()
+            self.all_downsampled_signals[key]=self.resample( signal, factor=self.milisecondscale['Prairie'], kind='linear').squeeze()
         
         
     def check_vis_stim_stimuli_in_database(self):
         if self.voltage_signals_object.acquisition_object.full_database_dictionary:
         
             self.database_VisStimInfo=self.voltage_signals_object.acquisition_object.full_database_dictionary['VisStim']
-            if self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session A Version A':
-                self.vis_stim_protocol='AllenA'
-                self.vis_stim_protocol_version='Version A'
-            elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session B Version A':
-                self.vis_stim_protocol='AllenB'
-                self.vis_stim_protocol_version='Version A'
-            elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session C Version A':
-                self.vis_stim_protocol='AllenC'
-                self.vis_stim_protocol_version='Version A'
+            if not self.database_VisStimInfo.empty:
+                if self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session A Version A':
+                    self.vis_stim_protocol='AllenA'
+                    self.vis_stim_protocol_version='Version A'
+                elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session B Version A':
+                    self.vis_stim_protocol='AllenB'
+                    self.vis_stim_protocol_version='Version A'
+                elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session C Version A':
+                    self.vis_stim_protocol='AllenC'
+                    self.vis_stim_protocol_version='Version A'
 
         else:
             self.vis_stim_protocol=None
  
-    def process_locomotion(self):
-        locomotion_df=self.voltage_signals['Locomotion'].T
-        self.locomotion_aray=locomotion_df.to_numpy().squeeze()
-        # calculate movement speed in transitions per milisecond
-        self.first_derivative_locomotion=np.diff(np.around(self.locomotion_aray,4))
-        # recify(get all signals as positive)
-        self.rectified_speed_array=np.absolute(self.first_derivative_locomotion)
-        # add the datapoint lost during the diff
-        self.rectified_speed_array=np.insert(self.rectified_speed_array,0,0) 
-        #get acceleration
-        self.acceleration_array=np.diff(np.around(self.rectified_speed_array,4))
-        self.acceleration_array=np.absolute(self.acceleration_array)
-        # add the datapoint lost during the diff
-        self.acceleration_array=np.insert(self.acceleration_array,0,0) 
+    def update_frame_rates_with_metadata(self, prairire_frame_rate, daq_frame_rate):
+        self.daqstim_voltagerate=daq_frame_rate
+        self.prairire_voltagerate=prairire_frame_rate
         
+        self.frame_rates={'Prairire':prairire_frame_rate,
+                          'Daq':daq_frame_rate,
+            }
+        self.second_scale={'Prairire':(1/self.frame_rates['Prairire'])*self.get_specific_signal('Time')['Prairire']['Time'],
+                          'Daq':(1/self.frame_rates['Daq'])*self.get_specific_signal('Time')['Prairire']['Time'],
+            }
+        self.milisecondscale={'Prairire':1000*self.second_scale['Prairire'],
+                        'Daq':1000*self.second_scale['Daq'],
+          }
+        self.minutes_scale={'Prairire':self.second_scale['Prairire']/60,
+                          'Daq':self.second_scale['Daq']/60,
+            }
+
+        self.choose_time_scale('milisecond')
+
     def choose_time_scale(self, scale)   :
-        if scale=='miliseconds':
+        if scale=='milisecond':
             self.time_scale=self.milisecondscale
-        elif scale=='secs':
-            self.time_scale=self.second_scale
+              
+        elif scale=='sec':
+            self.time_scale= self.second_scale
+                 
         elif scale=='min':
             self.time_scale=self.minutes_scale
-        
-        
-    def process_visstim_signal(self):
-        if 'VisStim' in self.voltage_signals.keys():
-            visualstim_df=self.voltage_signals['VisStim'].T
-            self.visualstim_array=visualstim_df.to_numpy().squeeze()
-            self.rounded_vis_stim=np.around(self.visualstim_array, 1)
-            self.dfdt_rounded_vis_stim = np.diff(self.rounded_vis_stim)
-        
-
 
 #%% Allen
 
-    def process_paradigms(self):
+    def process_allen_paradigms(self):
         
         self.get_paradigm_indexes()
         self.slice_visstim_by_paradigm()
@@ -238,19 +338,139 @@ class VoltageSignalsExtractions():
             
         '''
         # %matplotlib qt
+
+        """
+        summary of transtions
+        paradigm_start <-9.5
+        paradigm_end  >9.5
+        
+        noiseframes_start > rectified 0.5
+
+        movietrialfirst start>2.5
+        firstframemovie==movietrialatrat
+        nextrframes > rectifed 0.5
+        
+        movietrail2problematic=
+        movietrielaftesecond>2.3
         
         
-        
+        """
+
+
         if not self.transitions_dictionary:
         
-            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim<-6.5).flatten()+1
+            fig, ax = plt.subplots(2, sharex=True)
+            line, = ax[0].plot(self.visualstim_array['Prairire']['VisStim']) 
+            line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairire']['VisStim']) 
+            line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairire']['VisStim'],'r') 
+
+            ax[0].plot(self.time_scale['Prairire'][self.start_transitions],self.visualstim_array['Prairire']['VisStim'][self.start_transitions],'rx') 
+            ax[1].plot(self.time_scale['Prairire'][self.start_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.start_transitions],'rx') 
+            ax[0].plot(self.time_scale['Prairire'][self.end_transitions],self.visualstim_array['Prairire']['VisStim'][self.end_transitions],'go') 
+            ax[1].plot(self.time_scale['Prairire'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.end_transitions],'go') 
+
+
+            line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
+            line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
+
+
+            
+            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-9).flatten()
+            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-9).flatten()+1
             self.start_transitions=np.delete(self.start_transitions, -1)
-            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim>4.9).flatten()+1   
+            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>6).flatten()  
+            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>9.5).flatten()  +1
+
             self.end_transitions=np.delete(self.end_transitions, 0)
             #eliminate first 
         
-            self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim>5, self.dfdt_rounded_vis_stim<6.5)).flatten()+1
-            self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim<-0.5).flatten()[-1]+1
+            # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>5, self.dfdt_rounded_vis_stim['Prairire']['VisStim']<6.5)).flatten()+1
+            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-0.5).flatten()[-1]+1
+            
+
+            
+            """
+            for the newest protocols is differnet
+            """
+            if self.vis_stim_protocol =='AllenA':
+                # self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
+                #                             'first_drifting_set_last': self.end_transitions[0],
+                #                             'second_drifting_set_first':self.start_transitions[6],
+                #                             'second_drifting_set_last':self.end_transitions[5],
+                #                             'third_drifting_set_first':self.start_transitions[10],
+                #                             'third_drifting_set_last':self.last_down_transition+1,
+                #                             'first_movie_set_first':self.start_transitions[2],
+                #                             'first_movie_set_last': self.end_transitions[2],
+                #                             'second_movie_set_first':self.start_transitions[8],
+                #                             'second_movie_set_last': self.end_transitions[7],
+                #                             'short_movie_set_first':self.start_transitions[4],
+                #                             'short_movie_set_last':self.end_transitions[4],
+                #                             'spont_first':self.spont_start_transitions[3],
+                #                             'spont_last':self.end_transitions[6]-1,
+                #                             }
+                pass
+            
+            elif self.vis_stim_protocol =='AllenB':
+                # self.transitions_dictionary={'first_static_set_first':self.start_transitions[0],
+                #                             'first_static_set_last': self.end_transitions[0],
+                #                             'second_static_set_first':self.start_transitions[6],
+                #                             'second_static_set_last':self.end_transitions[5],
+                #                             'third_static_set_first':self.start_transitions[10],
+                #                             'third_static_set_last':self.last_down_transition+1,
+                #                             'movie_set_first':self.start_transitions[2],
+                #                             'movie_set_last': self.end_transitions[2],
+                #                             'first_images_set_first':self.start_transitions[8],
+                #                             'first_images_set_last': self.end_transitions[7],
+                #                             'second_images_set_first':self.start_transitions[4],
+                #                             'second_images_set_last':self.end_transitions[4],
+                                            # 'third_images_set_first':self.start_transitions[4],
+              #                               'third_images_set_last':self.end_transitions[4],
+                #                             'spont_first':self.spont_start_transitions[3],
+                #                             'spont_last':self.end_transitions[6]-1,
+                #                             }
+                pass
+            
+            elif self.vis_stim_protocol =='AllenC':
+                
+                self.transitions_dictionary={'first_noise_set_first':self.start_transitions[0],
+                                            'first_noise_set_last': self.end_transitions[0],
+                                            'second_noise_set_first':self.start_transitions[4],
+                                            'second_noise_set_last':self.end_transitions[4],
+                                            'third_noise_set_first':self.start_transitions[8],
+                                            'third_noise_set_last':self.end_transitions[8],
+                                            'first_movie_set_first':self.start_transitions[2],
+                                            'first_movie_set_last': self.end_transitions[2],
+                                            'second_movie_set_first':self.start_transitions[6],
+                                            'second_movie_set_last': self.end_transitions[6],
+                                            'spont1_first':self.start_transitions[1],
+                                            'spont1_last':self.end_transitions[1],
+                                            'spont2_first':self.start_transitions[7],
+                                            'spont2_last':self.end_transitions[7],
+                                            }
+                
+                
+                
+                
+            self.save_transition_indexes()
+
+                
+                
+            # newest signals thre allen sessions
+            # self.transitions_dictionary={'first_noise_set_first':self.start_transitions[0],
+            #                             'first_noise_set_last': self.end_transitions[0],
+            #                             'second_noise_set_first':self.start_transitions[4],
+            #                             'second_noise_set_last':self.end_transitions[4],
+            #                             'third_noise_set_first':self.start_transitions[8],
+            #                             'third_noise_set_last':self.end_transitions[8],
+            #                             'first_movie_set_first':self.start_transitions[2],
+            #                             'first_movie_set_last': self.end_transitions[2],
+            #                             'second_movie_set_first':self.start_transitions[6],
+            #                             'second_movie_set_last': self.end_transitions[6],
+            #                             'spont1_first':self.start_transitions[1],
+            #                             'spont1_last':self.end_transitions[1],
+            #                             'spont2_first':self.start_transitions[7],
+            #                             'spont2_last':self.end_transitions[7],
+            #                             }
             
             
             # newest signals thre allen sessions
@@ -274,13 +494,13 @@ class VoltageSignalsExtractions():
         
      
             # for  211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000_transitions_indexes
-            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim<-6.5).flatten()+1
-            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim>6.5).flatten()+1   
+            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-6.5).flatten()+1
+            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>6.5).flatten()+1   
             # self.end_transitions=np.delete(self.end_transitions, 0)
             # #eliminate first 
         
-            # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim>5, self.dfdt_rounded_vis_stim<6.5)).flatten()+1
-            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim<-0.5).flatten()[-1]+1
+            # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>5, self.dfdt_rounded_vis_stim['Prairire']['VisStim']<6.5)).flatten()+1
+            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-0.5).flatten()[-1]+1
             # self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
             #                             'first_drifting_set_last': self.end_transitions[0],
             #                             'second_drifting_set_first':self.start_transitions[6],
@@ -298,9 +518,9 @@ class VoltageSignalsExtractions():
             #                             }
  
             # for spja only
-            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim<-6.5).flatten()+1 
-            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim>5).flatten()+1   
-            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim<-0.5).flatten()[-1]+1
+            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-6.5).flatten()+1 
+            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>5).flatten()+1   
+            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-0.5).flatten()[-1]+1
             # self.transitions_dictionary={'first_drifting_set_first':self.end_transitions[0],
             #                             'first_drifting_set_last': self.start_transitions[1],
             #                             'second_drifting_set_first':self.end_transitions[5],
@@ -317,83 +537,149 @@ class VoltageSignalsExtractions():
             #                             'spont_last':self.end_transitions[6]-3,
             #                             }
             
-            fig, ax = plt.subplots(2)
-            line, = ax[0].plot(self.time_scale,self.visualstim_array) 
-            ax[0].plot(self.time_scale[self.start_transitions],self.visualstim_array[self.start_transitions],'rx') 
-            ax[0].plot(self.time_scale[self.end_transitions-1],self.visualstim_array[self.end_transitions-1],'bo') 
-            line, = ax[1].plot(self.dfdt_rounded_vis_stim) 
-            
+           
+         
+
          
          
-    def slice_visstim_by_paradigm (self):  
+    def slice_visstim_by_paradigm (self): 
+        
+        self.paradigm_sliced_vis_stim={}
         
         if self.vis_stim_protocol =='AllenA':
             
-            self.first_drifting_set=self.rounded_vis_stim[self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
-            self.second_drifting_set=self.rounded_vis_stim[self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
-            self.third_drifting_set=self.rounded_vis_stim[self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-            self.first_movie_set=self.rounded_vis_stim[self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.rounded_vis_stim[self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.short_movie_set=self.rounded_vis_stim[self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
-            self.spont=self.rounded_vis_stim[self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
+            self.first_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
+            self.second_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
+            self.third_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
+            self.first_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
+            self.second_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.short_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+            self.spont=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
         
-            self.first_drifting_set=self.visualstim_array[self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
-            self.second_drifting_set=self.visualstim_array[self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
-            self.third_drifting_set=self.visualstim_array[self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-            self.first_movie_set=self.visualstim_array[self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.visualstim_array[self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.short_movie_set=self.visualstim_array[self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
-            self.spont=self.visualstim_array[self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
+            self.first_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
+            self.second_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
+            self.third_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
+            self.first_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
+            self.second_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.short_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+            self.spont=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
+            
+        elif self.vis_stim_protocol =='AllenB':
+            
+            self.first_static_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_static_set_first']:self.transitions_dictionary['first_static_set_last']]
+            self.second_static_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_static_set_first']:self.transitions_dictionary['second_static_set_last']]
+            self.third_static_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['third_static_set_first']:self.transitions_dictionary['third_static_set_last']]
+            self.first_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_images_set_first']:self.transitions_dictionary['first_images_set_last']]
+            self.second_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_images_set_first']:self.transitions_dictionary['second_images_set_last']]
+            self.third_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['third_images_set_first']:self.transitions_dictionary['third_images_set_last']]
+            self.movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['movie_set_first']:self.transitions_dictionary['movie_set_last']]
+            self.spont=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
             
         elif self.vis_stim_protocol =='AllenC':
             
-            self.first_noise_set=self.rounded_vis_stim[self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
-            self.second_noise_set=self.rounded_vis_stim[self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
-            self.third_noise_set=self.rounded_vis_stim[self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
-            self.first_movie_set=self.rounded_vis_stim[self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.rounded_vis_stim[self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.spont2=self.rounded_vis_stim[self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
-            self.spont1=self.rounded_vis_stim[self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
+            self.first_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
+            self.second_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
+            self.third_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
+            self.first_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
+            self.second_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.spont1=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
+            self.spont2=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
                
 
     def slice_locomotion_by_paradigm (self):  
          
         if self.vis_stim_protocol =='AllenA':
         
-             self.first_drifting_set_speed=self.rectified_speed_array[self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
-             self.second_drifting_set_speed=self.rectified_speed_array[self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
-             self.third_drifting_set_speed=self.rectified_speed_array[self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-             self.first_movie_set_speed=self.rectified_speed_array[self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-             self.second_movie_set_speed=self.rectified_speed_array[self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-             self.short_movie_set_speed=self.rectified_speed_array[self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
-             self.spont_speed=self.rectified_speed_array[self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]    
+             self.first_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
+             self.second_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
+             self.third_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
+             self.first_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
+             self.second_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+             self.short_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+             self.spont_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]    
         
+        elif self.vis_stim_protocol =='AllenB':
+            pass
         elif self.vis_stim_protocol =='AllenC':
         
-            self.first_noise_set_speed=self.rectified_speed_array[self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
-            self.second_noise_set_speed=self.rectified_speed_array[self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
-            self.third_noise_set_speed=self.rectified_speed_array[self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
-            self.first_movie_set_speed=self.rectified_speed_array[self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set_speed=self.rectified_speed_array[self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.spont2_speed=self.rectified_speed_array[self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
-            self.spont1_speed=self.rectified_speed_array[self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
+            self.first_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
+            self.second_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
+            self.third_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
+            self.first_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
+            self.second_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.spont2_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
+            self.spont1_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
         
         
         
     def get_noise_trial_structure(self):
-        pass
-    def get_movies_trial_structure(self):
-        pass
+        
+   
+        self.noise_on_index_full_recording =np.zeros((1))
+        self.noise_off_index_full_recording=np.zeros((1))
+        self.load_noise_indexes()
+        
+        self.combined_noise_raw=np.concatenate((self.first_noise_set, self.second_noise_set, self.third_noise_set))
+        
+        
+    def get_movie_three_trial_structure(self):
+        
+        self.movie_three_on_index_full_recording =np.zeros((1))
+        self.movie_three_off_index_full_recording=np.zeros((1))
+        self.load_movie_three_indexes()
+        
+        self.combined_movie_threes_raw=np.concatenate(self.first_movie_three_set, self.second_movie_three_set)
+        
+    def get_movie_one_trial_structure(self):
+         
+        self.movie_one_on_index_full_recording =np.zeros((1))
+        self.movie_one_off_index_full_recording=np.zeros((1))
+        self.load_movie_one_indexes()
+
+        if 'A':
+            self.combined_movie_ones_raw=np.concatenate(self.short_movie_one_set)
+            
+        elif 'B':
+            self.combined_movie_ones_raw=np.concatenate(self.movie_set)
+            
+        elif 'C':
+            self.combined_movie_ones_raw=np.concatenate(self.first_movie_one_set )
+            
+            
+    def get_movie_two_trial_structure(self):
+         
+        self.movie_two_on_index_full_recording =np.zeros((1))
+        self.movie_two_off_index_full_recording=np.zeros((1))
+        self.load_movie_two_indexes()
+
+   
+        if 'C':
+            self.combined_movie_twos_raw=np.concatenate(self.second_movie_two_set )
+
+        
     def get_static_gratings_trial_structure(self):
-        pass
+        
+        self.static_on_index_full_recording =np.zeros((1))
+        self.static_off_index_full_recording=np.zeros((1))
+        self.load_static_indexes()
+        
+        self.combined_static_raw=np.concatenate((self.first_static_set, self.second_static_set, self.third_static_set))
 
     def get_natural_images_trial_structure(self):
-        pass
+        
+        self.images_on_index_full_recording =np.zeros((1))
+        self.images_off_index_full_recording=np.zeros((1))
+        self.load_images_indexes()
+        
+        self.combined_images_raw=np.concatenate((self.first_images_set, self.second_images_set, self.third_images_set))
+
+
+
 
     def correct_voltage_split_transitions(self, voltage_slice):
         # this is for transition that were split betwen 2 samples, I always get the inital transition to the sample with at tleast some 
         # voltage as voltages is send after the image and for the end transition i get the also the first as the image has chnaged before voltage change
-        voltage_slice_filtered=medfilt(voltage_slice, kernel_size=29)
+        voltage_slice_filtered=sg.medfilt(voltage_slice, kernel_size=29)
         voltage_slice_filtered_rounded=np.around(voltage_slice_filtered, 1)
         
         voltage_slice_filtered_rounded_corrected=np.copy(voltage_slice_filtered_rounded)
@@ -440,12 +726,9 @@ class VoltageSignalsExtractions():
         self.combined_gratings_raw=np.concatenate((self.first_drifting_set, self.second_drifting_set, self.third_drifting_set))
 
         
-        # if not (self.tuning_stim_on_index_full_recording.any() and self.tuning_stim_off_index_full_recording.any()):
-        if True:
+        if not (self.tuning_stim_on_index_full_recording.any() and self.tuning_stim_off_index_full_recording.any()):
 
-
-
-            temp=np.diff(np.around(medfilt(self.combined_gratings_raw, kernel_size=29),1))
+            temp=np.diff(np.around(sg.medfilt(self.combined_gratings_raw, kernel_size=29),1))
             temp2=np.around(temp,1)
             drifting_transition_indexes1=[np.argwhere(temp== voltage) for voltage in self.orientations_and_blank_sweep]
             drifting_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in self.orientations_and_blank_sweep]
@@ -483,8 +766,8 @@ class VoltageSignalsExtractions():
             plt.hist(stim_period_lengths.flatten(), bins=np.arange(2047, 2051), range=(2047,2051))
             plt.show()
        
-            index_start=  self.drifting_on_transition_indexes[0]
-            index_end= self.drifting_off_transition_indexes[0]
+            index_start=  self.drifting_on_transition_indexes[-1]
+            index_end= self.drifting_off_transition_indexes[-1]
             
             fig,axa=plt.subplots(1)
             for i ,j in  enumerate(index_start) : 
@@ -498,7 +781,6 @@ class VoltageSignalsExtractions():
 
             self.save_drifting_grating_indexes()
             
-        self.correct_grating_indexes_for_full_movie()
         self.create_full_recording_grating_binary_matrix()
 
 
@@ -527,17 +809,20 @@ class VoltageSignalsExtractions():
         self.tuning_stim_on_index_full_recording = vfunc(self.drifting_on_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
         self.tuning_stim_off_index_full_recording = vfunc(self.drifting_off_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
         
+        self.blank_sweep_on_index_full_recording = vfunc(self.blank_on_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
+        self.blank_sweep_off_index_full_recording = vfunc(self.blank_off_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
         
+
         oritoplot=20
         fig,axo=plt.subplots(oritoplot, sharex=(True))
         for k, j in enumerate(range(oritoplot)):
             for i  in  range(15) :  
-                axo[k].plot(self.rounded_vis_stim[self.tuning_stim_on_index_full_recording[j,i]-600:self.tuning_stim_off_index_full_recording[j,i]+600])
+                axo[k].plot(self.rounded_vis_stim['Prairire']['VisStim'][self.tuning_stim_on_index_full_recording[j,i]-600:self.tuning_stim_off_index_full_recording[j,i]+600])
                 
      
     def create_full_recording_grating_binary_matrix(self):
 
-        self.full_stimuli_binary_matrix=np.zeros((self.orientations.size,self.visualstim_array.shape[0] ))
+        self.full_stimuli_binary_matrix=np.zeros((self.orientations.size,self.visualstim_array['Prairire']['VisStim'].shape[0] ))
         for i, row in enumerate(self.tuning_stim_on_index_full_recording):
             for j, trial in enumerate(row):
                 self.full_stimuli_binary_matrix[i, self.tuning_stim_on_index_full_recording[i,j]:self.tuning_stim_off_index_full_recording[i,j]]=1
@@ -658,52 +943,113 @@ class VoltageSignalsExtractions():
 
 #%% saving indexes
     def save_transition_indexes(self):
-        with open(  self.transition_index_to_save_path, 'wb') as f:
-            pickle.dump(self.transitions_dictionary, f, pickle.HIGHEST_PROTOCOL)
+        if  not os.path.isfile(self.indexes_full_file_paths_to_save[0]):
+            with open(  self.indexes_full_file_paths_to_save[0], 'wb') as f:
+                pickle.dump(self.transitions_dictionary, f, pickle.HIGHEST_PROTOCOL)
 
     def load_indexes_from_file(self):
-        if os.path.isfile(self.transition_index_to_save_path):
-            with open(self.transition_index_to_save_path, 'rb') as f:
+        if os.path.isfile(self.indexes_full_file_paths_to_save[0]):
+            with open(self.indexes_full_file_paths_to_save[0], 'rb') as f:
                 self.transitions_dictionary= pickle.load(f)
+                
+                
+                
                 
     def save_drifting_grating_indexes(self):
    
-        with open( self.drifting_gratings_index_to_save_path_on, 'wb') as f:
+        with open( self.indexes_full_file_paths_to_save[1], 'wb') as f:
             pickle.dump(self.tuning_stim_on_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
 
-        with open(self.drifting_gratings_index_to_save_path_off, 'wb') as f:
+        with open(self.indexes_full_file_paths_to_save[2], 'wb') as f:
             pickle.dump(self.tuning_stim_off_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
             
-        with open( self.drifting_gratings_sliced_index_to_save_path_on, 'wb') as f:
+        with open( self.indexes_full_file_paths_to_save[3], 'wb') as f:
             pickle.dump(self.drifting_on_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
 
-        with open(self.drifting_gratings_sliced_index_to_save_path_off, 'wb') as f:
+        with open(self.indexes_full_file_paths_to_save[4], 'wb') as f:
             pickle.dump(self.drifting_off_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
             
+            
+            
+        with open( self.indexes_full_file_paths_to_save[5], 'wb') as f:
+            pickle.dump(self.blank_sweep_on_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[6], 'wb') as f:
+            pickle.dump(self.blank_sweep_off_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+        
+        with open( self.indexes_full_file_paths_to_save[7], 'wb') as f:
+            pickle.dump(self.blank_on_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[8], 'wb') as f:
+            pickle.dump(self.blank_off_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
+            
+   
+
     def load_drifting_grating_indexes(self):
-        if os.path.isfile(self.drifting_gratings_index_to_save_path_on):
-            with open(self.drifting_gratings_index_to_save_path_on, 'rb') as f:
+        if os.path.isfile(self.indexes_full_file_paths_to_save[1]):
+            with open(self.indexes_full_file_paths_to_save[1], 'rb') as f:
                 self.tuning_stim_on_index_full_recording=pickle.load(f)
 
-        if os.path.isfile(self.drifting_gratings_index_to_save_path_off):
-            with open( self.drifting_gratings_index_to_save_path_off, 'rb') as f:
+        if os.path.isfile(self.indexes_full_file_paths_to_save[2]):
+            with open( self.indexes_full_file_paths_to_save[2], 'rb') as f:
+                self.tuning_stim_off_index_full_recording=pickle.load(f)
+                
+                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[3]):
+            with open(self.indexes_full_file_paths_to_save[3], 'rb') as f:
                 self.drifting_on_transition_indexes=pickle.load(f)
-                
-                
-        if os.path.isfile(self.drifting_gratings_sliced_index_to_save_path_on):
-            with open(self.drifting_gratings_sliced_index_to_save_path_on, 'rb') as f:
-                self.tuning_stim_on_index_full_recording=pickle.load(f)
 
-        if os.path.isfile(self.drifting_gratings_sliced_index_to_save_path_off):
-            with open( self.drifting_gratings_sliced_index_to_save_path_off, 'rb') as f:
+        if os.path.isfile(self.indexes_full_file_paths_to_save[4]):
+            with open( self.indexes_full_file_paths_to_save[4], 'rb') as f:
                 self.drifting_off_transition_indexes=pickle.load(f)
+   
+    
+   
+        if os.path.isfile(self.indexes_full_file_paths_to_save[5]):
+            with open(self.indexes_full_file_paths_to_save[5], 'rb') as f:
+                self.blank_sweep_on_index_full_recording=pickle.load(f)
+    
+        if os.path.isfile(self.indexes_full_file_paths_to_save[6]):
+            with open( self.indexes_full_file_paths_to_save[6], 'rb') as f:
+                self.blank_sweep_off_index_full_recording=pickle.load(f)
+                
+                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[7]):
+            with open(self.indexes_full_file_paths_to_save[7], 'rb') as f:
+                self.blank_on_transition_indexes=pickle.load(f)
+    
+        if os.path.isfile(self.indexes_full_file_paths_to_save[8]):
+            with open( self.indexes_full_file_paths_to_save[8], 'rb') as f:
+                self.blank_off_transition_indexes=pickle.load(f)
+
    
            
         
-    def save_movie1_frame_indexes(self):
-        pass  
-    def save_movie3_frame_indexes(self):
+    def load_noise_indexes(self):
         pass
+    
+    def save_noise_indexes(self):
+        pass
+    
+    def load_movie_indexes(self):
+        pass
+    
+    def save_movie_indexes(self):
+        pass
+    
+    def load_static_indexes(self):
+        pass
+    
+    def save_static_indexes(self):
+        pass
+    
+    def load_images_indexes(self):
+        pass
+    
+    def save_images_indexes(self):
+        pass
+         
+         
     #%%plotting
     
     def plot_all_basics(self):
@@ -718,12 +1064,12 @@ class VoltageSignalsExtractions():
     
     def plot_vis_stim_trace(self):
         fig, ax = plt.subplots(1)
-        line, = ax.plot(self.time_scale,self.visualstim_array) 
+        line, = ax.plot(self.time_scale['Prairire'],self.visualstim_array['Prairire']['VisStim']) 
         
     def plot_stim_and_speed(self):
         fig, ax = plt.subplots(2)
-        line, = ax[0].plot(self.time_scale,self.visualstim_array) 
-        line, = ax[1].plot(self.time_scale,self.rectified_speed_array) 
+        line, = ax[0].plot(self.time_scale['Prairire'],self.visualstim_array['Prairire']['VisStim']) 
+        line, = ax[1].plot(self.time_scale['Prairire'],self.rectified_speed_array['Prairire']['Locomotion']) 
                 
     def plot_full_locomotion(self):
   
@@ -731,11 +1077,11 @@ class VoltageSignalsExtractions():
         # fig.set_title('Snapping cursor')
         for i in range(0,3):
             if i==0:
-                line, = ax[i].plot(self.time_scale,self.locomotion_aray) 
+                line, = ax[i].plot(self.time_scale['Prairire'],self.locomotion_aray) 
             elif i==1:
-                line, = ax[i].plot(self.time_scale,self.rectified_speed_array)  
+                line, = ax[i].plot(self.time_scale['Prairire'],self.rectified_speed_array['Prairire']['Locomotion'])  
             elif i==2:
-                line, = ax[i].plot(self.time_scale,self.acceleration_array)  
+                line, = ax[i].plot(self.time_scale['Prairire'],self.acceleration_array['Prairire']['Locomotion'])  
          
         # snap_cursor = SnappingCursor(ax[0], line)  
         # fig.canvas.mpl_connect('motion_notify_event', snap_cursor.on_mouse_move)
@@ -744,7 +1090,7 @@ class VoltageSignalsExtractions():
     def plot_speed(self):
         fig, ax = plt.subplots(1)
         
-        line, = ax.plot(self.time_scale,self.rectified_speed_array) 
+        line, = ax.plot(self.time_scale['Prairire'],self.rectified_speed_array['Prairire']['Locomotion']) 
         
     def plotting_paradigm_transitions(self):   
         
@@ -754,19 +1100,19 @@ class VoltageSignalsExtractions():
             datasets_to_plot=[self.first_noise_set, self.second_noise_set, self.third_noise_set, self.first_movie_set,self.second_movie_set,self.spont1,self.spont2]
 
         
-        datasets_to_plot.append(self.rounded_vis_stim)
+        datasets_to_plot.append(self.rounded_vis_stim['Prairire']['VisStim'])
          
         fig, axs = plt.subplots(1)
         fig.suptitle('VisStim Paradigm Transitions')
         
-        axs.plot(self.rounded_vis_stim)     
+        axs.plot(self.rounded_vis_stim['Prairire']['VisStim'])     
         symbol_list=['x','o','<','^','v','s','>','+','d',]
         color_list=['r', 'g']
         n=2        
         indexes=list(self.transitions_dictionary.values())
         for i in range(0, len(indexes)-n+1, n):
-            axs.plot(indexes[i], self.rounded_vis_stim[indexes[i]],symbol_list[i-int(i/2)],  color=color_list[i%2])
-            axs.plot(indexes[i+1], self.rounded_vis_stim[indexes[i+1]],symbol_list[i-int(i/2)],  color=color_list[(i+1)%2])
+            axs.plot(indexes[i], self.rounded_vis_stim['Prairire']['VisStim'][indexes[i]],symbol_list[i-int(i/2)],  color=color_list[i%2])
+            axs.plot(indexes[i+1], self.rounded_vis_stim['Prairire']['VisStim'][indexes[i+1]],symbol_list[i-int(i/2)],  color=color_list[(i+1)%2])
 
 
         fig, axs = plt.subplots(len(datasets_to_plot))
@@ -807,15 +1153,15 @@ class VoltageSignalsExtractions():
 
         fig, axs = plt.subplots(3)
         fig.suptitle('VoltageS Signals')
-        axs[0].plot(self.second_scale, self.rounded_vis_stim)
-        axs[1].plot(self.second_scale[0:-1], self.dfdt_rounded_vis_stim)
+        axs[0].plot(self.second_scale['Prairire'], self.rounded_vis_stim['Prairire']['VisStim'])
+        axs[1].plot(self.second_scale['Prairire'][0:-1], self.dfdt_rounded_vis_stim['Prairire']['VisStim'])
         # axs[2].plot(second_scale,photodiode_aray)
         mplcursors.cursor(axs) # or just mplcursors.cursor()
         
         fig, axs = plt.subplots(1)
-        axs.plot(self.rounded_vis_stim)
-        axs.plot(self.tuning_stim_on_index_full_recording,  self.rounded_vis_stim[self.tuning_stim_on_index_full_recording],'o')
-        axs.plot(self.tuning_stim_off_index_full_recording, self.rounded_vis_stim[self.tuning_stim_off_index_full_recording],'x')
+        axs.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+        axs.plot(self.tuning_stim_on_index_full_recording,  self.rounded_vis_stim['Prairire']['VisStim'][self.tuning_stim_on_index_full_recording],'o')
+        axs.plot(self.tuning_stim_off_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.tuning_stim_off_index_full_recording],'x')
   
         # figure()
         # plot(vistim)
@@ -832,18 +1178,18 @@ class VoltageSignalsExtractions():
         # mplcursors.cursor(line) # or just mplcursors.cursor()
 
         fig, ax = plt.subplots(nrows=1,sharey=True)            
-        ax.plot(self.rounded_vis_stim)
-        ax.plot(self.tuning_stim_off_index_full_recording[0,:]-1,self.rounded_vis_stim[self.tuning_stim_off_index_full_recording[0,:]-1],'o')
+        ax.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+        ax.plot(self.tuning_stim_off_index_full_recording[0,:]-1,self.rounded_vis_stim['Prairire']['VisStim'][self.tuning_stim_off_index_full_recording[0,:]-1],'o')
         # snap_cursor = SnappingCursor(ax, line)
         # # fig.canvas.mpl_connect('motion_notify_event', snap_cursor.on_mouse_move)
         # mplcursors.cursor(line) # or just mplcursors.cursor()
 
         fig, axs=plt.subplots(1)
-        axs.plot(self.rounded_vis_stim)
+        axs.plot(self.rounded_vis_stim['Prairire']['VisStim'])
         
         for i in range(40):
             color = tuple(np.random.choice(range(256), size=3)/256)
-            axs.plot(np.argwhere(self.full_stimuli_binary_matrix[i,:]) ,self.rounded_vis_stim[np.argwhere(self.full_stimuli_binary_matrix[i,:])],'x', color=color)
+            axs.plot(np.argwhere(self.full_stimuli_binary_matrix[i,:]) ,self.rounded_vis_stim['Prairire']['VisStim'][np.argwhere(self.full_stimuli_binary_matrix[i,:])],'x', color=color)
             
     def correct_signals_names(self):               
         signals=list(self.voltage_signals.keys())

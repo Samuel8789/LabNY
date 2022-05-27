@@ -34,3 +34,9 @@ class CRFsPrep():
     def __init__(self, analysis_object=None):
         pass
         print('Processing CRFResults')
+        '''
+        prepare matlab binary matrix
+        give standrad names
+        prepare transfer to server
+        
+        '''

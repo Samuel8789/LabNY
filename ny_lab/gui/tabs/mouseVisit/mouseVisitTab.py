@@ -440,7 +440,9 @@ class MouseVisitTab(tk.Frame):
         cage=self.breeding_cage.get()
         male_select=self.breedings_manager.selected_mice[0]
         females_select1=self.breedings_manager.breedings_manager_female_subframe.selected_mice
-        females_select2=self.breedings_manager.breedings_manager_female_subframe2.selected_mice
+        females_select2=[]
+        if self.breedings_manager.breedings_manager_female_subframe2.selected_mice:
+            females_select2=self.breedings_manager.breedings_manager_female_subframe2.selected_mice
         females_select=females_select1+females_select2
 
 
@@ -453,6 +455,8 @@ class MouseVisitTab(tk.Frame):
         self.breedings_manager.start_male_selection_frame.update_lists(updated_cage_list=sorted(self.gui_ref.MouseDat.stock_mice[self.gui_ref.MouseDat.stock_mice['Sex']=='Male']['Cage'].values.tolist()))
         self.breedings_manager.breedings_manager_female_subframe.start_female_selection_frame.update_lists(updated_cage_list=sorted(self.gui_ref.MouseDat.stock_mice[self.gui_ref.MouseDat.stock_mice['Sex']=='Female']['Cage'].values.tolist()))
         self.breedings_manager.breedings_manager_female_subframe2.start_female_selection_frame.update_lists(updated_cage_list=sorted(self.gui_ref.MouseDat.stock_mice[self.gui_ref.MouseDat.stock_mice['Sex']=='Female']['Cage'].values.tolist()))
+        self.breedings_manager.breedings_manager_female_subframe2.selected_mice=None
+        females_select2=[]
 
         print('New Breeding Set Up')      
         

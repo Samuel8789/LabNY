@@ -4,12 +4,18 @@ Created on Tue Oct 12 10:19:14 2021
 
 @author: sp3660
 """
-import matplotlib.pyplot as plt
-import numpy as np
 import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import pickle
+import glob
+import scipy.signal as sg
+
 import tifffile
 from PIL import Image
-
+from pydoc import importfile
 try:
     if __IPYTHON__:
         # this is used for debugging purposes only.
@@ -23,15 +29,18 @@ from caiman.source_extraction import cnmf as cnmf
 import time
 import matlab.engine
 import scipy.io as spio
-import glob
 from .caimanSorterYSResults_legacy import CaimanSorterYSResults
 import keyboard
-from ...functions.transform_path import transform_path
-from scipy.signal import convolve2d
 import copy
-from ....data_analysis.resultsAnalysis import ResultsAnalysis
-import matplotlib as mpl
+try:
+    from ...functions.transform_path import transform_path
+except:
+    module = importfile(r'C:/Users/sp3660/Documents/Github/LabNY/ny_lab/dataManaging/functions/transform_path.py')
+    transform_path = module.transform_path
+    
 
+    
+import matplotlib as mpl
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b",'g','y','c','m', 'tab:brown']) 
 
 mpl.rcParams['pdf.fonttype'] = 42
@@ -48,6 +57,27 @@ class CaimanResults():
         self.dataset_object=dataset_object
         self.movie_path=movie_path
         self.hdf5_file_path=hdf5_file_path
+        
+        
+        self.MCMC_sigma=50#ms
+        self.dfdt_sigma=50#ms
+
+
+        
+        
+        self.binarized_dfdt=np.empty((0, 0))
+        self.C_matrix=np.empty((0, 0))
+        self.raw=np.empty((0, 0))
+        self.dfdt_unsmoothed=np.empty((0, 0))
+        self.dfdt_accepted_matrix=np.empty((0, 0))
+        self.binarized_dfdt=np.empty((0, 0))
+        self.MCMC_matrix=np.empty((0, 0))
+        self.convolved_MCMC=np.empty((0, 0))
+        self.binarized_MCMC=np.empty((0, 0))
+        self.foopsi_matrix=np.empty((0, 0))
+        self.convolved_foopsi=np.empty((0, 0))
+        self.binarized_foospi=np.empty((0, 0))
+        
 
         if dataset_object and caiman_object:
             self.movie_path=self.dataset_object.kalman_object.kalman_path
@@ -62,8 +92,6 @@ class CaimanResults():
     def load_pyhton_cnm_object(self) :      
         self.cnm = cnmf.online_cnmf.OnACID(path=self.hdf5_file_path)
 
-    def load_analysis_object(self):
-        self.analysis_object=ResultsAnalysis(caiman_results_object=self)
 
     def check_if_mat_file(self):
         # matlab doesn save full path so change to glob mat files finsihed with sort
@@ -84,38 +112,58 @@ class CaimanResults():
 
 
     def load_caiman_hdf5_results(self):
-        pass
+        self.cnm = cnmf.online_cnmf.OnACID(path=self.hdf5_file_path)
+        self.data={}
+        self.data['est']={}
+        self.data['est']['C']=self.cnm.estimates.C
+        self.data['est']['YrA']=self.cnm.estimates.YrA
+        self.accepted_indexes_sorter=self.cnm.estimates.idx_components
+        self.accepted_cells_number=len( self.accepted_indexes_sorter)
+        
+        self.dfdt_unsmoothed =np.empty((0))
+        self.dfdt_accepted_matrix=np.empty((0))
+        self.binarized_dfdt=np.empty((0))
+        self.foopsi_matrix=np.empty((0))
+        self.convolved_foopsi=np.empty((0))
+        self.binarized_foospi=np.empty((0))
+        self.MCMC_matrix=np.empty((0))
+        self.convolved_MCMC=np.empty((0))
+        self.binarized_MCMC=np.empty((0))
+        self.accepted_cells_number=np.empty((0))
+        self.final_accepted_cells_matlabcorrected_indexes=np.empty((0))
+        
+
 
     def load_YSmat_results(self):
-        self.data = mat73.loadmat(self.mat_results_path)
-        self.get_all_sorting_indexes()
-    
+        if self.mat_results_path:
+            self.data = mat73.loadmat(self.mat_results_path)
+            self.get_all_sorting_indexes()
+        else:
+            self.load_caiman_hdf5_results()
+            
     def load_denoised_traces(self):  
         # self.raw=self.data['est']['C']+self.data['est']['YrA']
         self.C_matrix=self.data['est']['C'][self.accepted_indexes_sorter,:]
-        self.YrA_matrix=self.data['est']['C'][self.accepted_indexes_sorter,:]
+        self.YrA_matrix=self.data['est']['YrA'][self.accepted_indexes_sorter,:]
         self.raw=self.C_matrix + self.YrA_matrix
+        
 
-    def gaussian_smooth_kernel_convolution(self, signal):
+    def gaussian_smooth_kernel_convolution(self, signal, sigma):
         dt = 1000/np.double(self.data['ops']['init_params_caiman']['data']['fr'])
-        sigma=50#ms
         sigma_frames = sigma/dt
         # make kernel
         kernel_half_size = int(np.ceil(np.sqrt(-np.log(0.05)*2*sigma_frames**2)))
         gaus_win =list(range( -kernel_half_size,kernel_half_size+1))
         gaus_kernel = [np.exp(-(i**2)/(2*sigma_frames**2)) for i in gaus_win]
         gaus_kernel = gaus_kernel/sum(gaus_kernel)
-        conv_trace = convolve2d(np.expand_dims(signal,1), np.expand_dims(gaus_kernel,1), mode='same')
+        conv_trace = sg.convolve2d(np.expand_dims(signal,1), np.expand_dims(gaus_kernel,1), mode='same')
         return conv_trace
 
     def load_dfdt_traces(self):
         # dfdt traces are saved as smotthe/rectified/normalized acoording to checkboxes form yuriy sirter, dont need to do
         # default threshold of 2 stds 
-        self.dfdt=self.data['proc']['deconv']['smooth_dfdt']
-        self.dfdt_spikes=self.dfdt['S']
-        self.dfdt_std=self.dfdt['S_std']
+    
         self.dfdt_std_threshold=2
-        self.dfdt_accepted_matrix=self.dfdt['S'][self.accepted_indexes_sorter,:]
         
         self.dfdt= self.data['proc']['deconv']['smooth_dfdt']
         self.dfdt_spikes= self.dfdt['S']
@@ -146,7 +194,7 @@ class CaimanResults():
         self.mcmc_good_components=[cell[0] for cell in np.array(self.mcmc['S'])[self.accepted_indexes_sorter] if cell[0] is not None]
         self.MCMC_matrix=np.zeros(1)
         self.MCMC_matrix=np.array(self.mcmc_good_components).squeeze().astype('float64')
-        self.convolved_MCMC=np.apply_along_axis(self.gaussian_smooth_kernel_convolution, axis=1, arr=self.MCMC_matrix)
+        self.convolved_MCMC=np.apply_along_axis(self.gaussian_smooth_kernel_convolution, axis=1, arr=self.MCMC_matrix,  sigma=self.MCMC_sigma)
         self.convolved_MCMC=np.squeeze(self.convolved_MCMC)
         self.binarized_MCMC=np.where( self.convolved_MCMC > 0, 1, 0)
         # binarized_MCMC=(mcmc_good_components > 0.0001).astype(np.int_)
@@ -202,51 +250,43 @@ class CaimanResults():
             elif '.mmap' in self.movie_path:
                 self.image_sequence=cm.load(self.movie_path)
                     
-    def get_exciatotry_indices(self):
-        
-        matlabindexespyr=[9,55,88,99,102,142]
-        pythoncorrectedpyr=[i-1 for i in matlabindexespyr]
-        pyrcellindexactivity=[self.final_accepted_cells_matlabcorrected_indexes.tolist().index(i) for i in pythoncorrectedpyr]
-            
-    def get_inhibitory_indices(self):
-        matlabindexesinter=[2,5,17,30,44,45,66,71]
-        pythoncorrectedinter=[i-1 for i in matlabindexesinter]
-        intercellindexactivity=[self.final_accepted_cells_matlabcorrected_indexes.tolist().index(i) for i in pythoncorrectedinter]
 
-    def plot_registered_two_color_projections(self):
 
-        self.caiman_object.dataset_object.associated_tomato_dataset.load_dataset(kalman=False)
         
-        calcium_image=self.caiman_object.dataset_object.summary_images_object.projection_dic['std_projection_path']
-        tomato_image=self.caiman_object.dataset_object.associated_tomato_dataset.summary_images_object.projection_dic['average_projection_path']
-
-  
-
-        masks=self.data['est']['contours']
-        selected_masks=[ masks[i] for i in self.accepted_indexes_sorter]
-        self.load_pyhton_cnm_object()
-        Amat=self.cnm.estimates.A
-
-        maqsks=np.reshape(Amat, (256,256,227))
+    def plot_final_rasters(self):    
+        self.accepted_cells_number
+        self.accepted_indexes_sorter
         
-        accepted=Amat[:,self.accepted_indexes_sorter]
-     
+        pixel_per_bar = 4
+        dpi = 100
         
-        masks=''
-        #overlay accepted mask with tomato and green image
-        #measure red intensity in masks
-        # make a list of maska and a index selecting tomato /calcium
+               
+        fig,ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.dfdt_thesholded_accepted_matrix, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].imshow( self.binarized_dfdt, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_df/dt')
         
-        self.cnm.estimates.plot_contours( tomato_image, self.accepted_indexes_sorter[21:30])
-        pyrindexes=[2,5,6,7,8,11,17]
-        inteindexes=[1,3,4,9,10,12,13,14,15,16,18,19]
-        
-        
-        
-        
+        fig,ax = plt.subplots(3,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.MCMC_matrix, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[0].title.set_text('Raw_MCMC')
+        ax[1].imshow( self.convolved_MCMC, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[1].title.set_text('Smoothed_MCMC_{}'.format(self.MCMC_sigma))
+        ax[2].imshow( self.binarized_MCMC, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[2].title.set_text('Binarized_smoothed_MCMC_{}_{}'.format(0, self.MCMC_sigma ))
+        ax[-1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_MCMC')
     
         
-    
 
     def loadmat(self,filename):
         '''
@@ -301,8 +341,9 @@ class CaimanResults():
     def load_all(self):
         self.load_YSmat_results()
         self.load_denoised_traces()
-        self.load_dfdt_traces()
-        self.load_mcmc_traces()
+        if self.mat_results_path:
+            self.load_dfdt_traces()
+            self.load_mcmc_traces()
                 
 if __name__ == "__main__":
     

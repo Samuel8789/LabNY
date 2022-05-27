@@ -104,8 +104,8 @@ class ImagingSessionPanel(tk.Toplevel):
         self.frame1.frame1.listboxes={}
         self.frame1.frame1.listbox_variables={}
         self.frame1.frame1.scrollbar ={}
+        
         for i, litbox_name in enumerate(self.frame1.frame1.litbox_names):
-     
             self.frame1.frame1.listbox_variables[litbox_name]=StringVar()  
             self.frame1.frame1.listboxes[litbox_name]=Listbox(self.frame1.frame1, listvariable=self.frame1.frame1.listbox_variables[litbox_name], width=10, height=10, exportselection=0)
             self.frame1.frame1.scrollbar [litbox_name]= Scrollbar(self.frame1.frame1) 
@@ -116,8 +116,6 @@ class ImagingSessionPanel(tk.Toplevel):
         self.get_all_objects()
 
         
-
-    
         self.frame1.frame1.listboxes[ self.frame1.frame1.litbox_names[0]].bind('<<ListboxSelect>>', self.get_mouse_info_and_data)
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].bind('<<ListboxSelect>>', self.get_acquisition_info)
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[2]].bind('<<ListboxSelect>>', self.get_dataset_info)
@@ -294,6 +292,8 @@ class ImagingSessionPanel(tk.Toplevel):
                                     # 'Swicth tomato(if 3plane ac)',  
                                                               ]
                              
+        
+        
         self.frame2.frame1.buttons_commands=[self.open_facecamera_button, 
                                              self.open_kalman_button,
                                              self.open_directory_button, 
@@ -310,6 +310,8 @@ class ImagingSessionPanel(tk.Toplevel):
                                              # self.switch_red_button,
 
                                            ]   
+        
+        
         for i, butt in enumerate( self.frame2.frame1.buttons_names):
               self.frame2.frame1.buttons[ butt]= ttk.Button( self.frame2.frame1 , text= self.frame2.frame1.buttons_names[i], command= self.frame2.frame1.buttons_commands[i])
 
@@ -539,16 +541,12 @@ class ImagingSessionPanel(tk.Toplevel):
         self.mice=self.datamanaging.all_existing_sessions_not_database_objects[self.session_date].session_imaged_mice_codes
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[0]].set(self.mice)
 
- 
     def get_all_mouse_acquisitions(self):
   
-        
         acquisitions=list(self.mice_objects[self.mouse_code]['Acquisitions'].keys())
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[1]].set(acquisitions)   
         self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].config(width=0,height=0)
-        
-        
-        
+              
     def get_acquisition_datasets(self):   
         selected_acq_datasets= list(self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'].keys())
         # for listbox_var in   self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[2:]]:
@@ -557,20 +555,15 @@ class ImagingSessionPanel(tk.Toplevel):
            listbox_var.set(selected_acq_datasets)   
            self.frame1.frame1.listboxes[var_name].config(width=0,height=0)
 
-           
-           
         self.frame2.frame1.listbox_variables[list(self.frame2.frame1.listbox_variables.keys())[0]].set(selected_acq_datasets) 
         self.frame2.frame1.listboxes[list(self.frame2.frame1.listboxes.keys())[0]].config(width=0,height=0)
 
-
-                
     def get_dataset_objects(self):
         # self.selected_dataset_object=self.selected_acquisition_object.all_datasets[self.selected_dataset]
         self.selected_dataset_objects={}
         for key, val in  self.selected_datasets.items():
             self.selected_dataset_objects[key]=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'][val]['Object']
             
-                   
     def load_selected_datasets(self):
         
         self.selected_acquisition_object.load_vis_stim_info()
@@ -587,12 +580,8 @@ class ImagingSessionPanel(tk.Toplevel):
         
         self.selected_mouse_object= self.mice_objects[self.mouse_code]['Object']
         
-        
-        
     def get_acquisition_object(self):
         self.selected_acquisition_object=self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Object']
-        
-
         
     def get_mouse_info_and_data(self, event):
         selection = self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[0]].curselection()
@@ -625,22 +614,18 @@ class ImagingSessionPanel(tk.Toplevel):
         else:
             pass 
 
-        
     def get_acq_metadata(self):
         # self.selected_acquisition_object.load_metadata_slow_working_directories()
         self.metadata_dict=self.selected_acquisition_object.metadata_object.translated_imaging_metadata
 
+
         for i, label in enumerate(self.frame2.frame3.labels_names):  
             
             if self.metadata_dict[label] is not np.nan: 
-           
-            
                 self.frame2.frame3.labels_values_variables[label].set( self.metadata_dict[label])
             else:
                 self.frame2.frame3.labels_values_variables[label].set('NA')
 
-
-        
     def get_dataset_info(self, event):
         self.selected_datasets={}
         
@@ -772,7 +757,6 @@ class ImagingSessionPanel(tk.Toplevel):
             except:
                 print('kalman not transfered')
        
-
     def transfer_kalman_to_desktop_button(self):
         self.transfer_kalman_to_desktop()
 
@@ -789,9 +773,6 @@ class ImagingSessionPanel(tk.Toplevel):
             except:
                 print('caiman not transfered')
      
-
-
-
     def transfer_caiman_to_desktop_button(self):
         self.transfer_caiman_to_desktop()
 
@@ -807,8 +788,6 @@ class ImagingSessionPanel(tk.Toplevel):
 
             except:
                 print('facecam not transfered')
-      
-  
 
     def transfer_facecam_to_desktop_button(self):
         self.transfer_facecam_to_desktop()
@@ -831,8 +810,7 @@ class ImagingSessionPanel(tk.Toplevel):
     def open_slow_mouse_directory_action(self):
         
         os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging',self.session_date))
-  
-               
+      
     def open_raw_acquisition_directory_action(self):
         
         os.startfile(self.datamanaging.all_existing_sessions_not_database_objects[ self.session_date].imaging_session_mice_path+'\\'+self.mouse_code)
@@ -857,16 +835,13 @@ class ImagingSessionPanel(tk.Toplevel):
                 widefield_image[list(self.datamanaging.all_experimetal_mice_objects[ self.mouse_code].\
                     imaging_sessions_not_yet_database_objects[self.session_date].\
                         widefield_image.keys())[0]]
-        widefieldob.load_image()
-        self.frame1.frame3_widefield=widefieldob.widefield_image
-                
+                    
+        widefieldob.load_all()
         self.frame1.frame3.ax.clear()
-        self.frame1.frame3.ax.imshow(self.frame1.frame3_widefield, cmap='inferno')
+        widefieldob.plot_image(self.frame1.frame3.ax)
+        widefieldob.plot_rois(self.frame1.frame3.ax)
+        
         self.frame1.frame3.canvas.draw()   
-        
-        
-        
-        
         
     def plot_signals_button(self):
         t=time.time()
@@ -879,12 +854,10 @@ class ImagingSessionPanel(tk.Toplevel):
         
     def plot_signals(self):
         
-
         for i in self.frame2.frame2.axs:
             i.clear()
             
         self.frame2.frame2.canvas.draw()  
-
         dats=[]
         if not self.selected_acquisition_object.voltage_signal_object.no_voltage_signals:
             if hasattr(self.selected_acquisition_object.voltage_signal_object.extraction_object, 'rectified_speed_array'):               
@@ -900,13 +873,10 @@ class ImagingSessionPanel(tk.Toplevel):
                     self.frame2.frame2.axs[n].clear()
                     self.frame2.frame2.canvas.draw()  
                     self.frame2.frame2.axs[n].plot(dat)
-
         else:
-       
            dats.append(np.array([False]))
            self.frame2.frame2.axs[0].clear()
            self.frame2.frame2.axs[0].plot(dats[0])
-        
         
         self.frame2.frame2.canvas.draw()   
    

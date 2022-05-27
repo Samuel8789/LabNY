@@ -627,7 +627,7 @@ class ImagingDatabase():
         
         query_single_acquisition_info="""
             SELECT *        
-            FROM Acquisitions_table 
+            FROM Acquisitions_table s
             WHERE ID IN(?)""" 
         query_single_acquisition_imaging_info="""
             SELECT *        
@@ -640,7 +640,7 @@ class ImagingDatabase():
             WHERE AcquisitionID IN(?)""" 
             
         query_single_acquisition_visstim_info="""
-            SELECT a.*, b.*        
+            SELECT a.*, b.ID as ProtocolID, b.VisStimProtocol_name        
             FROM VisualStimulations_table a 
             LEFT JOIN VisualStimProtocols_table b ON b.ID=a.VisualStimulationProtocolID
             WHERE AcquisitionID IN(?)""" 
@@ -1632,6 +1632,10 @@ class ImagingDatabase():
             Behaviour=5
             Treatment='SessionA'
             VisStimSequence='10mingratings+5xmovie3+10xmovie1+10mingrating+5minspont+5xmovie3+10mingrating'
+        else:
+            Behaviour=4
+            Treatment='Mistmatch'
+            VisStimSequence=''
         
         query_add_visstim="""
                     INSERT INTO VisualStimulations_table(

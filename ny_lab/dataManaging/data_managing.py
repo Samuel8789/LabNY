@@ -37,7 +37,7 @@ class DataManaging():
         self.Database_ref=self.LabProjectObject.database
         # self.update_all_imaging_data_paths()
         
-        self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects']
+        self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects']
         self.data_paths_data={name:os.path.join(self.LabProjectObject.data_paths_project[name], self.data_paths[i])  for i , name in enumerate(self.LabProjectObject.data_paths_names)}     
 
         
@@ -398,10 +398,13 @@ class DataManaging():
         # self.delete_pre_procesed_strucutre_mouse_without_data()
         
     def delete_pre_procesed_strucutre_mouse_without_data(self):
-        mouse_to_delete=[ mouse for mouse in self.mouse_data_structure_paths['Pre_proccessed_slow'].keys() if mouse not in  list(self.all_imaged_mice_objects.keys())]
-        for mouse in mouse_to_delete:
-            if os.path.isdir(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse]):
-               recursively_delete_back_directories(self.mouse_data_structure_paths['Pre_proccessed_slow'][mouse])
+        for key in self.mouse_data_structure_paths.keys():
+            if ('Pre_proccessed_slow_chandelier_tigres' in key) or ('Pre_proccessed_slow_interneurons_others' in key) :
+                
+                mouse_to_delete=[ mouse for mouse in self.mouse_data_structure_paths[key].keys() if mouse not in  list(self.all_imaged_mice_objects.keys())]
+                for mouse in mouse_to_delete:
+                    if os.path.isdir(self.mouse_data_structure_paths[key][mouse]):
+                       recursively_delete_back_directories(self.mouse_data_structure_paths[key][mouse])
 #%% creating data_path_structures        
         
         
@@ -467,14 +470,23 @@ class DataManaging():
             
             if 'Interneuron' in project:
                 fast_disk='Analysis_Fast_2'
+                slowdisk='Pre_proccessed_slow_interneurons_others'
             if 'Chandelier' in project:
                 fast_disk='Analysis_Fast_1'
+                slowdisk='Pre_proccessed_slow_chandelier_tigres'
+
             if 'Tigre' in project   : 
                 fast_disk='Analysis_Fast_2'
+                slowdisk='Pre_proccessed_slow_chandelier_tigres'
+
             if 'TEST' in project   : 
                 fast_disk='Analysis_Fast_2'
+                slowdisk='Pre_proccessed_slow_interneurons_others'
+
             if 'Collaborations' in project   : 
                 fast_disk='Analysis_Fast_1'   
+                slowdisk='Pre_proccessed_slow_interneurons_others'
+
             
             # os.makedirs(os.path.join(self.secondary_data_path,projects[i],line[i],code))
             if '::' in line:
@@ -483,7 +495,7 @@ class DataManaging():
                     firstline=line[:indexes[0]]
                     secondline=line[(indexes[0]+2):]   
                     workingdir=os.path.join(self.data_paths_data[fast_disk] ,project,firstline,secondline,code)
-                    slowdir=os.path.join(self.data_paths_data['Pre_proccessed_slow'] ,project,firstline,secondline,code)
+                    slowdir=os.path.join(self.data_paths_data[slowdisk] ,project,firstline,secondline,code)
                     all_mice_paths[code]=[workingdir, slowdir]
 
                     if not os.path.isdir(slowdir):
@@ -493,14 +505,14 @@ class DataManaging():
                     secondline=line[(indexes[0]+2):indexes[1]]
                     thirdline=line[(indexes[1]+2):]
                     workingdir=os.path.join(self.data_paths_data[fast_disk] ,project,firstline,secondline,thirdline,code)
-                    slowdir=os.path.join(self.data_paths_data['Pre_proccessed_slow'] ,project,firstline,secondline,thirdline,code)
+                    slowdir=os.path.join(self.data_paths_data[slowdisk] ,project,firstline,secondline,thirdline,code)
                     all_mice_paths[code]=[workingdir, slowdir]
                     
                     if not os.path.isdir(slowdir):
                         os.makedirs(slowdir)
             else:
                 workingdir=os.path.join(self.data_paths_data[fast_disk] ,project,line,code)
-                slowdir=os.path.join(self.data_paths_data['Pre_proccessed_slow'] ,project,line,code)
+                slowdir=os.path.join(self.data_paths_data[slowdisk] ,project,line,code)
                 all_mice_paths[code]=[workingdir, slowdir]
                 
                 if not os.path.isdir(slowdir):
@@ -535,6 +547,38 @@ class DataManaging():
  
     
 #%% reading and updating all database imaging stroage paths  
+
+
+    def update_mouse_slow_storages(self):
+        
+        query_all_codes="""
+                SELECT a.Code,a.ID, a.SlowStoragePath, a.WorkingStoragePath
+                FROM ExperimentalAnimals_table a   
+                WHERE Project!=6 
+                """
+        params=()
+        all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
+        newdrive='D'
+        
+        for mouse in all_mouse_info:
+            mouse_expid=mouse[1]
+            mouse_SlowStoragePath=mouse[2]
+            mouse_WorkingStoragePath=mouse[3]
+
+            if ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations_' in mouse_SlowStoragePath):
+                newslowstorage=newdrive+mouse_SlowStoragePath[1:]
+                query_mouse_slow_storage_update="""
+                      UPDATE ExperimentalAnimals_table
+                      SET SlowStoragePath=?
+                      WHERE ID=?
+                      """  
+                params=(newslowstorage, mouse_expid)
+                self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)    
+                
+        self.update_all_imaging_data_paths()
+        
+        
+        
 
     def update_all_imaging_data_paths(self) :
         query_all_codes="""
@@ -775,7 +819,7 @@ class DataManaging():
               mouse_object.get_all_mouse_FOVdata_datasets()       
               mouse_object.all_mouse_acquisitions_datasets
               greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key}   
-              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 and dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']!=1}
+              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 and dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1}
               for dataset in tododeepgreensatasets.values():
                   dataset.do_deep_caiman()
         self.get_all_deep_caiman_objects()

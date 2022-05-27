@@ -5,12 +5,17 @@ Created on Fri Oct 15 10:37:21 2021
 @author: sp3660
 """
 
+import os
+import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import pickle
+import glob
 
 # import h5py
 # import scipy.io
 import mat73
-import numpy as np
 from scipy.spatial.distance import squareform, pdist
 from scipy.stats import distributions
 from scipy.cluster.hierarchy import dendrogram, linkage
@@ -18,48 +23,64 @@ from sklearn.cluster import AgglomerativeClustering, KMeans
 from scipy.cluster.hierarchy import fcluster
 from scipy.io import loadmat, savemat
 import networkx as nx 
+import random
+from scipy.stats import norm
+
 from pprint import pprint
 import time
 import copy
 from scipy.spatial.distance import cdist
-from .MiscFunctions.jesusMiscFunc import  shuffle, find_threshold_in_cumulative_distribution, seriation, get_peaks_similarity, contrast_index,get_evoked_neurons,get_peak_vectors
-from .MiscFunctions.jesusMiscFunc import get_significant_network_from_raster, filter_raster_by_network, find_peaks, change_raster_bin_size, get_peak_indices, get_adjacency_from_raster
-import matplotlib as mpl
+try:
+    from .MiscFunctions.jesusMiscFunc import  shuffle, find_threshold_in_cumulative_distribution, seriation, get_peaks_similarity, contrast_index,get_evoked_neurons,get_peak_vectors
+    from .MiscFunctions.jesusMiscFunc import get_significant_network_from_raster, filter_raster_by_network, find_peaks, change_raster_bin_size, get_peak_indices, get_adjacency_from_raster
+except:
+    from MiscFunctions.jesusMiscFunc import  shuffle, find_threshold_in_cumulative_distribution, seriation, get_peaks_similarity, contrast_index,get_evoked_neurons,get_peak_vectors
+    from MiscFunctions.jesusMiscFunc import get_significant_network_from_raster, filter_raster_by_network, find_peaks, change_raster_bin_size, get_peak_indices, get_adjacency_from_raster
+       
+    
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
-import pickle
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b",'g','y','c','m', 'tab:brown']) 
 
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
 mpl.rcParams['font.family'] = 'Arial'
+from matplotlib.backends.backend_pdf import PdfPages
+
+plt.rcParams["figure.figsize"] = [16, 9]
 
 class JesusEnsemblesResults():
     
-    def __init__(self, analysis_object=None, analysis_path=False):
+    def __init__(self, analysis_object=None, analysis_path=False, input_raster=np.empty([0]), plotting=None):
         self.analysis_object=analysis_object
         self.analysis_path=analysis_path
+        self.input_raster=input_raster
+       
         
             
-        if   not analysis_path:  
-            if  self.analysis_object.jesus_binary_spikes.any():
-                self.raster=self.analysis_object.jesus_binary_spikes
+        if not analysis_path:  
+            if self.analysis_object:
+                self.stimulus_table= self.analysis_object.stimulus_table
+                if  self.analysis_object.jesus_binary_spikes.any():
+                    self.raster=self.analysis_object.jesus_binary_spikes
                 # this is the testing rasetr
                 # self.raster=loadmat('toyraster.mat')['raster']
-            
-            
-            self.export_raster_to_mat()
+            elif self.input_raster.any():
+                self.raster=self.input_raster
+                
+            # self.export_raster_to_mat()
             np.random.seed(0)
             t_initial=time.time()
             self.set_default_options()
+            #%% get similarity between cells and threshold it based on shuffled activity
             network, adjacency,thres,adjacency_squareform=get_significant_network_from_raster(self.raster,  self.options['Network']['Bin'],
                                                     self.options['Network']['Iterations'],self.options['Network']['Alpha'],
                                                     self.options['Network']['NetworkMethod'],self.options['Network']['ShuffleMethod'],
                                                     self.options['Network']['SingleThreshold'])
+            #%%remove spikes of frames that are not significnatly connecteed to anything
             raster_filtered,spikes_fraction_removed=filter_raster_by_network(self.raster, network)
-            
-            #%% to translate
+            #%% get high activity vecrtos
             vector_id, _, _, _=find_peaks(np.sum(raster_filtered, axis=0),   self.coactive_neurons_threshold, False)
             if not vector_id.any():
                 analysis = []
@@ -67,7 +88,7 @@ class JesusEnsemblesResults():
             # % Get neural vectors
             pprint('   Getting vectors...')
             self.raster_vectors = get_peak_vectors(self.raster, vector_id, 'binary')
-            #%% Get similarity
+            #%% Get similarity betwen high active vectors
             pprint('   Getting similarity...')
             similarity,_ = get_peaks_similarity(self.raster_vectors, self.options['Clustering']['SimilarityMeasure'])
             
@@ -85,20 +106,25 @@ class JesusEnsemblesResults():
             # except:
             #     pass
             
-            #%% Get recommended number of ensembles
+            #%% Get recommended number of ensembles by contrat index
             pprint(['   Finding optimum number of clusters (based on ' +self.options['Clustering']['EvaluationIndex']+ ' index)...'])
             n_ensembles, clustering_indices = self.cluster_test(tree,similarity, self.raster_vectors, self.options['Clustering']['EvaluationIndex'], clusteringMethod='hierarchical', groups=self.options['Clustering']['Range'])
             
-            # % Get hierarchical clustering with recommended clusters
+            fig, ax=plt.subplots(1)
+            ax.plot(self.options['Clustering']['Range'], clustering_indices)
+            plt.show()
+            
+            #%% Get hierarchical clustering with recommended clusters
             pprint(['   Extracting '+ str(n_ensembles) +' ensembles...'])
             # sequence =AgglomerativeClustering(n_ensembles, linkage=self.options['Clustering']['LinkageMethod']).fit(1-similarity)
             sequence=fcluster(tree, n_ensembles,criterion='maxclust' )
             
-            # % Get ensemble structure
+            #%% Get neurons belonging to ensemble
             pprint('   Identifying significant neurons during ensemble activation...')
             structure_pre,structure_belongingness,structure_p,ensemble_activity_binary,ensemble_vectors,ensemble_indices = self.get_ensemble_neurons(self.raster, vector_id, sequence)
             
-            #% Get ensemble networks
+            #%% Get functional netwoek of cells belonging to each ensemble to do further filtering
+            # this sorted neurons in ensmble base on significance of previous step
             pprint('   Getting ensemble networks...')
             ensemble_neurons=[]
             ensemble_networks=[]
@@ -116,14 +142,14 @@ class JesusEnsemblesResults():
                 ensemble_networks.append(network_i)
                 all_ensemble_networks = np.logical_or(all_ensemble_networks,  ensemble_networks[i])
             
-            #% Get final ensemble neurons (this step removes neurons that were significantly active during 
+            #%% Get final ensemble neurons (this step removes neurons that were significantly active during 
             # % ensemble activation but were not significantly connected)
             pprint('   Setting functional connected neurons to ensembles...')
             structure=np.zeros((n_ensembles,network.shape[0] ))
             for i in range(n_ensembles):
                 structure[i,:] = np.sum(ensemble_networks[i], axis=0)>0;    
             
-            #% Get ensemble activity
+            #%% This gtes similarity betwen ensemble vectors to define significant ensembles
             pprint('   Getting ensemble activity...')
             neurons, frames = self.raster.shape; 
             n_ensembles = len(ensemble_networks);
@@ -132,18 +158,18 @@ class JesusEnsemblesResults():
             for i in range(n_ensembles):
                 # % Get activity weights
                 idd = ensemble_indices[i];
-                jaccard = 1-cdist(np.expand_dims(np.double(structure[i,:]>0), axis=0),np.double(ensemble_vectors[i].T),metric='jaccard');
+                jaccard = 1-cdist(np.expand_dims(np.double(structure[i,:]>0), axis=0), np.double(ensemble_vectors[i].T),metric='jaccard');
                 ensemble_activity[i,idd]=jaccard
                 
                 # % Get structure weights
                 structure_weights[i,:] = np.expand_dims(np.mean(ensemble_vectors[i],axis=1), axis=0);
             structure_weights_significant = structure_weights*(structure>0);
             
-            #% Number of ensemble activation and duration
+            #%% Number of ensemble activation and duration
             pprint('   Getting ensemble durations...')
-            widths,peaks_count = self.get_ensembles_length(vector_id, sequence);
+            widths ,peaks_count = self.get_ensembles_length(vector_id, sequence);
             
-            #% Evaluate similarity within ensemble vectors
+            #%% Evaluate similarity within ensemble vectors
             pprint('   Identifying significant ensembles...')
             # % Get similarity within rasters
             within,vector_count= self.similarity_within_rasters(ensemble_vectors);
@@ -154,15 +180,20 @@ class JesusEnsemblesResults():
             id_ensemble = np.where(h_ensemble)[0]
             id_nonensemble = np.where(h_ensemble==False)[0];
             
-            #%Get number of significant and non significant ensembles
+            #%%Separate significant and non significant ensembles
             n_ensembles = len(id_ensemble);
             n_nonensembles = len(id_nonensemble);
             if n_nonensembles:
                 # % Get new sequence (only significant ensembles)
                 sequence_new = np.zeros(sequence.shape);
                 for i in range(n_ensembles):
-                    sequence_new[sequence==id_ensemble[i]] = i;
+                    sequence_new[sequence==id_ensemble[i]+1] = i+1;
                 sequence = sequence_new;
+                
+                sequence_non_ensembles = np.zeros(sequence.shape);
+                for i in range(n_nonensembles):
+                    sequence_non_ensembles[sequence==id_nonensemble[i]+1] = i+1;
+                
                 
                 # % Non ensembles properties
                 nonensemble_activity = ensemble_activity[id_nonensemble,:]
@@ -205,7 +236,7 @@ class JesusEnsemblesResults():
                 pprint('      '+ str(n_ensembles)+ ' significant ensembles.')
                 pprint('      ' +str(n_nonensembles)+ ' non significant ensembles.')
             
-            #% Sort ensembles
+            #%% Sort ensembles by number of cells
             pprint('   Sorting ensembles from high to low participation...')
             structure_weights_sorted,neuron_id,ensemble_id_sorted,ensemble_avg_weights =self.sort_ensemble_weights(structure_weights_significant);
             ensemble_activity = ensemble_activity[ensemble_id_sorted,:]
@@ -232,7 +263,7 @@ class JesusEnsemblesResults():
             for  i in range(n_nonensembles):
                 vectors_id = np.concatenate((vectors_id, nonensemble_indices[i]))
     
-            # % Save analysis dictionary
+            # %% Save analysis dictionary
             pprint('   Adding results to ''analysis'' variable output...')
             self.analysis={}
             self.analysis['Options']=self.options
@@ -258,11 +289,7 @@ class JesusEnsemblesResults():
             self.analysis['Clustering']['ClusteringIndices']=clustering_indices
             # self.analysis['Clustering']['TreeID']=treeID
     
-    
-    
-    
-    
-    
+
             self.analysis['Ensembles']={}
             self.analysis['Ensembles']['Count']=n_ensembles
             self.analysis['Ensembles']['ActivationSequence']=sequence
@@ -293,6 +320,7 @@ class JesusEnsemblesResults():
     
             if n_nonensembles:
                 self.analysis['NonEnsembles']['Count']=n_nonensembles
+                self.analysis['NonEnsembles']['ActivationSequence']=sequence_non_ensembles
                 self.analysis['NonEnsembles']['Activity']=nonensemble_activity
                 self.analysis['NonEnsembles']['ActivityBinary']=nonensemble_activity_binary
                 self.analysis['NonEnsembles']['Networks']=nonensemble_networks
@@ -309,28 +337,44 @@ class JesusEnsemblesResults():
                 self.analysis['NonEnsembles']['Durations']=nonensemble_widths
                 self.analysis['NonEnsembles']['PeaksCount']=nonensemble_peaks_count
                 self.analysis['NonEnsembles']['Probability']=nonensemble_p
-    
-    
-      
+
             
             # % Display the total time
             t_final = time.time()-t_initial;
             pprint('You are all set! (total time: ' +str(t_final)+ ' seconds)')
+            
         else:
             self.load_analysis_from_file()
             
-#%% methods
+#%% file managing
 
-
+    # def save_results(self):
+    #     print('Saving jesus run')
+    #     datapath=os.path.join(self.jesus_runs_path, self.jesus_runs_path_name)
+        
+    #     if not os.path.isdir(self.jesus_runs_path):
+    #         os.mkdir(self.jesus_runs_path)
+            
+    
+    #     with open(datapath, 'wb') as f:
+    #         # Pickle the 'data' dictionary using the highest protocol available.
+    #         pickle.dump(self.jesus_run, f, pickle.HIGHEST_PROTOCOL)
+    
     def load_analysis_from_file(self):
 
         with open( self.analysis_path, 'rb') as file:
             self.results_from_file= pickle.load(file)
             
-        self.analysis=self.results_from_file[3] 
-            
+        self.analysis=self.results_from_file[4] 
         
-        
+    def export_raster_to_mat(self):
+        savemat(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_analysis\Jesus\Ensemblex\Ensemblex\test_raster.mat',{'raster':self.raster})
+
+
+
+#%% methods
+  
+
     def cluster_test(self, treeOrData, similarity,vectors,  metric='contrast',clusteringMethod='hierarchical',groups=np.arange(2,31),fig=None):
         '''
         # % Clustering indexes
@@ -570,8 +614,7 @@ class JesusEnsemblesResults():
             mu,sigma = distributions.norm.fit(selected);
             # % [~,pCov] = normlike([mu,sigma],selected); % this is for confidence intervals (pLo and pUp)
             # % [p,pLo,pUp] = normcdf(ensemble_sim,mu,sigma,pCov);
-            from scipy.stats import norm
-            p.append( 1-norm.cdf(ensemble_sim,mu,sigma))
+            p.append( 1-norm.cdf(ensemble_sim ,mu,sigma))
         return p
     
     def sort_ensemble_weights(self,structure,weight_threshold=0):
@@ -613,8 +656,7 @@ class JesusEnsemblesResults():
         avg_weights_sorted = avgWeights[ensemble_id]
         return structure_sorted, neuron_id, ensemble_id, avg_weights_sorted
 
-    def export_raster_to_mat(self):
-        savemat(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_analysis\Jesus\Ensemblex\Ensemblex\test_raster.mat',{'raster':self.raster})
+  
         
     def set_default_options(self):
         
@@ -635,31 +677,77 @@ class JesusEnsemblesResults():
                     'Alpha':0.05
                     }
     
-    def plotting_summary(self):
+    #%%plotting
+    def plot_raster(self):
         
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Raster'], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raw Unsorted')
+        # for vector in np.where(self.analysis['Filter']['VectorID'])[0]:
+        #     ax.axvspan(vector-1,vector+1, facecolor='g', alpha=0.1)
+        
+        
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Filter']['RasterFiltered'], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.set_xlabel('Time (s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Filtered Unsorted')
+        # for vector in np.where(self.analysis['Filter']['VectorID'])[0]:
+        #     ax.axvspan(vector-1,vector+1, facecolor='g', alpha=0.1)
 
-        neuron_id=self.analysis['Ensembles']['NeuronID']
-        raster=self.analysis['Raster']
-        vector_id=self.analysis['Ensembles']['VectorID'].astype('uint64')
-             
-        #%%network
-        network=self.analysis['Network']
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Filter']['RasterVectors'].T, cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.set_xlabel('Vector')
+        fig.supylabel('Cell Number')
+        fig.suptitle('RasterVectors')
+     
+    def plot_networks(self):  
+        
+        network=self.analysis['Significant Network']
+        adjacency=self.analysis['Cell Adjacency Matrix']
+
         pixel_per_bar = 4
         dpi = 100
         
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(10,10))
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(network, aspect='auto')
+        ax.imshow(network, cmap='binary', aspect='auto')
         ax.set_xlabel('Cell Number')
         fig.supylabel('Cell Number')
-        fig.suptitle('Network')
+        fig.suptitle('Significant Network')
         
         # fig, ax=plt.subplots(1)
         # ax.imshow(network, aspect='auto')
-            
         
-        #%% vectors
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(10,10))
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(adjacency, aspect='auto')
+        ax.set_xlabel('Cell Number')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Adjacency Network')
+        
+        # fig, ax=plt.subplots(1)
+        # ax.imshow(network, aspect='auto')
+    def plot_vector_clustering(self):
         similarity=self.analysis['Clustering']['Similarity']
         fig = plt.figure(figsize=(16,9))
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
@@ -669,35 +757,245 @@ class JesusEnsemblesResults():
         fig.suptitle('Vector Similarity')
         
         
-        #%% ensemble activity
-        esnnet=self.analysis['Ensembles']['AllEnsembleNetwork']
+        N=self.analysis['Filter']['RasterVectors'].shape[0]
+        res_ord = seriation(self.analysis['Clustering']['Tree'], N, N+N-2)
+        
+        similarity=self.analysis['Clustering']['Similarity']
         fig = plt.figure(figsize=(16,9))
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(esnnet, aspect='auto')
-        ax.set_xlabel('Cell Number')
+        ax.imshow(similarity[res_ord ], aspect='auto')
+        ax.set_xlabel('Ensemble Vector')
+        fig.supylabel('Ensemble Vector')
+        fig.suptitle('Sorted Vector Similarity')
+     
+        fig = plt.figure(figsize=(10, 6))
+        dn = dendrogram(self.analysis['Clustering']['Tree'])
+        
+        
+        
+    def plot_input_raster(self):
+        
+        pixel_per_bar = 4
+        dpi = 100
+        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Raster'], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.set_xlabel('Time (s)')
         fig.supylabel('Cell Number')
-        fig.suptitle('Network')
+        fig.suptitle('Raw Unsorted')
         
         
-        esact=self.analysis['Ensembles']['ActivityBinary']
-        fig = plt.figure(figsize=(16,9))
+    def plot_all_ensembles_rasters(self):
+        
+        for ensemble_index  in range(len(self.analysis['Ensembles']['EnsembleNeurons'])):
+            self.plot_activity_cell_ensemble(ensemble_index)
+            
+        
+    def plot_activity_cell_ensemble(self, ensemble_index):
+        
+        
+        # first get cell indexes
+        
+        cells=self.analysis['Ensembles']['EnsembleNeurons'][ensemble_index]
+        # cells=self.analysis['NonEnsembles']['EnsembleNeurons'][ensemble_index]
+
+        cells.sort()
+        #second get activity
+        activity=self.analysis['Raster'][cells]
+        # get ensmeble presentations
+        ensembleframes=np.where(self.analysis['Ensembles']['ActivationSequence']==ensemble_index+1)[0]
+        # nonensembleframes=np.where(self.analysis['NonEnsembles']['ActivationSequence']==ensemble_index+1)[0]
+
+        
+        
+        #plot raster
+        # pixel_per_bar = 4
+        # dpi = 100
+        # fig = plt.figure(figsize=(16,9),dpi=dpi)
+        # ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        # ax.imshow(activity,cmap='binary', aspect='auto')
+        # ax.set_xlabel('Time(s)')
+        # fig.supylabel('Ensemble Cell')
+        # fig.suptitle('Ensemble {} Activity'.format(ensemble_index+1) )
+        
+        #plot traces
+        pixel_per_bar = 4
+        dpi = 100
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  #
+        
+        for i,cell in enumerate(cells):
+            ax.vlines(np.where(activity[i,:]), ymin=i+0, ymax=i+1)
+            self.finali=i
+
+        for j in   ensembleframes : 
+            ax.axline((j, 0), (j, self.finali+1), linewidth=0.1, color='g', alpha=0.2)
+ 
+        ax.set_xlabel('Time(s)')
+        fig.supylabel('Ensemble Cell')
+        fig.suptitle('Ensemble {} Activity'.format(ensemble_index+1))
+        
+       
+        
+        
+        
+        
+        
+    def plotting_ensembles(self):
+        self.analysis['Ensembles']['ActivationSequence']
+        
+        
+        
+        
+        
+        pixel_per_bar = 4
+        dpi = 100
+        
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(esact, aspect='auto')
-        ax.set_xlabel('Ensemble')
+        ax.imshow(self.analysis['Ensembles']['Activity'],cmap='binary', aspect='auto')
+        ax.set_xlabel('Time(s)')
         fig.supylabel('Ensemble')
-        fig.suptitle('Network')
+        fig.suptitle('Ensemble Activity')
         
+             
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Ensembles']['ActivityBinary'],cmap='binary', aspect='auto')
+        ax.set_xlabel('Time(s)')
+        fig.supylabel('Ensemble')
+        fig.suptitle('Ensemble Activity Binary')
+        
+        
+              
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Ensembles']['AllEnsembleNetwork'],cmap='binary', aspect='auto')
+        ax.set_xlabel('Cell')
+        fig.supylabel('Cell')
+        fig.suptitle('Ensemble Network')
+        
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Ensembles']['Structure'].T,cmap='binary', aspect='auto')
+        ax.set_xlabel('Ensemble')
+        fig.supylabel('Cell')
+        fig.suptitle('Ensemble Network')
+        
+        fig = plt.figure(figsize=(16,9),dpi=dpi)
+        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        ax.imshow(self.analysis['Ensembles']['StructureSorted'].T,cmap='binary', aspect='auto')
+        ax.set_xlabel('Ensemble')
+        fig.supylabel('Cell')
+        fig.suptitle('Ensemble Network')
+        
+      
+        
+        ensemble_1_neurons=sorted(self.analysis['Ensembles']['EnsembleNeurons'][0])
+        ensemble_1_activations=sorted(self.analysis['Ensembles']['Indices'][0])
+
+        self.full_data=self.analysis_object.full_data
+        self.stimulus_table=self.analysis_object.stimulus_table
+        activity_traces=self.analysis_object.full_data['imaging_data']['Plane1']['Traces']['dfdt_binary']
+        driftinfo=self.analysis_object.full_data['visstim_info']['Drifting_Gratings']
+        
+  
+        
+        for j ,i in enumerate(self.analysis['Ensembles']['Networks']):
+           fig = plt.figure(figsize=(16,9),dpi=dpi)
+           ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+           ax.imshow(i,cmap='binary', aspect='auto')
+           ax.set_xlabel('Cell')
+           fig.supylabel('Cell')
+           fig.suptitle('Ensemble '+str(j+1)+' Network')
+           
+           
+        colors_ = lambda n: list(map(lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF),range(n)))
+        colors = colors_(len(self.analysis['Ensembles']['Vectors']))   
+        for j ,i in enumerate(self.analysis['Ensembles']['Vectors']):
+           fig = plt.figure(figsize=(16,9),dpi=dpi)
+           ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+           ax.imshow(i,cmap='binary', aspect='auto')
+           ax.set_xlabel('Vectors')
+           fig.supylabel('Cell')
+           fig.suptitle('Ensemble '+str(j+1)+' Network')
+           
+           
+           ensemble_neurons=sorted(self.analysis['Ensembles']['EnsembleNeurons'][j])
+           for ne in ensemble_neurons:
+               ax.axhspan(ne-0.5, ne+0.5, facecolor=colors[j], alpha=0.3)
+           
+            
+         
+        ensemble_vis_stim_info=[]   
+         
+        for l, ensemble in enumerate(self.analysis['Ensembles']['Indices']):
+        
+            stim_indexes = 1000*np.ones((1,len(ensemble)))
+            
+            for k, activation in enumerate(ensemble):
+                for i, row in  self.stimulus_table['drifting_gratings'].iterrows():
+                    range_to_test=np.arange(row.start, row.end)
+                    
+                    if activation in range_to_test:
+                        stim_indexes[0,k]=np.int32(row.name)
+
+            active_stim=np.unique(stim_indexes)     
+                
+            active_ensemble_trials=self.stimulus_table['drifting_gratings'].iloc[active_stim[:-1]]
+            
+            ensemble_vis_stim_info.append((stim_indexes,active_ensemble_trials))
+            
+            
+        ensemble_vis_stim_info_corrected=copy.copy(ensemble_vis_stim_info)    
+        
+        for j, ensemb in enumerate(ensemble_vis_stim_info_corrected):
+            for k, idx in enumerate(ensemb[0][0]):
+                if idx!=1000:
+                    ensemble_vis_stim_info_corrected[j][0][0][k]=ensemble_vis_stim_info[j][1].loc[int(idx)].orientation
+            
+            
+        fig,ax=plt.subplots(4,2, figsize=(16,9))
+        for mm, ensemble in enumerate(ensemble_vis_stim_info_corrected):
+            # plt.hist(ensemble_vis_stim_info_corrected[0][0][0][ensemble_vis_stim_info_corrected[0][0][0]!=1000])
+            no1000=ensemble[0][0][ensemble[0][0]!=1000]
+            nonan=no1000[np.isnan(no1000)]=360
+            # _ = ax[int(mm/2),mm%2].hist(no1000, bins=np.linspace(0,360,9))
+            hist, bin_edges = np.histogram(no1000, bins=np.linspace(0,360,9))
+            ax[int(mm/2),mm%2].pie(hist, labels=bin_edges[:-1], autopct='%1.1f%%',
+            shadow=True, startangle=90)# arguments are passed to np.histogram
+
+
+        plt.pie(hist, labels=bin_edges[:-1], autopct='%1.1f%%',
+        shadow=True, startangle=90)
+           
+
+    def save_multi_image(self, filename):
+       pp = PdfPages(filename)
+       fig_nums = plt.get_fignums()
+       figs = [plt.figure(n) for n in fig_nums]
+       for fig in figs:
+          fig.savefig(pp, format='pdf')
+       pp.close()
+       plt.close('all')
+
+
+        
+        
+    def plotting_summary(self):
+
+
+        neuron_id=self.analysis['Ensembles']['NeuronID']
+        raster=self.analysis['Raster']
+        vector_id=self.analysis['Ensembles']['VectorID'].astype('uint64')
+
         
         ensemble_structure=np.vstack((self.analysis['Ensembles']['StructureWeightsSignificant'][:,neuron_id], self.analysis['NonEnsembles']['StructureWeightsSignificant'][:,neuron_id]))
         structure=ensemble_structure.T
         [n_neurons,n_ensembles] = structure.shape
-
-
-
         
-        
-        
-        #%% raster
         neuronsorted=raster[neuron_id,:][::-1]
         vectorsorted=raster[:,vector_id]
         neurvectorsorted=neuronsorted[:,vector_id]
@@ -706,15 +1004,7 @@ class JesusEnsemblesResults():
         pixel_per_bar = 4
         dpi = 100
         
-        
-        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(16,9), dpi=dpi)
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(raster, cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
-        ax.set_xlabel('Time (s)')
-        fig.supylabel('Cell Number')
-        fig.suptitle('Unsorted')
+
             
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(16,9), dpi=dpi)
@@ -724,6 +1014,7 @@ class JesusEnsemblesResults():
         ax.set_xlabel('Time (s)')
         fig.supylabel('Cell Number')
         fig.suptitle('Neuron Vectors Sorted')
+        plt.show()
         
      
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
@@ -735,6 +1026,8 @@ class JesusEnsemblesResults():
         ax.set_xlabel('Time (s)')
         fig.supylabel('Cell Number')
         fig.suptitle('Neuron Sorted')
+        plt.show()
+
         
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(16,9), dpi=dpi)
@@ -745,6 +1038,8 @@ class JesusEnsemblesResults():
         ax.set_xlabel('Time (s)')
         fig.supylabel('Cell Number')
         fig.suptitle(' Vectors Sorted')
+        plt.show()
+
         
         
          
@@ -757,11 +1052,39 @@ class JesusEnsemblesResults():
         fig.suptitle('Ensemble 1 Activity')
         plt.show()
 
-
         
+        pathtosav=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data\JesusRuns'
+
+        filename = os.path.join(pathtosav,"raster.pdf")
+        self.save_multi_image(filename)
+        # self.plot_raster()
+        filename = os.path.join(pathtosav,"raster2.pdf")
+        self.save_multi_image(filename)
+        self.plot_networks()
+        filename = os.path.join(pathtosav,"networks.pdf")
+        self.save_multi_image(filename)
+        self.plot_vector_clustering()
+        filename = os.path.join(pathtosav,"vectoclustering.pdf")
+        self.save_multi_image(filename)
+        # self.plotting_ensembles()
+        # filename = os.path.join(pathtosav,"ensembles.pdf")
+        # self.save_multi_image(filename)
+
+
+
     
 if __name__ == "__main__":
     
-  pass
+    jesus_run_file=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPHV\data\JesusRuns\210615_SPHV_FOV1_10minspont_50024_narrored_920_with-000_20220510-132101_MCMC_Plane1_Full_All_jesus_results.pkl'
+    
+    res=JesusEnsemblesResults(analysis_path=jesus_run_file)
+    self=res
+
+#%% rerun for tesitng
+    # raster=res.analysis['Raster']
+    # res=JesusEnsemblesResults(input_raster=raster)
+    # self=res
+
+    
     
    

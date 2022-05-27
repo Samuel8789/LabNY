@@ -11,6 +11,7 @@ import caiman as cm
 import numpy as np
 import pickle
 import glob
+import scipy.signal as sg
 from PIL import Image
 import matplotlib.pyplot as plt
 import tifffile
@@ -21,11 +22,15 @@ from caiman.motion_correction import apply_shift_online
 # from kalman_stack_filter import kalman_stack_filter
 # from save_imagej_hdf5_tiff import save_imagej_hdf5
 # from bidiShiftManager import BidiShiftManager
-
-from .kalman_stack_filter import kalman_stack_filter
-from .save_imagej_hdf5_tiff import save_imagej_hdf5
-from .bidiShiftManager import BidiShiftManager
-from ...functions.transform_path import transform_path
+try :
+    from .kalman_stack_filter import kalman_stack_filter
+    from .save_imagej_hdf5_tiff import save_imagej_hdf5
+    from .bidiShiftManager import BidiShiftManager
+    
+except:
+    from kalman_stack_filter import kalman_stack_filter
+    from save_imagej_hdf5_tiff import save_imagej_hdf5
+    from bidiShiftManager import BidiShiftManager
 
 
 class MotionCorrectedKalman:
@@ -83,6 +88,7 @@ class MotionCorrectedKalman:
                                 module_logger.info('doing new custom kalman')
                                 self.MC_corrected=cm.load(self.shifted_mmap_path) 
                                 self.do_kalman_filter()
+                                self.do_temporal_gaussian_smoothing(100)
                                 module_logger.info('saving kalman')
                     
                                 self.save_MC_kalman_movie()
@@ -103,6 +109,7 @@ class MotionCorrectedKalman:
                     self.build_output_filenames_if_not_there()
                     self.MC_corrected=cm.load(self.shifted_mmap_path) 
                     self.do_kalman_filter()
+                    self.do_temporal_gaussian_smoothing(100)
                     module_logger.info('doing first kalman')
                     module_logger.info('saving kalman')
                     self.save_MC_kalman_movie()
@@ -202,6 +209,8 @@ class MotionCorrectedKalman:
          self.kalman_custom_path=None
          self.kalman_full_path=None
          self.kalman_path=None
+         self.smoothed_path=None
+
          
          self.kalman_full_paths=glob.glob(self.temporary_path + '\\**Movie_MC_OnACID_**MC_kalman.tiff')
          self.kalman_custom_paths=glob.glob(self.temporary_path + '\\**end_MC_OnACID_**MC_kalman.tiff')
@@ -256,7 +265,14 @@ class MotionCorrectedKalman:
                    self.kalman_path='_'.join([os.path.join(self.temporary_path,self.good_filename),'MC_kalman.tiff'])
         
             elif self.mmap_directory:
-                   self.kalman_path='_'.join([os.path.join(self.mmap_directory,self.good_filename),'MC_kalman.tiff'])    
+                   self.kalman_path='_'.join([os.path.join(self.mmap_directory,self.good_filename),'MC_kalman.tiff'])   
+                   
+        if not self.smoothed_path:
+            if self.temporary_path and not self.dataset_object.bidishift_object.start_end_flag:
+                   self.smoothed_path='_'.join([os.path.join(self.temporary_path,self.good_filename),'MC_smoothed_100ms.tiff'])
+        
+            elif self.mmap_directory:
+                   self.smoothed_path='_'.join([os.path.join(self.mmap_directory,self.good_filename),'MC_smoothed_100ms.tiff'])   
    
         
 #%% loading from folder        
@@ -336,7 +352,34 @@ class MotionCorrectedKalman:
         else:
             module_logger.info('kalman already done')
 
+    def do_temporal_gaussian_smoothing(self, sigma):
+        
+        frame=self.dataset_object.metadata.translated_imaging_metadata['FinalFrequency']
+        sigma=100#ms
 
+        def gaussian_smooth_kernel_convolution(signal, fr, sigma):
+            dt = 1000/fr
+            sigma_frames = sigma/dt
+            # make kernel
+            kernel_half_size = int(np.ceil(np.sqrt(-np.log(0.05)*2*sigma_frames**2)))
+            gaus_win =list(range( -kernel_half_size,kernel_half_size+1))
+            gaus_kernel = [np.exp(-(i**2)/(2*sigma_frames**2)) for i in gaus_win]
+            gaus_kernel = gaus_kernel/sum(gaus_kernel)
+            conv_trace = sg.convolve2d(np.expand_dims(signal,1), np.expand_dims(gaus_kernel,1), mode='same')
+            return conv_trace.flatten()
+
+        smoothed=np.zeros_like(self.MC_corrected)
+        for x in np.arange(self.MC_corrected.shape[1]):
+            for y in np.arange(self.MC_corrected.shape[2]):
+                smoothed[:,x,y]=gaussian_smooth_kernel_convolution(self.MC_corrected[:,x,y],frame,sigma)
+        self.smoothed_motion_corrected=cm.movie(smoothed)
+
+    
+        
+        
+        
+        
+        
 
 #%% saving 
     def save_MC_kalman_movie(self):
@@ -346,6 +389,14 @@ class MotionCorrectedKalman:
                 save_imagej_hdf5(self.dataset_kalman_caiman_movie, os.path.splitext(self.kalman_path)[0], '.tiff', )
             # if not os.path.isfile( os.path.join(os.path.splitext(self.kalman_path)[0],'.mmap')):
             #     self.dataset_kalman_caiman_movie.save(os.path.splitext(self.kalman_path)[0]+'.mmap' ,to32=False)  
+            
+    def save_gaussian_smoothed_movie(self):
+     
+        if self.smoothed_path and self.smoothed_motion_corrected.any():
+            if not os.path.isfile( self.smoothed_path):
+                save_imagej_hdf5(self.smoothed_motion_corrected, os.path.splitext(self.smoothed_path)[0], '.tiff', )
+            # if not os.path.isfile( os.path.join(os.path.splitext(self.kalman_path)[0],'.mmap')):
+            #     self.dataset_kalman_caiman_movie.save(os.path.splitext(self.kalman_path)[0]+'.mmap' ,to32=False)
                 
 
           

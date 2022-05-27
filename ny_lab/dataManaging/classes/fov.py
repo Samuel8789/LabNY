@@ -14,7 +14,6 @@ from .aquisition import Aquisition
 # from .acquisitonVariants import Tomato1050Acquisition, Tomato3Plane1050Acquisition, TomatoHighResStack1050Acquisition, HighResStackGreenAcquisition, SurfaceImageAquisition, OtherAcqAquisition
 from .acquisitonVariants import *
 
-from ...data_pre_processing.dataExplorations import DataExplorations
 
 class FOV():
     

@@ -143,7 +143,7 @@ def filter_raster_by_network(raster, network):
         # % Find active neurons on single frame
         active = np.where(raster[:,frame]==1)[0]
         if active.any():
-    #         % Identify active neurons without no significant coactivation
+    #         % Identify active neurons without significant coactivation
             no_significant =  np.where(np.sum(network[active[:, np.newaxis], active], axis=0)==0)[0]
             if no_significant.shape!=0:
     #             % Delete no significant neuronal coactivity from frame
@@ -183,7 +183,7 @@ def get_significant_network_from_raster(raster,window,
     else:
         th = find_threshold_in_cumulative_distribution(As[:],alpha)
     A_significant = A_raw>th    
-    return A_significant, A_raw, th,As
+    return A_significant, A_raw, th, As
     
 def get_adjacency_from_raster(raster,connectivity_method='coactivity'):   
     
@@ -340,8 +340,8 @@ def find_threshold_in_cumulative_distribution( data, alpha):
             
         y,_ = np.histogram(data,x)
         cdy = np.cumsum(y)
-        cdy = cdy/np.max(cdy)
-        idd = (cdy>(1-alpha)).argmax(axis=0)
+        cdy2 = cdy/np.max(cdy)
+        idd = (cdy2>(1-alpha)).argmax(axis=0)
         th = x[idd]
     return th
 

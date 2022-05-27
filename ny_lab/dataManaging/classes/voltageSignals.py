@@ -4,35 +4,37 @@ Created on Fri Jan 14 16:12:17 2022
 
 @author: sp3660
 """
-
 import os
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-import glob
-import mplcursors
+import numpy as np
 import pickle
+import glob
+# lazy_import
+import mplcursors
 import math
 import shutil
 import gc
 import scipy.io as sio
 import copy
+import matplotlib as mpl
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
 import logging 
 module_logger = logging.getLogger(__name__)
-try :
-    from .standalone.voltageSignalsExtractions import VoltageSignalsExtractions
+
+try:
+   from .standalone.voltageSignalsExtractions import VoltageSignalsExtractions
 except:
-    from standalone.voltageSignalsExtractions import VoltageSignalsExtractions
+   from standalone.voltageSignalsExtractions import VoltageSignalsExtractions
 
 
 class VoltageSignals():
     
     def __init__(self, acquisition_object=None, voltage_excel_path=False, temporary_path=False, just_copy=False, slow_voltage_raw_csv_path=None, acquisition_directory_raw=False, extra_daq_path=None ):
         module_logger.info('Processing Voltage Signals')
-        
+
         # create empty dictionarys
         self.no_voltage_signals=True
         self.voltage_signals_dictionary_daq={'Locomotion': pd.DataFrame({'Locomotion' : []}),
@@ -44,8 +46,8 @@ class VoltageSignals():
                                          'Time':pd.DataFrame({'Time' : []}),
                                          'Input7':pd.DataFrame({'Input7' : []}),
                                          'PhotoStim':pd.DataFrame({'PhotoStim' : []}),
-                                         'PhotoTrig':pd.DataFrame({'PhotoTrigger' : []}),   
-                                         'AcqTrig':pd.DataFrame({'AcqTrigger' : []})
+                                         'PhotoTrig':pd.DataFrame({'PhotoTrig' : []}),   
+                                         'AcqTrig':pd.DataFrame({'AcqTrig' : []})
                                          }
         self.voltage_signals_dictionary=copy.copy(self.voltage_signals_dictionary_daq)
         del  self.voltage_signals_dictionary['Time']
@@ -71,6 +73,9 @@ class VoltageSignals():
         if self.acquisition_object: 
            
             self.check_slow_files()  
+            
+            
+            
             if self.acquisition_object.raw_input_path:
                 self.check_raw_files()
                 self.transfer_to_slow()
@@ -80,11 +85,35 @@ class VoltageSignals():
                 self.convert_signals_dictionaries_to_feather()
                 self.unload_voltage_signals()
                 self.unload_voltage_signals_daq()
-        
+        else:
+            if  self.extra_daq_path:
+                self.voltage_recording_extra_daq_slow_full_file_path= self.extra_daq_path
+                self.load_full_daq()
+                
+            if self.voltage_excel_path:
+                self.acq_temp_name=os.path.split(os.path.split(self.voltage_excel_path)[0])[1]
+                self.temporary_folder=os.path.join(r'C:\Users\sp3660\Desktop\TemporaryProcessing',self.acq_temp_name)
+                if not os.path.isdir( self.temporary_folder):
+                    os.mkdir(self.temporary_folder)
+
+                self.voltage_recording_raw_file_slow_full_file_path=self.voltage_excel_path
+                self.load_full_csv()
+
+
+                
 
                 
             
 #%% methods
+    def add_time_to_voltage_signals_dic(self):
+        
+        if self.voltage_signals_dictionary and not set(self.voltage_signals_dictionary).issuperset(['Time']):
+            self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(self.voltage_signals_dictionary['Locomotion'].shape[0]), columns=['Time'])
+            
+            
+
+
+    
     def check_slow_files(self):
         self.create_slow_storage_ftr_paths()
         self.check_if_ftr_files_in_slow_storage()
@@ -116,7 +145,9 @@ class VoltageSignals():
                                          'Input7':os.path.join(tosavepath['planes'], 'input7.ftr'),
                                          'PhotoStim':os.path.join(tosavepath['photostim'], 'photostim.ftr'),
                                          'PhotoTrig':os.path.join(tosavepath['photostim'], 'phototrigg.ftr'),
-                                         'AcqTrig':os.path.join(tosavepath['planes'], 'acqtrig.ftr')
+                                         'AcqTrig':os.path.join(tosavepath['planes'], 'acqtrig.ftr'),
+                                         'Time':os.path.join(tosavepath['planes'], 'time.ftr')
+
                                              }
         
         self.voltage_signals_ftr_path_daq_dictionary={'Locomotion':os.path.join(tosavepath['locomotion'], 'locomotion_daq.ftr') ,
@@ -249,6 +280,10 @@ class VoltageSignals():
                     self.voltage_signals_dictionary['Input2']=voltage_signals[signal].to_frame()
                 if 'Input7' in signal or 'Input 7' in signal:
                     self.voltage_signals_dictionary['Input7']=voltage_signals[signal].to_frame()
+                    
+                    
+            self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(voltage_signals.shape[0]), columns=['Time'])
+
             
    
     def load_full_daq(self):
@@ -267,7 +302,7 @@ class VoltageSignals():
             fullsignals_extra_daq=np.hstack((time_array,volt_array)).T
             
             
-            self.new_daq_keys=['Time', 'VisStim', 'OptoPockels', 'Start/End', 'LED', 'PhotoTrigger', 'Locomotion']
+            self.new_daq_keys=['Time', 'VisStim', 'Optopockels', 'Start/End', 'LED', 'PhotoTrigger', 'Locomotion']
             self.old_daq_keys=['Time', 'VisStim', 'Photodiode', 'Locomotion', 'LED/Frames', 'Optopockels',]
             if volt_array.shape[1]==5:
                 self.daq_keys=self.old_daq_keys
@@ -284,7 +319,7 @@ class VoltageSignals():
                     self.voltage_signals_dictionary_daq['LED']=self.voltage_signals_dictionary_daq['LED'].assign(LED=fullsignals_extra_daq[i,:].T.tolist()) 
                 if 'Photodiode' in key:
                     self.voltage_signals_dictionary_daq['PhotoDiode']=self.voltage_signals_dictionary_daq['PhotoDiode'].assign(PhotoDiode=fullsignals_extra_daq[i,:].T.tolist()) 
-                if 'Optopockels' in key:
+                if  'Optopockels' in key:
                     self.voltage_signals_dictionary_daq['PhotoStim']=self.voltage_signals_dictionary_daq['PhotoStim'].assign(PhotoStim=fullsignals_extra_daq[i,:].T.tolist())
                 if 'PhotoTrigger' in key:
                     self.voltage_signals_dictionary_daq['PhotoTrig']=self.voltage_signals_dictionary_daq['PhotoTrig'].assign(PhotoTrig=fullsignals_extra_daq[i,:].T.tolist())
@@ -332,6 +367,13 @@ class VoltageSignals():
         for key in self.voltage_signals_dictionary.keys():
             self.voltage_signals_dictionary[key].plot()
         pass
+    
+    def plot_all_signals_daq(self):
+
+        for key in self.voltage_signals_dictionary_daq.keys():
+            if not self.voltage_signals_dictionary_daq[key].empty:
+                self.voltage_signals_dictionary_daq[key].plot()
+        pass
 
 
     def load_slow_storage_voltage_signals(self):   
@@ -346,6 +388,9 @@ class VoltageSignals():
    
                 module_logger.info('no voltage signal '+ path)
                 
+        self.add_time_to_voltage_signals_dic()
+
+                
                 
     def load_slow_storage_voltage_signals_daq(self):   
     
@@ -358,6 +403,8 @@ class VoltageSignals():
             else:
    
                 module_logger.info('no daq voltage signal '+ path)
+        self.add_time_to_voltage_signals_dic()
+
 
             
     def unload_voltage_signals(self):
@@ -381,12 +428,18 @@ class VoltageSignals():
         self.extraction_object=VoltageSignalsExtractions(voltage_signals_object=self)
 
               
-            
+          #%%  
 if __name__ == "__main__":
-    extra=r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Chandelier_Optogenetics\VRC\SLF\Ai65\SPJM\imaging\20211111\test aquisitions\211111_SPJM_CellC_opto_25x_920_50024_narrow_with_10ms_14um_16sp_10x-000\raw_volatge_csv\211111_SPJM_CellC_opto_25x_920_50024_narrow_with_10ms_14um_16sp_10x-000_Cycle00001_VoltageRecording_001.csv'
-    voltagesignals=VoltageSignals(slow_voltage_raw_csv_path=extra)
-    test=voltagesignals.voltage_signals_dictionary_daq
-    # temporary_path1='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPJA\imaging\20210702\data aquisitions\FOV_1\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\raw_volatge_csv\210702_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    # voltagesignals=VoltageSignals(slow_voltage_raw_csv_path=temporary_path1)
-    # voltagesignals.plot_all_signals()
+    extra=r'G:\Projects\TemPrairireSSH\20220422\Calibrations\SensoryStimulation\UnprocessedDaq\220422_StimTest_0_AllenC_10minspont10reps_4_22_2022_18_42.mat' 
+    prairiresignals=r'G:\Projects\TemPrairireSSH\20220422\Calibrations\SensoryStimulation\TestAcquisitions\220422_AllenCCalTest-000\220422_AllenCCalTest-000_Cycle00001_VoltageRecording_001.csv'
+    voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals,extra_daq_path=extra)
+    # voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals)
+
+    voltagesignals.plot_all_signals_daq()
+    voltagesignals.plot_all_signals()
+    # voltagesignals.signal_extraction_object()
+    # extraction=voltagesignals.extraction_object
+    
+
+
     pass

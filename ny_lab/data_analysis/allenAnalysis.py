@@ -7,9 +7,13 @@ Created on Fri Feb 25 11:56:22 2022
 
 import networkx as nx
 import numpy as np
+import scipy.stats as st
+
 import matplotlib.pyplot as plt
 from matplotlib import gridspec
 # import torch
+from math import sqrt
+
 # import torch.nn as nn
 from random import sample, random
 from sklearn.decomposition import PCA
@@ -34,10 +38,25 @@ from scipy import stats, interpolate
 import scipy.io
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist, squareform
+from allensdk.brain_observatory.drifting_gratings import DriftingGratings
+try:
+    from .allenDatasetEquivalent import AllenDatasetEquivalent
+except:
+    from allenDatasetEquivalent import AllenDatasetEquivalent
 
 from matplotlib import pyplot as plt
 import pandas as pd
+import scipy.stats as st
+import pandas as pd
+import numpy as np
+import h5py
+from math import sqrt
+import logging
+from . import observatory_plots as oplots
+from . import circle_plots as cplots
 
+    
+import matplotlib.pyplot as plt
 
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
@@ -52,16 +71,53 @@ class AllenAnalysis():
                  acquisition_voltage_signals_object=None, metadata_object=None):
      
         if analysis_object:
+            self.analysis_object=analysis_object
+        
+        
+            self.path_managing()
+            self.milisecond_period=self.analysis_object.milisecond_period
+            self.full_data=self.analysis_object.full_data
+            self.movie_rate=self.full_data['imaging_data']['Frame_rate']
+            self.stimulus_table={}
+
+            '''
+            steps
+                plot visstim signal with speed
+                plottransitions framse
+                plot individual paradimgs with speed
+                Selecte ALLENA
+                    Define drifting grating parameters
+                    get slicnf ranges already corrected and aligne
+                        ?what to do if ranges have different size
+                            align to start
+                    get sliced grating matrix
+                    calculate dff over trials
+                    calculate trial avergae activity
+                    plot and check everythin here
+                    
+                    do teh rest of analysys
+                            
+                
+                
+                
+            # '''
+            # self.organize_signals_and_traces()
+
             
-            pass
-        
-        
-        
-        
-        
-        
-        
-        
+            # if self.analysis_object.signals_object.vis_stim_protocol =='AllenA':
+            #     self.set_up_drifting_gratings_parameters()
+            #     self.do_AllenA_analysis()
+
+                
+            # self.calculate_windows_and_ranges()
+            
+            
+            # self.slice_responses_by_gratings(  self.activity_matrixes_resampled,  self.ranges_resampled,     self.voltage_traces_resampled)
+            # self.calculate_df_f()
+            # self.trial_averaging_and_evoked_activity()
+
+
+            
         
         else:
                 
@@ -108,8 +164,8 @@ class AllenAnalysis():
                 
             self.cell_number=self.allplanesC.shape[0]
                           
-            self.resample_voltage_matrices()
-            self.resample_grating_indexes_and_matrix()
+            # self.resample_voltage_matrices()
+            # self.resample_grating_indexes_and_matrix()
             self.slice_borders()
             self.analyze_drifting_gratings()
             self.calculate_windows_and_ranges()
@@ -126,74 +182,435 @@ class AllenAnalysis():
 
 
 
-   #%% Allen analsysys
+#%% Allen analsysys
+    def path_managing(self):
+        self.allen_results_path=self.analysis_object.allen_runs_path
+        noise_correlations_filename=self.analysis_object.acquisition_object.aquisition_name+'_noise_correlations'
+        signal_correlations_filename=self.analysis_object.acquisition_object.aquisition_name+'_signal_correlations'
+        represent_similarty_matrix_filename=self.analysis_object.acquisition_object.aquisition_name+'_represent_similarty'
+        self.noise_correlations_to_save_path=os.path.join(self.allen_results_path,noise_correlations_filename)
+        self.signal_correlations_to_save_path=os.path.join(self.allen_results_path,signal_correlations_filename)
+        self.represent_similarty_matrix_to_save_path=os.path.join(self.allen_results_path,represent_similarty_matrix_filename)
+        
+        
 
-    def resample_voltage_matrices(self):
+
+   
+    def do_AllenA_analysis(self, plane, matrix):
         
-        self.resampled_vistim_matrix=self.resample(self.acquisition_voltage_signals.rounded_vis_stim[:], factor=self.milisecond_period, kind='linear').squeeze()
-        self.resampled_speed_matrix=self.resample(self.acquisition_voltage_signals.rectified_speed_array[:], factor=self.milisecond_period, kind='linear').squeeze()
-        self.resampled_acceleration_matrix=self.resample(self.acquisition_voltage_signals.acceleration_array    [:], factor=self.milisecond_period, kind='linear').squeeze()    
-      
-    def resample(self, x, factor, kind='linear'):
-        n = int(np.ceil(x.size / factor))
-        f = interpolate.interp1d(np.linspace(0, 1, x.size), x, kind)
-        return f(np.linspace(0, 1, n))       
+        self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']=self.stimulus_table['drifting_gratings']
+        self.mock_allen_dataset=AllenDatasetEquivalent(self.full_data, plane)
+        self.drift_obj=DriftingGratings(self.mock_allen_dataset)
+        self.sweeplength = 33
+        self.interlength = 16
+        self.extralength = 0
+        self.drift_obj.sweeplength = self.sweeplength
+        self.drift_obj.interlength = self.interlength
+        
+        self.sweep_response, self.mean_sweep_response,  self.pval = self.deconvolved_get_sweep_response(self, plane, matrix)
+
+        
+        
+        
+    def deconvolved_get_sweep_response(self, plane, matrix):
+        def do_mean(x):
+            # +1])
+            return np.mean(
+                x[self.interlength:
+                  self.interlength + self.sweeplength + self.extralength])
+
+        def do_p_value(x):
+            (_, p) = \
+                st.f_oneway(
+                    x[:self.interlength],
+                    x[self.interlength:
+                      self.interlength + self.sweeplength + self.extralength])
+            return p
+
+        C_mat=self.analysis_object.full_data['imaging_data'][plane]['Traces'][matrix]
+        self.numbercells=len(C_mat)
+        self.celltraces=C_mat
+        
+        self.dxcm=self.mock_allen_dataset.get_running_speed()
+        sweep_response = pd.DataFrame(index=self.stimulus_table['drifting_gratings'].index.values,
+                                      columns=list(map(str, range(
+                                          self.numbercells + 1))))
+        
+        sweep_response.rename(
+            columns={str(self.numbercells): 'dx'}, inplace=True)
+        
+        
+        for index, row in self.stimulus_table['drifting_gratings'].iterrows():
+            start = int(row['start'] - self.interlength)
+            end = int(row['start'] + self.sweeplength + self.interlength)
+
+            for nc in range(self.numbercells):
+                temp = self.celltraces[int(nc), start:end]
+                sweep_response[str(nc)][index] =temp 
+            sweep_response['dx'][index] = self.dxcm[start:end]
             
+        mean_sweep_response = sweep_response.applymap(do_mean)
+
+        pval = sweep_response.applymap(do_p_value)
+        return sweep_response, mean_sweep_response, pval
     
-    
-    
-    def resample_grating_indexes_and_matrix(self):    
+       
+
+
+        def get_response(self):
+            ''' Computes the mean response for each cell to each stimulus
+            condition.  Return is
+            a (# orientations, # temporal frequencies, # cells, 3) np.ndarray.
+            The final dimension
+            contains the mean response to the condition (index 0), standard
+            error of the mean of the response
+            to the condition (index 1), and the number of trials with a
+            significant response (p < 0.05)
+            to that condition (index 2).
+
+            Returns
+            -------
+            Numpy array storing mean responses.
+            '''
+            DriftingGratings._log.info("Calculating mean responses")
+
+            response = np.empty(
+                (self.drift_obj.number_ori, self.drift_obj.number_tf, self.numbercells + 1, 3))
+
+            def ptest(x):
+                if x.empty:
+                    return np.nan
+                return len(np.where(x < (0.05 / (8 * 5)))[0])
+
+            for ori in self.drift_obj.orivals:
+                ori_pt = np.where(self.drift_obj.orivals == ori)[0][0]
+                for tf in self.drift_obj.tfvals:
+                    tf_pt = np.where(self.drift_obj.tfvals == tf)[0][0]
+                    subset_response = self.mean_sweep_response[
+                        (self.drift_obj.stim_table.temporal_frequency == tf) & (
+                                    self.drift_obj.stim_table.orientation == ori)]
+                    subset_pval = self.pval[
+                        (self.drift_obj.stim_table.temporal_frequency == tf) & (
+                                self.drift_obj.stim_table.orientation == ori)]
+                    response[ori_pt, tf_pt, :, 0] = subset_response.mean(axis=0)
+                    response[ori_pt, tf_pt, :, 1] = subset_response.std(
+                        axis=0) / sqrt(len(subset_response))
+                    response[ori_pt, tf_pt, :, 2] = subset_pval.apply(
+                        ptest, axis=0)
+            return response
+        
+        self.response=get_response(self)
+        
+        def get_peak(self):
+            ''' Computes metrics related to each cell's peak response condition.
+     
+            Returns
+            -------
+            Pandas data frame containing the following columns (_dg suffix is
+            for drifting grating):
+                * ori_dg (orientation)
+                * tf_dg (temporal frequency)
+                * reliability_dg
+                * osi_dg (orientation selectivity index)
+                * dsi_dg (direction selectivity index)
+                * peak_dff_dg (peak dF/F)
+                * ptest_dg
+                * p_run_dg
+                * run_modulation_dg
+                * cv_dg (circular variance)
+            '''
+            DriftingGratings._log.info('Calculating peak response properties')
+     
+            peak = pd.DataFrame(index=range(self.drift_obj.numbercells),
+                                columns=('ori_dg', 'tf_dg', 'reliability_dg',
+                                         'osi_dg', 'dsi_dg', 'peak_dff_dg',
+                                         'ptest_dg', 'p_run_dg',
+                                         'run_modulation_dg',
+                                         'cv_os_dg', 'cv_ds_dg', 'tf_index_dg',
+                                         'cell_specimen_id'))
+            cids = self.drift_obj.data_set.get_cell_specimen_ids()
+     
+            orivals_rad = np.deg2rad(self.drift_obj.orivals)
+            for nc in range(self.drift_obj.numbercells):
+                cell_peak = np.where(self.response[:, 1:, nc, 0] == np.nanmax(
+                    self.response[:, 1:, nc, 0]))
+                prefori = cell_peak[0][0]
+                preftf = cell_peak[1][0] + 1
+                peak.cell_specimen_id.iloc[nc] = cids[nc]
+                peak.ori_dg.iloc[nc] = prefori
+                peak.tf_dg.iloc[nc] = preftf
+     
+                pref = self.response[prefori, preftf, nc, 0]
+                orth1 = self.response[np.mod(prefori + 2, 8), preftf, nc, 0]
+                orth2 = self.response[np.mod(prefori - 2, 8), preftf, nc, 0]
+                orth = (orth1 + orth2) / 2
+                null = self.response[np.mod(prefori + 4, 8), preftf, nc, 0]
+     
+                tuning = self.response[:, preftf, nc, 0]
+                tuning = np.where(tuning > 0, tuning, 0)
+                # new circular variance below
+                CV_top_os = np.empty((8), dtype=np.complex128)
+                CV_top_ds = np.empty((8), dtype=np.complex128)
+                for i in range(8):
+                    CV_top_os[i] = (tuning[i] * np.exp(1j * 2 * orivals_rad[i]))
+                    CV_top_ds[i] = (tuning[i] * np.exp(1j * orivals_rad[i]))
+                peak.cv_os_dg.iloc[nc] = np.abs(CV_top_os.sum()) / tuning.sum()
+                peak.cv_ds_dg.iloc[nc] = np.abs(CV_top_ds.sum()) / tuning.sum()
+     
+                peak.osi_dg.iloc[nc] = (pref - orth) / (pref + orth)
+                peak.dsi_dg.iloc[nc] = (pref - null) / (pref + null)
+                peak.peak_dff_dg.iloc[nc] = pref
+     
+                groups = []
+                for ori in self.drift_obj.orivals:
+                    for tf in self.drift_obj.tfvals[1:]:
+                        groups.append(
+                            self.mean_sweep_response[
+                                (self.drift_obj.stim_table.temporal_frequency == tf) &
+                                (self.drift_obj.stim_table.orientation == ori)][str(nc)])
+                groups.append(self.mean_sweep_response[
+                                  self.drift_obj.stim_table.temporal_frequency == 0][
+                                  str(nc)])
+                _, p = st.f_oneway(*groups)
+                peak.ptest_dg.iloc[nc] = p
+     
+                subset = self.mean_sweep_response[
+                    (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
+                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
+     
+                # running modulation
+                subset_stat = subset[subset.dx < 1]
+                subset_run = subset[subset.dx >= 1]
+                if (len(subset_run) > 2) & (len(subset_stat) > 2):
+                    (_, peak.p_run_dg.iloc[nc]) = st.ttest_ind(subset_run[str(nc)],
+                                                               subset_stat[
+                                                                   str(nc)],
+                                                               equal_var=False)
+     
+                    if subset_run[str(nc)].mean() > subset_stat[str(nc)].mean():
+                        peak.run_modulation_dg.iloc[nc] = (subset_run[
+                                                               str(nc)].mean() -
+                                                           subset_stat[
+                                                               str(nc)].mean()) \
+                                                          / np.abs(
+                            subset_run[str(nc)].mean())
+                    elif subset_run[str(nc)].mean() < subset_stat[str(nc)].mean():
+                        peak.run_modulation_dg.iloc[nc] = \
+                            (-1 * (subset_stat[str(nc)].mean() -
+                                   subset_run[str(nc)].mean()) /
+                             np.abs(subset_stat[str(nc)].mean()))
+     
+                else:
+                    peak.p_run_dg.iloc[nc] = np.NaN
+                    peak.run_modulation_dg.iloc[nc] = np.NaN
+     
+                # reliability
+                subset = self.sweep_response[
+                    (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
+                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
+                corr_matrix = np.empty((len(subset), len(subset)))
+                for i in range(len(subset)):
+                    for j in range(len(subset)):
+                        r, p = st.pearsonr(subset[str(nc)].iloc[i][30:90],
+                                           subset[str(nc)].iloc[j][30:90])
+                        corr_matrix[i, j] = r
+                mask = np.ones((len(subset), len(subset)))
+                for i in range(len(subset)):
+                    for j in range(len(subset)):
+                        if i >= j:
+                            mask[i, j] = np.NaN
+                corr_matrix *= mask
+                peak.reliability_dg.iloc[nc] = np.nanmean(corr_matrix)
+     
+                # TF index
+                tf_tuning = self.response[prefori, 1:, nc, 0]
+                trials = self.mean_sweep_response[
+                    (self.drift_obj.stim_table.temporal_frequency != 0) &
+                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])
+                ][str(nc)].values
+                SSE_part = np.sqrt(
+                    np.sum((trials - trials.mean()) ** 2) / (len(trials) - 5))
+                peak.tf_index_dg.iloc[nc] = (np.ptp(tf_tuning)) / (
+                            np.ptp(tf_tuning) + 2 * SSE_part)
+     
+            return peak
+        
+        self.peak=get_peak(self)
+        def row_from_cell_id(self, csid=None, idx=None):
+
+            if csid is not None and not np.isnan(csid):
+                return self.drift_obj.data_set.get_cell_specimen_ids().tolist().index(csid)
+            elif idx is not None:
+                return idx
+            else:
+                raise Exception("Could not find row for csid(%s) idx(%s)"
+                                % (str(csid), str(idx)))
+        
+        def open_star_plot(self, cell_specimen_id=None, include_labels=False,
+                           cell_index=None):
+            cell_index = self.row_from_cell_id(cell_specimen_id, cell_index)
+
+            df = self.mean_sweep_response[str(cell_index)]
+            st = self.drift_obj.data_set.get_stimulus_table('drifting_gratings')
+            mask = st.dropna(subset=['orientation']).index
+
+            data = df.values
+
+            cmin = self.response[0, 0, cell_index, 0]
+            cmax = max(cmin, data.mean() + data.std() * 3)
+
+            fp = cplots.FanPlotter.for_drifting_gratings()
+            fp.plot(r_data=st.temporal_frequency.loc[mask].values,
+                    angle_data=st.orientation.loc[mask].values,
+                    data=df.loc[mask].values,
+                    clim=[cmin, cmax])
+            fp.show_axes(closed=True)
+
+            if include_labels:
+                fp.show_r_labels()
+                fp.show_angle_labels()
+
+        def plot_orientation_selectivity(self,
+                                         si_range=oplots.SI_RANGE,
+                                         n_hist_bins=oplots.N_HIST_BINS,
+                                         color=oplots.STIM_COLOR,
+                                         p_value_max=oplots.P_VALUE_MAX,
+                                         peak_dff_min=oplots.PEAK_DFF_MIN):
+            # responsive cells
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min)
+
+            # orientation selective cells
+            osi_cells = vis_cells & ( self.peak.osi_dg > si_range[0][0]) & (
+                        self.peak.osi_dg < si_range[0][1])
+
+            peak_osi =  self.peak.loc[osi_cells]
+            osis = peak_osi.osi_dg.values
+
+            oplots.plot_selectivity_cumulative_histogram(osis,
+                                                         "orientation "
+                                                         "selectivity index",
+                                                         si_range=si_range[0],
+                                                         n_hist_bins=n_hist_bins,
+                                                         color=color)
+
+        def plot_direction_selectivity(self,
+                                       si_range=oplots.SI_RANGE,
+                                       n_hist_bins=oplots.N_HIST_BINS,
+                                       color=oplots.STIM_COLOR,
+                                       p_value_max=oplots.P_VALUE_MAX,
+                                       peak_dff_min=oplots.PEAK_DFF_MIN):
+
+            # responsive cells
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min)
+
+            # direction selective cells
+            dsi_cells = vis_cells & (self.peak.dsi_dg > si_range[0]) & (
+                        self.peak.dsi_dg < si_range[1])
+
+            peak_dsi = self.peak.loc[dsi_cells]
+            dsis = peak_dsi.dsi_dg.values
+
+            oplots.plot_selectivity_cumulative_histogram(dsis,
+                                                         "direction selectivity "
+                                                         "index",
+                                                         si_range=si_range,
+                                                         n_hist_bins=n_hist_bins,
+                                                         color=color)
+
+        def plot_preferred_direction(self,
+                                     include_labels=False,
+                                     si_range=oplots.SI_RANGE,
+                                     color=oplots.STIM_COLOR,
+                                     p_value_max=oplots.P_VALUE_MAX,
+                                     peak_dff_min=oplots.PEAK_DFF_MIN):
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min)
+            pref_dirs =  self.peak.loc[vis_cells].ori_dg.values
+            pref_dirs = [self.drift_obj.orivals[pref_dir] for pref_dir in pref_dirs]
+
+            angles, counts = np.unique(pref_dirs, return_counts=True)
+            oplots.plot_radial_histogram(angles,
+                                         counts,
+                                         include_labels=include_labels,
+                                         all_angles=self.drift_obj.orivals,
+                                         direction=-1,
+                                         offset=0.0,
+                                         closed=True,
+                                         color=color)
+
+        def plot_preferred_temporal_frequency(self,
+                                              si_range=oplots.SI_RANGE,
+                                              color=oplots.STIM_COLOR,
+                                              p_value_max=oplots.P_VALUE_MAX,
+                                              peak_dff_min=oplots.PEAK_DFF_MIN):
+
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min)
+            pref_tfs = self.peak.loc[vis_cells].tf_dg.values
+
+            oplots.plot_condition_histogram(pref_tfs,
+                                            self.tfvals[1:],
+                                            color=color)
+
+            plt.xlabel("temporal frequency (Hz)")
+            plt.ylabel("number of cells")
+         
+        # peak_info=self.drift_obj.get_peak() #gives error
+        # reponse_info=self.drift_obj.get_response() # not proper dimensions
+        # noise_cor=self.drift_obj.get_noise_correlation()
+        # rep_sim=self.drift_obj.get_representational_similarity()
+        # sig_cor=self.drift_obj.get_signal_correlation()
+        # # open_star_plot(cell_specimen_id=)
+        
+        # plt.imshow(sig_cor[0])
+        # plt.imshow(rep_sim[0])
+        # plt.imshow(noise_cor[0][:,:,0,0])
+        # plt.imshow(noise_cor[2])
+        # plt.imshow(noise_cor[3])
+        
+        # cell=2
+        # cell_resp=reponse_info[:,1:,cell,:]
+        # goodresp=reponse_info[:,1:,:,2]
+        # plt.imshow(goodresp[:,:,cell], aspect='auto')
+        
+        # test=self.mock_allen_dataset.get_corrected_fluorescence_traces()
+        # test2=self.mock_allen_dataset.get_cell_specimen_ids()
+        # plt.plot(test[0], test[1][cell,:])
         
         
-        self.resampled_stim_binary_matrix=np.zeros(( self.acquisition_voltage_signals.full_stimuli_binary_matrix.shape[0],
-                                                    self.movie_frames))
-        for row in range(self.acquisition_voltage_signals.full_stimuli_binary_matrix.shape[0]) :
-            self.resampled_stim_binary_matrix[row,:]=np.ceil(self.resample(self.acquisition_voltage_signals.full_stimuli_binary_matrix[row,:], factor=self.milisecond_period, kind='linear'))
-      
-        self.resampled_grating_start_indexes=np.ceil(self.acquisition_voltage_signals.tuning_stim_on_index_full_recording/self.milisecond_period).astype('uint16')
-        self.resampled_grating_end_indexes=np.ceil(self.acquisition_voltage_signals.tuning_stim_off_index_full_recording/self.milisecond_period).astype('uint16')
-            
-      
-        self.ranges_resampled={'resampled_grating_start_indexes':self.resampled_grating_start_indexes,
-                               'resampled_grating_end_indexes':self.resampled_grating_end_indexes,
-                                   }
-      
-        self.activity_matrixes_resampled={'grating_binary_matrix':self.resampled_stim_binary_matrix,
-                                  'cmatrix':self.allplanesC,
-                                  'dfdtmatrix':self.allplanesdfdt,
-                                  'foopsimatrx':self.allplanesfoopsi,
-                                  'mcmcmatrix':self.allplanesMCMC,
-                                  'rawmatrix':self.allplanesraw
-                                   }
-      
-        self.voltage_traces_resampled={'vistim_trace':self.resampled_vistim_matrix,
-                                  'speed_trace':self.resampled_speed_matrix,
-                                  'acceleration_trace':self.resampled_acceleration_matrix,
-                                   }
         
-    def slice_borders(self):
+        # filt=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']['orientation']==45
+        # self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]
+        # filt2=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]['temporal_frequency']==8
+        # filtered=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt][filt2]
         
-        self.pre_cut=60 # this is bases on the cut I did for crfs, might have to change it, howver fisrt grating is bad
-        self.post_cut=1616
-        self.border_slice=slice(self.pre_cut-1, self.movie_frames-self.post_cut,1)
+        # trial=558
         
-        self.activity_matrixes_resampled_bordercuts={key: value[:,self.border_slice] for key, value in  self.activity_matrixes_resampled.items()}
-        self.voltage_traces_resampled_bordercuts={key:value[self.border_slice] for key, value in  self.voltage_traces_resampled.items()}
-        self.ranges_resampled_bordercuts={key:(array-(self.pre_cut+1)) for key, array  in  self.ranges_resampled.items()}
         
-    def analyze_drifting_gratings(self):
+        # plt.plot(test[0][filtered.start[trial]-10:filtered.end[trial]+10], test[1][cell, filtered.start[trial]-10:filtered.end[trial]+10])
+
+
+
         
-      
+#%% DRIFTING GRATINGS
+    def set_up_drifting_gratings_parameters(self):
+        
+        
         self.isi_time=1000     #ms
         self.stim_time=2000    #ms
         self.pre_time=350     #ms
         self.post_time=350      #ms
         self.pre_frames=np.ceil(self.pre_time/self.milisecond_period).astype(int)
         self.post_frames=np.ceil(self.post_time/self.milisecond_period).astype(int)
-        self.grating_number=self.ranges_resampled_bordercuts['resampled_grating_start_indexes'].shape[0]
         
-        self.grating_repetitions=self.ranges_resampled_bordercuts['resampled_grating_start_indexes'].shape[1]
-        self.grating_frame_number=np.arange(self.resampled_grating_start_indexes[0,0]-self.pre_frames, self.resampled_grating_end_indexes[0,0]+self.post_frames).size
+        
+        self.grating_number=self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'].shape[0]
+        
+        
+        self.grating_repetitions=self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'].shape[1]
+        self.grating_frame_number=np.arange(self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][0,0]-self.pre_frames, self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_off'][0,0]+self.post_frames).size
       
         self.angles=np.linspace(0,360,9)[:-1]
         self.angle_numbers=len(self.angles)
@@ -202,19 +619,45 @@ class AllenAnalysis():
       
         self.angles_xv, self.frequencies_yv = np.meshgrid(self.angles, self.frequencies)
         self.anglevalues = np.reshape(np.arange(1,41), (5, 8))
+        
+        all_rows=[]
+        for ori in range(1,41):
+  
+            angled=self.angles_xv[:,np.where(self.anglevalues==ori)[1][0]][0]
+            freq=float(self.frequencies[np.where(self.anglevalues==ori)[0][0]])
+            
+            
+            indexes=list(zip(self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][ori-1,:], self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_off'][ori-1,:]))
+            for i in indexes:
+               all_rows.append((np.float32(freq),np.float32(angled), np.float32(0),np.int32(i[0]), np.int32(i[1]) ))
+              
+              
+        blankindexes=list(zip(self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Blank_sweep_on'], self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Blank_sweep_off']))
+
+        for i in blankindexes:
+          all_rows.append((np.float32(np.nan), np.float32(np.nan), np.float32(1),np.int32(i[0][0]), np.int32(i[1][0]) ))
+ 
+        df = pd.DataFrame(all_rows, columns =['temporal_frequency','orientation', 'blank_sweep', 'start', 'end'])
+        sorted_df=df.sort_values(by=['start'])
+        
+        self.stimulus_table['drifting_gratings']=sorted_df.reset_index(drop=True)
+
+        
     
     def calculate_windows_and_ranges(self):
         
         self.frame_windows={}
         for grat in range( self.grating_number):
             temp=[]
-            selected_grating_starts=self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][grat,:]
-            selected_grating_ends=self.ranges_resampled_bordercuts['resampled_grating_end_indexes'][grat,:]
+            selected_grating_starts=self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][grat,:]
+            selected_grating_ends=self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_off'][grat,:]
             for rept in range( self.grating_repetitions): 
                 frame_window=np.arange(selected_grating_starts[rept]-self.pre_frames, selected_grating_ends[rept]+self.post_frames).astype('int64')
-                if len(frame_window)!=self.grating_frame_number:
+                if len(frame_window)<self.grating_frame_number:
                     # temp.append(np.append(frame_window, frame_window[-1]+1))
                     temp.append(np.insert(frame_window, 0, frame_window[0]-1))
+                elif len(frame_window)>self.grating_frame_number:
+                    temp.append(frame_window[:-1])
                 else:
                     temp.append(frame_window)
             self.frame_windows[grat]=np.vstack(temp)    
@@ -223,108 +666,126 @@ class AllenAnalysis():
         for key, grat in self.frame_windows.items():
             self.ranges[key]=[]
             for trial in grat:
-                self.ranges[key].append(range(trial[0],trial[-1]+1))
+                self.ranges[key].append(np.arange(trial[0],trial[-1]+1))
+                
+            self.ranges[key]=np.vstack( self.ranges[key])
                 
                 
         self.extended_ranges={}
         for key, grat in self.frame_windows.items():
             self.extended_ranges[key]=[]
             for trial in grat:
-                self.extended_ranges[key].append(range(trial[0]-100,trial[-1]+100))
+                self.extended_ranges[key].append(np.arange(trial[0]-50,trial[-1]+50))
+            self.extended_ranges[key]=np.vstack(self.extended_ranges[key])
+
                 
                 
         for i in range(self.grating_number):       
-            zzz=np.ceil(self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][i,self.frame_windows[i]])
+            zzz2=np.ceil(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_downsampled'][i,self.frame_windows[i].squeeze()])
+            zzz=np.ceil(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,self.frame_windows[i].squeeze()])
+
             zzzz=np.diff(zzz)
             firsidex=np.argwhere(zzzz[:,:11])[:,1]
             tocorrect=np.argwhere(abs(firsidex-np.nanmean(firsidex))==max(abs(firsidex-np.nanmean(firsidex))))
             self.frame_windows[i][tocorrect.flatten()]=self.frame_windows[i][tocorrect.flatten()]-1
           
-            # zzz2=np.ceil(activity_matrixes_resampled_bordercuts['grating_binary_matrix'][i,frame_windows[i]])
+            # zzz2=np.ceil(activity_matrixes_resampled['grating_binary_matrix'][i,frame_windows[i]])
             # zzzz2=np.diff(zzz2)
             # firsidex2=np.argwhere(zzzz2[:,:11])[:,1]
             # tocorrect2=np.argwhere(abs(firsidex2-np.nanmean(firsidex2))==max(abs(firsidex2-np.nanmean(firsidex2))))
   
           
-    def slice_responses_by_gratings(self):       
   
-        self.grating_sliced_arrays={}
-        self.grating_sliced_arrays['dfdtmatrix']=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number, self.cell_number))
-        self.grating_sliced_arrays['rawmatrix']=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number, self.cell_number))
-        self.grating_sliced_arrays['mcmcmatrix']=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number, self.cell_number))
+    
+    def slice_matrix_by_indexes(self, matrix, slicing_range_matrix):
+        pass
+        # stim=indexes_on.shape[0]
+        # reps=indexes_on.shape[1]
+        # sliced_matrix=np.zeros((matrix.shape[0],stim, reps, self.grating_frame_number))
         
-        self.grating_sliced_traces={}
-        self.grating_sliced_traces['speed_trace']=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number))
-        self.grating_sliced_traces['vistim_trace']=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number))
+    
   
-  
-  
-        self.grating_extended_sliced_arrays={}
-        self.grating_extended_sliced_arrays['dfdtmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
-        self.grating_extended_sliced_arrays['rawmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
-        self.grating_extended_sliced_arrays['mcmcmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
+    def slice_responses_by_gratings(self, activity_dic, indexes, voltage_dictionary):   
         
-        self.grating_extended_sliced_traces={}
-        self.grating_extended_sliced_traces['speed_trace']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number))
-        self.grating_extended_sliced_traces['vistim_trace']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number))
+        
+        self.grating_sliced_dictionary={}
+        self.extended_grating_sliced_dictionary={}
+        
+        for activity_matrix  in activity_dic.keys():
+            self.grating_sliced_dictionary[activity_matrix]={}
+            self.extended_grating_sliced_dictionary[activity_matrix]={}
+
+            for plane in activity_dic[activity_matrix]:
+                cell_number=activity_dic[activity_matrix][plane].shape[0]
+                self.grating_sliced_dictionary[activity_matrix][plane]=np.zeros((cell_number,self.grating_number, self.grating_repetitions,self.grating_frame_number))
+                self.extended_grating_sliced_dictionary[activity_matrix][plane]=np.zeros((cell_number,self.grating_number ,self.grating_repetitions, len(self.extended_ranges[0][0]) ))
+                             
+                
+               
   
+        for activity, planes in self.grating_sliced_dictionary.items():
+            for plane, matrix  in planes.items():
+                for cell in range(matrix.shape[0]):
+                    for grat, trials in  self.ranges.items():
+                        for row, trial in enumerate(trials):
+                            matrix[cell,grat,row,:]=activity_dic[activity][plane][cell,trial]
   
-        for key, value in self.grating_sliced_arrays.items():
-          for cell in range(0,self.cell_number):
-              for grat, trials in   self.frame_windows.items():
-                  for row, trial in enumerate(trials):
-                      value[row,:,grat,cell]=self.activity_matrixes_resampled_bordercuts[key][cell,trial]
-         
-        for key, value in self.grating_sliced_traces.items():
-          for grat, trials in   self.frame_windows.items():
+        for activity, planes in self.extended_grating_sliced_dictionary.items():
+            for plane, matrix  in planes.items():
+                for cell in range(matrix.shape[0]):
+                    for grat, trials in  self.extended_ranges.items():
+                        for row, trial in enumerate(trials):
+                            matrix[cell,grat,row,:]=activity_dic[activity][plane][cell,trial]
+   
+                
+        self.grating_sliced_voltages_dictionary={}
+        self.extended_grating_sliced_voltages_dictionary={}
+        
+        for activity_matrix  in voltage_dictionary.keys():
+            self.grating_sliced_voltages_dictionary[activity_matrix]=np.zeros((self.grating_repetitions,self.grating_frame_number, self.grating_number))
+            self.extended_grating_sliced_voltages_dictionary[activity_matrix]=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number))
+            
+            self.grating_sliced_voltages_dictionary[activity_matrix]=np.zeros((self.grating_number,self.grating_repetitions,self.grating_frame_number ))
+            self.extended_grating_sliced_voltages_dictionary[activity_matrix]=np.zeros((self.grating_number,self.grating_repetitions,len(self.extended_ranges[0][0])))
+
+        for key, value in self.grating_sliced_voltages_dictionary.items():
+          for grat, trials in   self.ranges.items():
               for row, trial in enumerate(trials):
-                  value[row,:,grat]=self.voltage_traces_resampled_bordercuts[key][trial]  
-                  
-        self.grating_extended_sliced_arrays={}
-        self.grating_extended_sliced_arrays['dfdtmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
-        self.grating_extended_sliced_arrays['rawmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
-        self.grating_extended_sliced_arrays['mcmcmatrix']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number, self.cell_number))
-        
-        self.grating_extended_sliced_traces={}
-        self.grating_extended_sliced_traces['speed_trace']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number))
-        self.grating_extended_sliced_traces['vistim_trace']=np.zeros((self.grating_repetitions,len(self.extended_ranges[0][0]), self.grating_number))
-     
-  
-        for key, value in self.grating_extended_sliced_arrays.items():
-          for cell in range(0,self.cell_number):
-              for grat, trials in   self.extended_ranges.items():
-                  for row, trial in enumerate(trials):
-                      value[row,:,grat,cell]=self.activity_matrixes_resampled_bordercuts[key][cell,trial]
-         
-        for key, value in self.grating_extended_sliced_traces.items():
+                  self.grating_sliced_voltages_dictionary[key][grat,row,:]=voltage_dictionary[key][trial]  
+
+        for key, value in self.extended_grating_sliced_voltages_dictionary.items():
           for grat, trials in   self.extended_ranges.items():
               for row, trial in enumerate(trials):
-                  value[row,:,grat]=self.voltage_traces_resampled_bordercuts[key][trial]  
+                  self.extended_grating_sliced_voltages_dictionary[key][grat,row,:]=voltage_dictionary[key][trial]  
   
   
     def df_f_trial(self,trial_activity):
     
       prestim_activity=trial_activity[:self.pre_frames+1]
       prestim_mean=np.nanmean(prestim_activity)
+      prestim_mean2=prestim_mean
       # put something here for std 
       if prestim_mean==0 or prestim_mean<0.002:
-          prestim_mean=1
-      df_f_trial_activity=(trial_activity-prestim_mean)/ prestim_mean
+          prestim_mean2=1
+      df_f_trial_activity=(trial_activity-prestim_mean)/ prestim_mean2
     
       return df_f_trial_activity
     
     def calculate_df_f(self):
   
         self.grating_df_f_percentages={}
-        self.grating_df_f_percentages['dfdtmatrix']=np.zeros(self.grating_sliced_arrays['dfdtmatrix'].shape);
-        self.grating_df_f_percentages['rawmatrix']=np.zeros(self.grating_sliced_arrays['rawmatrix'].shape);
-        self.grating_df_f_percentages['mcmcmatrix']=np.zeros(self.grating_sliced_arrays['mcmcmatrix'].shape);
         
-        for key, value in  self.grating_df_f_percentages.items():
-            for cell in range(self.cell_number):
-                for grat in range(self.grating_number):
-                    for rept in range(self.grating_repetitions):               
-                           value[rept,:,grat,cell]=self.df_f_trial(self.grating_sliced_arrays[key][rept,:,grat,cell])
+        for activity_matrix  in  self.activity_matrixes_resampled.keys():
+            self.grating_df_f_percentages[activity_matrix]={}
+            for plane in self.activity_matrixes_resampled[activity_matrix]:
+                self.grating_df_f_percentages[activity_matrix][plane]=np.zeros(self.grating_sliced_dictionary[activity_matrix][plane].shape);
+
+        for activity, planes in self.grating_df_f_percentages.items():
+            for plane, matrix  in planes.items():
+                for cell in range(self.grating_sliced_dictionary[activity][plane].shape[0]):
+                    for grat in range(self.grating_number):
+                        for rept in range(self.grating_repetitions):               
+                               matrix[cell,grat,rept,:]=self.df_f_trial(self.grating_sliced_dictionary[activity][plane][cell,grat,rept,:])
                            
    
     def trial_averaging_and_evoked_activity(self):
@@ -334,34 +795,59 @@ class AllenAnalysis():
         self.extended_grating_activity_trial_averaged={}
   
   
-        for key, value in self.grating_df_f_percentages.items():
+        for activity, planes in self.grating_df_f_percentages.items():
+            self.extended_grating_activity_trial_averaged[activity]={}
+            self.grating_activity_trial_averaged[activity]={}
+            self.grating_df_f_percentages_trial_averaged[activity]={}
+            for plane, matrix  in planes.items():
             
-            self.grating_activity_trial_averaged[key]=np.nanmean(self.grating_extended_sliced_arrays[key],0)
-            self.grating_activity_trial_averaged[key]=np.nanmean(self.grating_sliced_arrays[key],0)
-            self.grating_df_f_percentages_trial_averaged[key]=np.nanmean(self.grating_df_f_percentages[key],0)
+                self.extended_grating_activity_trial_averaged[activity][plane]=np.nanmean(self.extended_grating_sliced_dictionary[activity][plane],2)
+                self.grating_activity_trial_averaged[activity][plane]=np.nanmean(self.grating_sliced_dictionary[activity][plane],2)
+                self.grating_df_f_percentages_trial_averaged[activity][plane]=np.nanmean(self.grating_df_f_percentages[activity][plane],2)
   
         # shape is  frames, grating, cell
-        self.mean_response_per_gratings=np.nanmean(self.grating_activity_trial_averaged['dfdtmatrix'],2).T
-        self.mean_reponse_per_cell=np.nanmean(self.grating_activity_trial_averaged['dfdtmatrix'],1).T
-        self.mean_df_f_per_gratings=np.nanmean(self.grating_df_f_percentages_trial_averaged['dfdtmatrix'],2).T
-        self.mean_df_f_per_cell=np.nanmean(self.grating_df_f_percentages_trial_averaged['dfdtmatrix'],1).T
-        self.slice_evoked_activity()
         
+        
+        self.mean_response_per_gratings={}
+        self.mean_reponse_per_cell={}
+        self.mean_df_f_per_gratings={}
+        self.mean_df_f_per_cell={}
+        
+        for activity, planes in self.grating_df_f_percentages.items():
+            self.mean_response_per_gratings[activity]={}
+            self.mean_reponse_per_cell[activity]={}
+            self.mean_df_f_per_gratings[activity]={}
+            self.mean_df_f_per_cell[activity]={}
+
+            for plane, matrix  in planes.items():
+                
+                self.mean_response_per_gratings[activity][plane]=np.nanmean(self.grating_activity_trial_averaged[activity][plane],1).T
+                self.mean_reponse_per_cell[activity][plane]=np.nanmean(self.grating_activity_trial_averaged[activity][plane],0).T
+                self.mean_df_f_per_gratings[activity][plane]=np.nanmean(self.grating_df_f_percentages_trial_averaged[activity][plane],1).T
+                self.mean_df_f_per_cell[activity][plane]=np.nanmean(self.grating_df_f_percentages_trial_averaged[activity][plane],0).T
+
+        self.slice_evoked_activity()
+                
         
     def slice_evoked_activity(self):
-      self.evoked_slice=slice(self.pre_frames+1,-self.post_frames+2)
-      self.evoked_all_activities={}
-      for key, value in  self.grating_df_f_percentages.items():
-          self.evoked_all_activities[key]={}
-          self.evoked_all_activities[key]['evoked_trial_df_f']=self.grating_df_f_percentages[key][:,self.evoked_slice,:,:]
-          self.evoked_all_activities[key]['evoked_trial_df_f_mean']=np.nanmean( self.evoked_all_activities[key]['evoked_trial_df_f'],1)
-          self.evoked_all_activities[key]['evoked_trial_averaged_df_f']=  self.grating_df_f_percentages_trial_averaged[key][self.evoked_slice,:,:]
-          self.evoked_all_activities[key]['evoked_trial_averaged_df_f_mean']=np.nanmean( self.evoked_all_activities[key]['evoked_trial_averaged_df_f'],0).T
-          
-      self.evoked_all_activities['speed_trace']={}
-      self.evoked_all_activities['speed_trace']['evoked_locomotion']=self.grating_sliced_traces['speed_trace'][:,self.evoked_slice,:]
-      self.evoked_all_activities['speed_trace']['evoked_locomotion_mean']=np.nanmean(self.evoked_all_activities['speed_trace']['evoked_locomotion'], axis=1)
+        self.evoked_slice=slice(self.pre_frames+1,-self.post_frames+2)
+        self.evoked_all_activities={}
+        
+        for activity, planes in self.grating_df_f_percentages.items():
+            self.evoked_all_activities[activity]={}
+      
+            for plane, matrix  in planes.items():
+      
+                self.evoked_all_activities[activity][plane]={}
+                self.evoked_all_activities[activity][plane]['evoked_trial_df_f']=self.grating_df_f_percentages[activity][plane][:,:,:,self.evoked_slice]
+                self.evoked_all_activities[activity][plane]['evoked_trial_df_f_mean']=np.nanmean( self.evoked_all_activities[activity][plane]['evoked_trial_df_f'],3)
+                self.evoked_all_activities[activity][plane]['evoked_trial_averaged_df_f']=  self.grating_df_f_percentages_trial_averaged[activity][plane][:,:,self.evoked_slice]
+                self.evoked_all_activities[activity][plane]['evoked_trial_averaged_df_f_mean']=np.nanmean( self.evoked_all_activities[activity][plane]['evoked_trial_averaged_df_f'],2)
   
+        self.evoked_all_activities['speed_trace']={}
+        self.evoked_all_activities['speed_trace']['evoked_locomotion']=self.grating_sliced_voltages_dictionary['speed_trace'][:,:,self.evoked_slice]
+        self.evoked_all_activities['speed_trace']['evoked_locomotion_mean']=np.nanmean(self.evoked_all_activities['speed_trace']['evoked_locomotion'], axis=2)
+    
   
     def orientation_tuning(self):
         print('doing')
@@ -578,7 +1064,7 @@ class AllenAnalysis():
   
   
     def running_modulation(self):
-        self.running_threshold=np.mean(self.voltage_traces_resampled_bordercuts['speed_trace'])+1.5*np.std(self.voltage_traces_resampled_bordercuts['speed_trace'])
+        self.running_threshold=np.mean(self.voltage_traces_resampled['speed_trace'])+1.5*np.std(self.voltage_traces_resampled['speed_trace'])
         c_constant= self.evoked_all_activities['speed_trace']['evoked_locomotion_mean'].copy()
         self.c_constant=np.where(c_constant>self.running_threshold, 1, -1)
         self.running_modulation_matrix=np.zeros((self.cell_number, self.grating_number, self.grating_repetitions))
@@ -613,138 +1099,148 @@ class AllenAnalysis():
 
     def plotting_corrected_ranges(self):
         
-        for i in range(self.grating_number):       
+        # for i in range(self.grating_number):  
+        for i in range(5):  
             fig, axss=plt.subplots( self.grating_repetitions, sharex=True)
             for j in range(self.grating_repetitions):               
-                # axss[j].plot(activity_matrixes_resampled_bordercuts['grating_binary_matrix'][i,frame_windows[i][j]]) 
-                axss[j].plot(self.voltage_traces_resampled_bordercuts['vistim_trace'][self.frame_windows[i][j]]) 
+                # axss[j].plot(activity_matrixes_resampled['grating_binary_matrix'][i,frame_windows[i][j]]) 
+                # axss[j].plot(self.voltage_traces_resampled['vistim_trace'][self.ranges[i][j]]) 
+                axss[j].plot(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,self.ranges[i][j]]) 
             fig.suptitle('Grating : '  + str(i+1))
         
 
         fig, axs=plt.subplots(3, sharex=True)
-        axs[1].imshow(self.activity_matrixes_resampled_bordercuts['dfdtmatrix'],   
-                      vmax=np.nanmean(self.activity_matrixes_resampled_bordercuts['dfdtmatrix'])+2*np.std(self.activity_matrixes_resampled_bordercuts['dfdtmatrix']),     aspect='auto', cmap='binary') 
-        axs[0].plot(self.voltage_traces_resampled_bordercuts['vistim_trace'])    
-        axs[2].plot(self.voltage_traces_resampled_bordercuts['speed_trace'])   
+        axs[1].imshow(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'],   
+                      vmax=np.nanmean(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'])+2*np.std(self.activity_matrixes_resampled['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary') 
+        axs[0].plot(self.voltage_traces_resampled['vistim_trace'])    
+        axs[2].plot(self.voltage_traces_resampled['speed_trace'])   
         for i in range(40):
             for j in range(15):
                 color = tuple(np.random.choice(range(256), size=3)/256)
-                axs[0].plot(self.ranges[i][j], self.voltage_traces_resampled_bordercuts['vistim_trace'][self.frame_windows[i][j]],'x', color=color) 
+                axs[0].plot(self.ranges[i][j], self.voltage_traces_resampled['vistim_trace'][self.frame_windows[i][j]],'x', color=color) 
      
             fig, axss=plt.subplots(1, sharex=True)
             for j in range(15):
-                axss.plot(self.voltage_traces_resampled_bordercuts['vistim_trace'][self.frame_windows[i][j]])  
+                axss.plot(self.voltage_traces_resampled['vistim_trace'][self.frame_windows[i][j]])  
         
 
     
     def plot_activity_matrixes(self):
-        fig, ax = plt.subplots(4, 1, sharex=True)
+        fig, ax = plt.subplots(2, 1, sharex=True)
         # norm1=mlp.colors.Normalize(0, 1)
-        ax[0].imshow(self.allplanesC,     vmax=np.nanmean(self.allplanesC)+2*np.std(self.allplanesC),     aspect='auto', cmap='binary')
-        ax[1].imshow(self.allplanesdfdt,  vmax=np.nanmean(self.allplanesdfdt)+2*np.std(self.allplanesdfdt),     aspect='auto', cmap='binary')
-        ax[2].imshow(self.allplanesfoopsi,vmax=np.nanmean(self.allplanesfoopsi)+2*np.std(self.allplanesfoopsi),     aspect='auto', cmap='binary')
-        ax[3].imshow(self.allplanesMCMC,  vmax=np.nanmean(self.allplanesMCMC)+2*np.std(self.allplanesMCMC),     aspect='auto', cmap='binary')
+        # ax[0].imshow(self.allplanesC,     vmax=np.nanmean(self.allplanesC)+2*np.std(self.allplanesC),     aspect='auto', cmap='binary')
+        ax[0].imshow(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'],  vmax=np.nanmean(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'])+2*np.std(self.activity_matrixes_resampled['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
+        # ax[2].imshow(self.allplanesfoopsi,vmax=np.nanmean(self.allplanesfoopsi)+2*np.std(self.allplanesfoopsi),     aspect='auto', cmap='binary')
+        ax[1].imshow(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'],  vmax=np.nanmean(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'])+2*np.std(self.activity_matrixes_resampled['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
+        
+        
+        
 
     def plot_activity_matrix_with_signals(self, activity_matrix):
+        activity_matrix=self.activity_matrixes_resampled['dfdtmatrix']['Plane1']
         
         fig, axs=plt.subplots(3, sharex=True)
         axs[1].imshow(activity_matrix,   vmax=np.nanmean(activity_matrix)+2*np.std(activity_matrix),     aspect='auto', cmap='binary') 
-        axs[0].plot(self.resampled_vistim_matrix)    
-        axs[2].plot(self.resampled_speed_matrix)   
+        axs[0].plot(self.voltage_traces_resampled['vistim_trace'])    
+        axs[2].plot(self.voltage_traces_resampled['speed_trace'])   
         for i in range(40):
             color = tuple(np.random.choice(range(256), size=3)/256)
-            axs[0].plot(np.argwhere(self.resampled_stim_binary_matrix[i,:]) , self.resampled_vistim_matrix[np.argwhere(self.resampled_stim_binary_matrix[i,:])],'x', color=color) 
+            axs[0].plot(np.argwhere(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,:]) , self.voltage_traces_resampled['vistim_trace'][np.argwhere(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,:])],'x', color=color) 
+    
+    
+    
     
     def plotting2(self):
         fig, axs = plt.subplots(3)
         fig.suptitle('Locomotion')
-        axs[0].plot(self.acquisition_voltage_signals.second_scale, self.acquisition_voltage_signals.rectified_speed_array)
-        axs[1].plot(self.acquisition_voltage_signals.second_scale, self.acquisition_voltage_signals.voltage_signals['VisStim'])
-        axs[2].plot(self.acquisition_voltage_signals.second_scale, self.acquisition_voltage_signals.voltage_signals['PhotoDiode'])
+        axs[0].plot(self.analysis_object.signals_object.second_scale, self.analysis_object.signals_object.rectified_speed_array)
+        axs[1].plot(self.analysis_object.signals_object.second_scale, self.analysis_object.signals_object.voltage_signals['VisStim'])
+        axs[2].plot(self.analysis_object.signals_object.second_scale, self.analysis_object.signals_object.voltage_signals['PhotoDiode'])
+        
         mplcursors.cursor(axs) # or just mplcursors.cursor()
         
     def plot_activity_matrix_with_signals_and_grating_ranges(self, activity_matrix=None):
         
         fig, axs=plt.subplots(3, sharex=True)
-        axs[1].imshow(self.activity_matrixes_resampled_bordercuts['dfdtmatrix'],   
-                      vmax=np.nanmean(self.activity_matrixes_resampled_bordercuts['dfdtmatrix'])+2*np.std(self.activity_matrixes_resampled_bordercuts['dfdtmatrix']),     aspect='auto', cmap='binary') 
-        axs[0].plot(self.voltage_traces_resampled_bordercuts['vistim_trace'])    
-        axs[2].plot(self.voltage_traces_resampled_bordercuts['speed_trace'])   
+        axs[1].imshow(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'],   
+                      vmax=np.nanmean(self.activity_matrixes_resampled['dfdtmatrix']['Plane1'])+2*np.std(self.activity_matrixes_resampled['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary') 
+        axs[0].plot(self.voltage_traces_resampled['vistim_trace'])    
+        axs[2].plot(self.voltage_traces_resampled['speed_trace'])   
         for i in range(40):
             color = tuple(np.random.choice(range(256), size=3)/256)
-            axs[0].plot(np.argwhere(self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][i,:]) ,
-                        self.voltage_traces_resampled_bordercuts['vistim_trace'][np.argwhere(self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][i,:])],'x', color=color) 
+            axs[0].plot(np.argwhere(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,:]) ,
+                        self.voltage_traces_resampled['vistim_trace'][np.argwhere(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,:])],'x', color=color) 
         
     def plotting_resampling_accuracy_of_ranges(self):
         # fig, axs = plt.subplots(1,1)
         # axs.imshow(self.gratin1_periods_only,vmin=0, vmax=0.1,aspect='auto',cmap='inferno')
                  
-        for stim in range( self.grating_number):
+        for stim in range(self.grating_number):
              fig, axs=plt.subplots(2, sharex=True)
-             axs[0].plot(self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][stim,:].T) 
-             axs[1].plot(self.voltage_traces_resampled_bordercuts['vistim_trace']) 
+             axs[0].plot(self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_downsampled'][stim,:]) 
+             axs[1].plot(self.voltage_traces_resampled['vistim_trace']) 
              color = tuple(np.random.choice(range(256), size=3)/256)
-             axs[0].plot( self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+1, 
-                           self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][stim,self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+1]      ,'x', color=color)      
-             axs[0].plot( self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+2, 
-                           self.activity_matrixes_resampled_bordercuts['grating_binary_matrix'][stim,self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+2]      ,'o', color=color) 
-             axs[1].plot( self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+1, 
-                           self.voltage_traces_resampled_bordercuts['vistim_trace'][self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+1]      ,'x', color=color)      
-             axs[1].plot( self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+2, 
-                           self.voltage_traces_resampled_bordercuts['vistim_trace'][self.ranges_resampled_bordercuts['resampled_grating_start_indexes'][stim,:]+2]      ,'o', color=color)    
+             axs[0].plot( self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:], 
+                           self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_downsampled'][stim,self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]]      ,'x', color=color)      
+             axs[0].plot( self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]+1, 
+                           self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_downsampled'][stim,self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]+1]      ,'o', color=color) 
+             axs[1].plot( self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:], 
+                           self.voltage_traces_resampled['vistim_trace'][self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]]      ,'x', color=color)      
+             axs[1].plot( self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]+1, 
+                           self.voltage_traces_resampled['vistim_trace'][self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][stim,:]+1]      ,'o', color=color)    
+             plt.show()
              
     def more_plotting(self, cell, grating, trial):
          
          fig, axs = plt.subplots(nrows=3, sharex=True)          
          # one cell response to 15 trial of single gratin
-         axs[0].imshow(self.grating_sliced_arrays['dfdtmatrix'][:,:,grating,cell],   vmax=np.nanmean(self.grating_sliced_arrays['dfdtmatrix'])+2*np.std(self.grating_sliced_arrays['dfdtmatrix']),     aspect='auto', cmap='binary')
+         axs[0].imshow(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][:,:,grating,cell],   vmax=np.nanmean(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'])+2*np.std(self.grating_sliced_dictionary['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
          # response of all cells to a single repetion of s sigle stoimuli
-         axs[1].imshow(self.grating_sliced_arrays['dfdtmatrix'][trial,:,grating,:].T, vmax=np.nanmean(self.grating_sliced_arrays['dfdtmatrix'])+2*np.std(self.grating_sliced_arrays['dfdtmatrix']),     aspect='auto', cmap='binary')
+         axs[1].imshow(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][trial,:,grating,:].T, vmax=np.nanmean(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'])+2*np.std(self.grating_sliced_dictionary['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
          # response a cell to a single repetition of all stimuli
-         axs[2].imshow(self.grating_sliced_arrays['dfdtmatrix'][trial,:,:,cell],   vmax=np.nanmean(self.grating_sliced_arrays['dfdtmatrix'])+2*np.std(self.grating_sliced_arrays['dfdtmatrix']),     aspect='auto', cmap='binary')
+         axs[2].imshow(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][trial,:,:,cell],   vmax=np.nanmean(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'])+2*np.std(self.grating_sliced_dictionary['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
 
          #trial averaged activctu for all cells  and for a single cell
 
          fig, axs = plt.subplots(nrows=2,  sharex=True)            
-         axs[0].imshow(self.trial_averaged_activity[:,grating,:].T, vmax=np.nanmean(self.trial_averaged_activity)+2*np.std(self.trial_averaged_activity),     aspect='auto', cmap='binary')
-         axs[1].plot(self.trial_averaged_activity[:,grating,cell])
+         axs[0].imshow(self.grating_activity_trial_averaged['dfdtmatrix']['Plane1'][:,grating,:], vmax=np.nanmean(self.grating_activity_trial_averaged['dfdtmatrix']['Plane1'])+2*np.std(self.grating_activity_trial_averaged['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
+         axs[1].plot(self.grating_activity_trial_averaged['dfdtmatrix']['Plane1'][cell,grating,:])
 
 
          fig, axs = plt.subplots(nrows=2)            
-         axs[0].imshow(self.mean_response_per_gratings, vmax=np.nanmean(self.mean_response_per_gratings)+2*np.std(self.mean_response_per_gratings),     aspect='auto', cmap='binary')
-         axs[1].imshow(self.mean_reponse_per_cell,  vmax=np.nanmean(self.mean_reponse_per_cell)+2*np.std(self.mean_reponse_per_cell),     aspect='auto', cmap='binary')
+         axs[0].imshow(self.mean_response_per_gratings['dfdtmatrix']['Plane1'].T, vmax=np.nanmean(self.mean_response_per_gratings['dfdtmatrix']['Plane1'])+2*np.std(self.mean_response_per_gratings['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
+         axs[1].imshow(self.mean_reponse_per_cell['dfdtmatrix']['Plane1'].T,  vmax=np.nanmean(self.mean_reponse_per_cell['dfdtmatrix']['Plane1'])+2*np.std(self.mean_reponse_per_cell['dfdtmatrix']['Plane1']),     aspect='auto', cmap='binary')
 
 
     def plot_all_tuning_single_cell(self, celltoplot):
                         
-           
             for gratingtoplot in range(self.grating_number):
                   
                 fig, ax =plt.subplots(6,sharex=True)
-                ax[0].imshow(self.grating_sliced_arrays['dfdtmatrix'][:,:,gratingtoplot,celltoplot], 
-                             vmax=np.nanmean(self.grating_sliced_arrays['dfdtmatrix'][:,:,gratingtoplot,celltoplot])+2*np.std(self.grating_sliced_arrays['dfdtmatrix'][:,:,gratingtoplot,celltoplot]), aspect='auto',cmap='binary')
-                ax[1].plot(np.nanmean(self.grating_sliced_arrays['dfdtmatrix'], axis=0)[:,gratingtoplot,celltoplot])
+                ax[0].imshow(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot], 
+                             vmax=np.nanmean(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot])+2*np.std(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot]), aspect='auto',cmap='binary')
+                ax[1].plot(np.nanmean(self.grating_sliced_dictionary['dfdtmatrix']['Plane1'], axis=0)[:,gratingtoplot,celltoplot])
             
-                ax[2].imshow(self.df_f_percentage_array[:,:,gratingtoplot,celltoplot],   
-                             vmax=np.nanmean(self.df_f_percentage_array[:,:,gratingtoplot,celltoplot])+2*np.std(self.df_f_percentage_array[:,:,gratingtoplot,celltoplot]),        aspect='auto',cmap='binary')
-                ax[3].plot(np.nanmean(self.df_f_percentage_array, axis=0)[:,gratingtoplot,celltoplot])
-                ax[4].plot(np.nanmean(self.grating_sliced_traces['vistim_trace'], axis=0)[:,gratingtoplot])
-                ax[5].plot(np.nanmean(self.grating_sliced_traces['speed_trace'], axis=0)[:,gratingtoplot])
+                ax[2].imshow(self.grating_df_f_percentages['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot],   
+                             vmax=np.nanmean(self.grating_df_f_percentages['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot])+2*np.std(self.grating_df_f_percentages['dfdtmatrix']['Plane1'][:,:,gratingtoplot,celltoplot]),        aspect='auto',cmap='binary')
+                ax[3].plot(np.nanmean(self.grating_df_f_percentages['dfdtmatrix']['Plane1'], axis=0)[:,gratingtoplot,celltoplot])
+                ax[4].plot(np.nanmean(self.grating_sliced_voltages_dictionary['vistim_trace'], axis=0)[:,gratingtoplot])
+                ax[5].plot(np.nanmean(self.grating_sliced_voltages_dictionary['speed_trace'], axis=0)[:,gratingtoplot])
                 fig.suptitle('Grating : '  + str(gratingtoplot))
 
                 
     def plot_trial_averaged_single_cell(self, celltoplot):
-                        
-            for gratingtoplot in range(self.grating_number):        
+                        # self.grating_number
+            for gratingtoplot in range(2):        
 
                 fig, ax =plt.subplots(3)
-                ax[0].imshow( self.grating_df_f_percentages_trial_averaged['dfdtmatrix'][:,gratingtoplot,:].T, 
-                             vmax=np.nanmean( self.grating_df_f_percentages_trial_averaged['dfdtmatrix'][:,gratingtoplot,:])+2*np.std( self.grating_df_f_percentages_trial_averaged['dfdtmatrix'][:,gratingtoplot,:]),   aspect='auto',cmap='binary')
+                ax[0].imshow( self.grating_df_f_percentages_trial_averaged['dfdtmatrix']['Plane1'][:,gratingtoplot,:].T, 
+                             vmax=np.nanmean( self.grating_df_f_percentages_trial_averaged['dfdtmatrix']['Plane1'][:,gratingtoplot,:])+2*np.std( self.grating_df_f_percentages_trial_averaged['dfdtmatrix']['Plane1'][:,gratingtoplot,:]),   aspect='auto',cmap='binary')
             
-                ax[1].imshow(self.mean_df_f_per_gratings[25:30,:],     
+                ax[1].imshow(self.mean_df_f_per_gratings['dfdtmatrix']['Plane1'][25:30,:],     
                               aspect='auto',cmap='binary')
-                ax[2].imshow(self.mean_df_f_per_cell,       
-                              vmax=np.nanmean(self.mean_df_f_per_cell)+2*np.std(self.mean_df_f_per_cell),   aspect='auto',cmap='binary')
+                ax[2].imshow(self.mean_df_f_per_cell['dfdtmatrix']['Plane1'],       
+                              vmax=np.nanmean(self.mean_df_f_per_cell['dfdtmatrix']['Plane1'])+2*np.std(self.mean_df_f_per_cell['dfdtmatrix']['Plane1']),   aspect='auto',cmap='binary')
                 fig.suptitle('Grating trial averaged : '  + str(gratingtoplot))
 
     def plot_evoked_tuning_single_cell(self, celltoplot):
@@ -1113,6 +1609,68 @@ class AllenAnalysis():
         fig3.savefig('Ensembles Direction Tuning Averaged TF'+".pdf")
         fig4.savefig('Ensembles Orientation Tuning Averaged TF'+".pdf")
 
+
+
+# cell=0
+# trial=0
+# self.drift_obj.sweep_response[cell][trial]
+
+# drift_obj.drift_obj.sweep_response
+# drift_obj.stim_table
+# mean_response_info=reponse_info[:,1:,:,0]
+# trialresponsive_response_info=reponse_info[:,1:,:,2]
+
+# plt.imshow(mean_response_info[0,:,:], aspect='auto')
+# plt.imshow(trialresponsive_response_info[0,:,:], aspect='auto')
+
+
+# for cell in range(reponse_info.shape[2]):
+#     plt.figure()
+#     plt.imshow(mean_response_info[:,:,cell], aspect='auto')
+#     plt.show()
+
+
+
+
+# # for str(cell) in range(drift_obj.sweep_response.shape[1]):
+# for cell in range(10):
+
+#     fig, ax=plt.subplots(1)
+#     for trial in drift_obj.stim_table[drift_obj.stim_table.orientation==45].index:
+
+#         ax.plot(drift_obj.sweep_response[str(cell)][trial])
+#     plt.show()
+    
+    
+    
+# fig, ax=plt.subplots(8)
+
+# for i, ori in enumerate(drift_obj.orivals):
+    
+#     for trial in drift_obj.stim_table[(drift_obj.stim_table.orientation==ori) & (drift_obj.stim_table.blank_sweep==0)].index:
+        
+    
+#         ax[i].plot(drift_obj.sweep_response[str(cell)][trial])
+        
+#     ax[i].set_title("Angle: "+str(ori), y=0.8)
+#     ax[i].axvspan(0, drift_obj.interlength, facecolor='g', alpha=0.1)
+#     ax[i].axvspan(drift_obj.interlength, drift_obj.interlength + drift_obj.sweeplength, facecolor='b', alpha=0.1)
+
+
+
+
+
+
+# fig, ax=plt.subplots(8)
+
+# for i, ori in enumerate(drift_obj.orivals):
+    
+#     for trial in drift_obj.stim_table[(drift_obj.stim_table.orientation==ori) & (drift_obj.stim_table.blank_sweep==0)].index:
+        
+    
+#         ax[i].plot(drift_obj.mean_sweep_response[str(cell)][drift_obj.stim_table[drift_obj.stim_table.orientation==ori].index].tolist())
+        
+#     ax[i].set_title("Angle: "+str(ori), y=0.8)
 
                     
         

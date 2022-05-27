@@ -8,8 +8,10 @@ Database full calss
 """
 
 import tkinter as Tkinter
-import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import pandas as pd
 import sqlite3
 import datetime
 import os
@@ -68,28 +70,86 @@ class MouseDatabase():
         file_path='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date 
         file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PreVisit_'
         self.max_codes = pd.DataFrame([[self.max_current_cage,self.max_current_code]], columns = ['MaxCage', 'MaxCode'])
-        pth=os.path.join(file_path ,'PreVisit_MouseVisit.xlsx')
+        pth=os.path.join(file_path ,'PreVisit_MouseVisit.pdf')
         if new_visit:
             file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PreVisit2_'
-            pth=os.path.join(file_path ,'PreVisit2_MouseVisit.xlsx')
+            pth=os.path.join(file_path ,'PreVisit2_MouseVisit.pdf')
             # pth=os.path.join(file_path ,'PreVisit2_MouseVisit.html')
             # pth2=os.path.join(file_path ,'PreVisit2_MouseVisit.pdf')
 
-        all_dfs=[ self.breedings, self.stock_mice, self.mice_to_genotype, self.max_codes ]
-        with pd.ExcelWriter(pth,engine='xlsxwriter') as writer:
-            for i, df in enumerate(all_dfs):
-                    df.to_excel(writer,sheet_name='MouseVisit',startrow=i*60+1 , startcol=0)
-        self.all_colony_mice.to_excel(os.path.join(file_path2 + 'AllMice.xlsx'))
-        self.current_litters.to_excel(os.path.join(file_path2 + 'Litters.xlsx'))
+        all_dfs=[ self.breedings, self.stock_mice, self.mice_to_genotype, self.max_codes, self.current_litters]
+        # with pd.ExcelWriter(pth,engine='xlsxwriter') as writer:
+        #     for i, df in enumerate(all_dfs):
+        #             df.to_excel(writer,sheet_name='MouseVisit',startrow=i*60+1 , startcol=0)
+        # self.all_colony_mice.to_excel(os.path.join(file_path2 + 'AllMice.xlsx'))
+        # self.current_litters.to_excel(os.path.join(file_path2 + 'Litters.xlsx'))
         
+        rows_per_page=30
+        pages=np.ceil(self.all_colony_mice.shape[0]/rows_per_page)
+        
+        fragments=[]
+        for i in range(int(pages)):
+            start=(i*rows_per_page)+1
+            end=start+rows_per_page
+            if i==0:
+                start=0
+                end=start+rows_per_page+1
+            if i==int(pages)-1:
+                end=self.all_colony_mice.shape[0]+1
+            fragment=self.all_colony_mice.iloc[start:end,:]
+            fragment2=fragment.fillna(False)
+            fig, ax =plt.subplots(figsize=(12,4))
+            ax.axis('tight')
+            ax.axis('off')
+            the_table = ax.table(cellText=fragment2.values, colLabels=fragment2.columns,loc='center')
+            cells = the_table.properties()["celld"]
+            lastecell=sorted(list(cells.keys()))[-1]
 
-# import pdfkit as pdf
+            for k in range (0,lastecell[0]+1):
+                for j in range(0, lastecell[1]+1):
+                    cells[k, j].set_text_props(ha="center")
+                    
+            fragments.append(fig)
+            
+            pp = PdfPages(os.path.join(file_path2 + 'AllMice.pdf'))
+            
+            for fig in fragments: ## will open an empty extra figure :(
+                pp.savefig( fig , bbox_inches='tight')
+            pp.close()
 
+        figs=[]
+        for i, df in enumerate(all_dfs):
+            if i in [0,4]:
+                df.fillna(False, inplace=True)
+                df['Notes'] = pd.Series(dtype='int')
+                df.fillna('', inplace=True)
+            else:
+                df.fillna(False, inplace=True)
+                
+            fig, ax =plt.subplots(figsize=(12,4))
+            ax.axis('tight')
+            ax.axis('off')
+            the_table = ax.table(cellText=df.values, colLabels=df.columns,loc='center')
+            cells = the_table.properties()["celld"]
+            lastecell=sorted(list(cells.keys()))[-1]
 
-
-# self.breedings.to_html(pth, column)
-# pdf.from_file(pth, pth2,configuration=config)
-# config = pdf.configuration(wkhtmltopdf='C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe')
+            for k in range (0,lastecell[0]+1):
+                for j in range(0, lastecell[1]+1):
+                    cells[k, j].set_text_props(ha="center")
+            if i in [0,4]:
+                the_table.scale(1, 3)
+                for k in range (0,lastecell[0]+1):
+                    cells[k,lastecell[1]].set_width(0.8)
+                
+                
+            figs.append(fig)   
+        
+        pp2 = PdfPages(pth)
+        
+        for fig in figs: ## will open an empty extra figure :(
+            pp2.savefig( fig , bbox_inches='tight')
+        pp2.close()
+        
 
     def mouse_postvisit(self,date_performed=False,new_visit=False):   
         
@@ -444,6 +504,7 @@ class MouseDatabase():
         virusstockinfo="""
         SELECT *
         FROM Virus_table
+        WHERE CurrentAliquots!=0
         """
         projects="""
         SELECT *
@@ -481,7 +542,13 @@ class MouseDatabase():
 
 #%% get max vavalues
     def remove_unnecesary_genes_from_df(self, df):
-        new_df=df.loc[:,~df.eq('WT').all()]
+        
+        genes=['G2C', 'Ai14', 'Ai75', 'VRC', 'SLF', 'PVF', 'Ai65', 'Ai80', 'VGC', 'Ai162', 'Ai148']
+        
+        genes_in_index=[gene for gene in genes if gene in df.columns.tolist()]
+        wt_filter=df[genes_in_index].eq('WT').all()
+        genes_to_filter_out=wt_filter.where(lambda x: x).dropna().index
+        new_df=df.drop(genes_to_filter_out.tolist(), axis=1)
         return new_df
     
     def remove_unnecesary_virusinfo_from_df(self, df):
@@ -528,7 +595,7 @@ class MouseDatabase():
                line=12
         elif 5 in lines and 3 in lines:
                line=13       
-        elif 18 in lines and 2 in lines:
+        elif 18 in lines and ((2 in lines) or (19 in lines)):
                line=19      
         elif 18 in lines and 4 in lines:
                line=20    
@@ -739,7 +806,7 @@ class MouseDatabase():
         BreedingCage=int(litter_info.loc[0,'Cage'])
         Line=int(litter_info.loc[0,'Line'])
         Parent_Breeding=int(litter_info.loc[0,'Breeding_Parents'])
-        query_all_mouse_id_for_breeding="SELECT  Male, Female1, Female2 FROM Breedings_table    WHERE Breedings_table.ID=?"      
+        query_all_mouse_id_for_breeding="SELECT  Male, Female1, Female2, Requires_Genotyping  FROM Breedings_table    WHERE Breedings_table.ID=?"      
         params=(Parent_Breeding,)
         ParentCodes=self.arbitrary_query_to_df(query_all_mouse_id_for_breeding, params).values.tolist()[0]
         
@@ -813,13 +880,14 @@ class MouseDatabase():
         if Line==21:
                 genes_switcher['VRC']=5
                 genes_switcher['PVF']=5
-        if Line==22:
-                genes_switcher['VRC']=6
-                genes_switcher['PVF']=6
-                genes_switcher['Ai65']=6
+               
     
         if Line==2:
-            query_3mouse_breeding="SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, Ai65, Genotypes_types  FROM MICE_table LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.Ai65  WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"
+            query_3mouse_breeding="""
+                                    SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, Ai65, Genotypes_types  
+                                    FROM MICE_table 
+                                    LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.Ai65  
+                                    WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"""
             params=(ParentCodes[0],ParentCodes[1],ParentCodes[2])
             mouse_from_breeding = self.arbitrary_query_to_df(query_3mouse_breeding, params)
             
@@ -829,7 +897,11 @@ class MouseDatabase():
                 Label=7
                 
         if Line==18:
-            query_3mouse_breeding="SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, SLF, Genotypes_types  FROM MICE_table LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.SLF  WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"          
+            query_3mouse_breeding="""
+                                    SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, SLF,VRC, Genotypes_types  
+                                    FROM MICE_table 
+                                    LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.SLF  
+                                    WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"""         
             params=(ParentCodes[0],ParentCodes[1],ParentCodes[2])
             mouse_from_breeding = self.arbitrary_query_to_df(query_3mouse_breeding, params)
              
@@ -840,16 +912,39 @@ class MouseDatabase():
                 Label=7
                      
         if Line==19:
-            query_3mouse_breeding="SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, SLF, Genotypes_types  FROM MICE_table LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.SLF  WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"
+            query_3mouse_breeding="""
+                                    SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, SLF,VRC,Ai65, Genotypes_types 
+                                    FROM MICE_table 
+                                    LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.SLF  
+                                    WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"""
             params=(ParentCodes[0],ParentCodes[1],ParentCodes[2])
             mouse_from_breeding = self.arbitrary_query_to_df(query_3mouse_breeding, params)
             
-            if 2 in mouse_from_breeding.SLF.values :
-                genes_switcher['SLF']=4
-                genes_switcher['VRC']=6
-                genes_switcher['Ai65']=6
-                Genotyping_Status=1
-                Label=7
+            for gene in ['SLF', 'VRC', 'Ai65']:
+                if not all([True if i in [1,5] else False for i in mouse_from_breeding[gene].values ]):
+                    genes_switcher[gene]=4
+                    Genotyping_Status=1
+                    Label=7
+                
+        if Line==22:
+              query_3mouse_breeding="""
+                                      SELECT MICE_table.ID, Lab_Number, Sex, Cage,Breeding_status,Parent_Breeding, Ai65, PVF, VRC, Genotypes_types  
+                                      FROM MICE_table 
+                                      LEFT JOIN Genotypes_table ON Genotypes_table.ID=MICE_table.SLF 
+                                      WHERE MICE_table.ID=? OR MICE_table.ID=? OR MICE_table.ID=?"""
+              params=(ParentCodes[0],ParentCodes[1],ParentCodes[2])
+              mouse_from_breeding = self.arbitrary_query_to_df(query_3mouse_breeding, params)
+              for gene in ['PVF', 'VRC', 'Ai65']:
+                if not all([True if i in [1,5] else False for i in mouse_from_breeding[gene].values ]):
+                      genes_switcher[gene]=4
+                      Genotyping_Status=1
+                      Label=7
+
+        if  ParentCodes[-1]:
+            Genotyping_Status=1
+            Label=7
+
+                
         notes=''     
         common_values= (Breeding_status,DOB,Label,Parent_Breeding,
                     genes_switcher['Ai14'],
@@ -916,7 +1011,7 @@ class MouseDatabase():
         for lit in updated_litters[1:]:
                Alive=lit[2]
                Dead=lit[3]
-               ID=lit[0]
+               ID=lit[1]
                c.execute(query_update_litter,( int(Alive),int(Dead), int(ID),))
                
                if int(Alive)==0:
@@ -941,7 +1036,7 @@ class MouseDatabase():
               VALUES(?,?,date('now'),?,?,?,?) 
               '''
         for lit in new_litters[1:]: 
-            Cage=lit[1]
+            Cage=lit[0]
             Alive=lit[2]
             Dead=lit[3]
             Age=lit[4]

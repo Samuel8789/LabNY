@@ -49,10 +49,23 @@ class new_window_plan_injections(tk.Toplevel):
         self.number_of_injections_label=ttk.Label(self, text='Number of Injections', width=20)
         self.number_of_injections_label.grid(column=0, row=3)
         
-        self.gui.MouseDat.allVirusstock['VirusName'].tolist()
-        self.virus1_names=self.gui.MouseDat.allVirusstock['VirusName'].tolist()
-        self.virus2_names=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['Recombinase']==3]['VirusName'].tolist()
-        self.virus3_names=self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==2) | (self.gui.MouseDat.allVirusstock['ID']==4) | (self.gui.MouseDat.allVirusstock['ID']==10)| (self.gui.MouseDat.allVirusstock['ID']==21)]['VirusName'].tolist()
+       
+        
+        full=list(zip(self.gui.MouseDat.allVirusstock['VirusCode'].tolist(),  self.gui.MouseDat.allVirusstock['VirusName'].tolist()))
+        
+        
+        self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['Recombinase']==3][['VirusCode', 'VirusName']].values.tolist()
+
+        self.virus1_names=[ virus_name[0]+': '+virus_name[1] for  virus_name in self.gui.MouseDat.allVirusstock[['VirusCode', 'VirusName']].values.tolist()]
+        self.virus2_names=[ virus_name[0]+': '+virus_name[1] for  virus_name in self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['Recombinase']==3][['VirusCode', 'VirusName']].values.tolist()]
+
+        self.virus3_names=[virus_name[0]+': '+virus_name[1] for virus_name in self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==2) | 
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==4) | 
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==10)| 
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==21)][['VirusCode', 'VirusName']].values.tolist()]
+        
+        
+        
         self.virus1_label=ttk.Label(self, text='Virus 1', width=20)
         self.virus1_label.grid(column=0, row=5)
         self.virus2_label=ttk.Label(self, text='Virus 2', width=20)

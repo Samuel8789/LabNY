@@ -10,6 +10,7 @@ import math
 import matplotlib.pyplot as plt
 import os
 import mplcursors
+import copy
 import numpy as np
 import matplotlib as mlp
 # from TestPLot import SnappingCursor
@@ -23,9 +24,11 @@ mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"])
 
 class EnsemblesYuriy():
     
-    def __init__(self, results_object ):
-        self.results_object=results_object
-        self.activity_matrix=  self.results_object.activity_matrixes_resampled_bordercuts['dfdtmatrix']
+    def __init__(self, analysis_object ):
+        self.analysis_object=analysis_object
+        self.full_data= self.analysis_object.full_data
+
+        self.normalize_activity_matrix(activity_matrix, 'norm_mean_std')
 
         pass
 
@@ -46,6 +49,51 @@ class EnsemblesYuriy():
         # AgglomerativeClustering().fit(X)
 
 
+    def permute_cells(self, activity_matrix):
+        
+        permuted_cells=np.random.permutation(activity_matrix)
+        
+        return permuted_cells
+
+        
+    def remove_inactive_cells(self, activity_matrix):
+        
+        inactive_cells_removed=copy.copy(activity_matrix)
+        active_cells = np.sum(inactive_cells_removed,2) > 0
+        inactive_cells=1-active_cells
+        inactive_cells_removed[inactive_cells,:] = []
+
+        
+        return inactive_cells_removed
+    
+    def shuffle_data(self, activity_matrix):
+
+        shuflled=np.apply_along_axis(np.roll, 1, activity_matrix,np.ceil(np.random.uniform()*activity_matrix.shape[0]) )
+        
+        return shuflled
+    
+    def normalize_activity_matrix(self, activity_matrix, method):
+        from sklearn.metrics import mean_squared_error
+        
+        if 'norm_mean_std' in method:
+            activity_matrix_norm = activity_matrix - np.mean(activity_matrix,2)
+            activity_matrix_norm = activity_matrix_norm/np.std(activity_matrix_norm,1) 
+            # %firing_rate_cont(isnan(firing_rate_cont)) = 0;
+        elif 'norm_mean' in method:
+            activity_matrix_norm = activity_matrix - np.mean(activity_matrix,2)
+        elif 'norm_std' in method:
+            activity_matrix_norm = activity_matrix/np.std(activity_matrix,[],2) 
+        elif 'norm_rms' in method:
+            activity_matrix_norm = activity_matrix/mean_squared_error(activity_matrix,2) 
+        elif 'none' in method:
+            activity_matrix_norm = activity_matrix
+
+        activity_matrix_norm[np.isnan(activity_matrix_norm)] = 0;
+
+        
+        
+        
+        
 if __name__ == "__main__":
     pass
     # plt.close('all')

@@ -152,7 +152,7 @@ class plan_window_parameters(tk.Toplevel):
             self.gui.MouseDat.Experimental_class.plan_multiple_new_windows(self.values, codes_selected=self.selected_codes)
             # self.gui.MouseDat.Experimental_class.plan_new_window(self.values, codes_selected=self.selected_codes)
         else:
-            self.gui.MouseDat.Experimental_class.plan_multiple_new_windows(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
+            self.gui.MouseDat.Experimental_class.plan_multiple_new_windows(self.values, lab_number_selected= [int(i) for i in list(list(zip(*self.values[1:]))[0])])
             # self.gui.MouseDat.Experimental_class.plan_new_window(self.values, lab_number_selected= list(list(zip(*self.values[1:]))[0]))
 
            

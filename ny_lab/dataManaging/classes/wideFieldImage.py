@@ -4,12 +4,20 @@ Created on Tue Apr 20 14:18:06 2021
 
 @author: sp3660
 """
-import os
 import shutil
-import matplotlib.pyplot as plt
 import logging 
 module_logger = logging.getLogger(__name__)
+from roifile import ImagejRoi
+import os
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+import numpy as np
+import pickle
+import glob
+import scipy.signal as sg
 
+from zipfile import ZipFile
 
 class WideFieldImage:
     
@@ -31,12 +39,52 @@ class WideFieldImage:
                 shutil.copyfile(self.roi_zip_path_raw, self.roi_zip_path_stored)
             
         else:
-            self.WidefieldImagePath_stored=os.path.join(self.mouse_imaging_session_object.mouse_session_path,'widefield image',file_name)
+            self.widefield_data_path=os.path.join(self.mouse_imaging_session_object.mouse_session_path,'widefield image')
+            self.WidefieldImagePath_stored=os.path.join(self.widefield_data_path,file_name)
 
 
-    def plot_image(self):
+    def create_figure_and_plot(self):
+        self.load_all()
+        self.fig, self.ax=plt.subplots(1)
+        self.plot_image(self.ax)
+        self.plot_rois(self.ax)
+
+    def load_all(self):
         self.load_image()
-        self.imgplot = plt.imshow(self.widefield_image,cmap='inferno')
+        self.load_rois()
+        self.create_roi_patches()
+
+    def plot_image(self,ax=None):
+        self.imgplot = ax.imshow(self.widefield_image,cmap='inferno')
+        
     def load_image(self):
         self.widefield_image = plt.imread(self.WidefieldImagePath_stored)
+        
+    def load_rois(self):
+        zipfiles=glob.glob( self.widefield_data_path+'\*.zip')
+        roifiles=glob.glob( self.widefield_data_path+'\*.roi')
+        
+        if zipfiles and not roifiles:
+            zipobject= ZipFile(zipfiles[0]) 
+            zipobject.extractall(self.widefield_data_path)
+            roifiles=[os.path.join(self.widefield_data_path,x.filename) for x in zipobject.infolist()]
+            
+        self.rois_info=[]    
+        for roi_file_path in roifiles:
+            roi = ImagejRoi.fromfile(roi_file_path)
+            x=roi.coordinates()[0][0]
+            y=roi.coordinates()[0][1]
+            width=roi.coordinates()[2][0]-roi.coordinates()[0][0]
+            height=roi.coordinates()[1][1]-roi.coordinates()[0][1]
+            
+            self.rois_info.append((roi,x,y,width,height,os.path.split(roi_file_path)[1]))
+    
+    def create_roi_patches(self):
+        self.roi_patches=[(roi[5],mpl.patches.Rectangle((roi[1], roi[2]), roi[3], roi[4], linewidth=1, edgecolor='r', facecolor='none')) for roi in self.rois_info]
+        
+
+    def plot_rois(self, ax=None) :
+        for rect in self.roi_patches:
+            ax.add_patch(rect[1])
+            
 

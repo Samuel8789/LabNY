@@ -97,8 +97,6 @@ class PrairieImagingSession():
     def cleaning_up_empty_mouse(self):
        removed_mice_codes=[recursively_eliminate_empty_folders(mouse_path) for mouse_path in self.session_imaged_mice_paths if '_'  in mouse_path]
             
-        
-          
     # def deal_with_calibrations(self)
     def cleaning_up_raw_mouse_acquisitions(self):
              
