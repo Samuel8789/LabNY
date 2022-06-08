@@ -819,7 +819,7 @@ class DataManaging():
               mouse_object.get_all_mouse_FOVdata_datasets()       
               mouse_object.all_mouse_acquisitions_datasets
               greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key}   
-              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 and dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1}
+              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if (dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 or dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1)}
               for dataset in tododeepgreensatasets.values():
                   dataset.do_deep_caiman()
         self.get_all_deep_caiman_objects()

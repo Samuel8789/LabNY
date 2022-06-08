@@ -233,7 +233,7 @@ class ResultsAnalysis():
     def load_all_data_objects(self):
         self.load_all_acquisition_subobjects()
         self.load_calcium_extractions()
-        self.check_caiman_rasters()
+        # self.check_caiman_rasters()
         self.load_voltage_signals()
 
     def load_all_acquisition_subobjects(self):
@@ -404,6 +404,7 @@ class ResultsAnalysis():
 
     def extrac_voltage_visstim_signals(self):
         self.milisecond_period=1000/self.full_data['imaging_data']['Frame_rate']
+        voltagerate=self.metadata_object.translated_imaging_metadata['VoltageRecordingFrequency']
         self.full_data['voltage_traces']['Speed']=self.resample(self.signals_object.rectified_speed_array['Prairire']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze()
         self.full_data['voltage_traces']['Acceleration']=self.resampled_acceleration_matrix=self.resample(self.signals_object.rectified_acceleration_array['Prairire']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze() 
         if self.signals_object.rounded_vis_stim:
@@ -414,7 +415,7 @@ class ResultsAnalysis():
         self.full_data['voltage_traces']['Optopockels']=''
         self.full_data['voltage_traces']['OptoTrigger']=''
 
-        if self.signals_object.vis_stim_protocol:
+        if self.signals_object.vis_stim_protocol and self.signals_object.transitions_dictionary:
             self.full_data['visstim_info']['Paradigm_Indexes']={key:(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
             self.full_data['visstim_info']['Movie1']={'Indexes':'',
                                                       'Binary_Maytrix':''
@@ -424,10 +425,10 @@ class ResultsAnalysis():
     
             if self.signals_object.vis_stim_protocol =='AllenA':
             
-                self.full_data['visstim_info']['Drifting_Gratings']={'Indexes':{'Drift_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_on_index_full_recording]),
-                                                                                'Drift_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_off_index_full_recording]),
-                                                                                'Blank_sweep_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_on_index_full_recording]),
-                                                                                'Blank_sweep_off':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_off_index_full_recording])
+                self.full_data['visstim_info']['Drifting_Gratings']={'Indexes':{'Drift_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_on_index_full_recording]),
+                                                                                'Drift_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_off_index_full_recording]),
+                                                                                'Blank_sweep_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_on_index_full_recording]),
+                                                                                'Blank_sweep_off':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_off_index_full_recording])
                                                                                 },
                                                                      'Binary_Maytrix_downsampled':np.vstack([self.resample(self.signals_object.full_stimuli_binary_matrix[srtim], 
                                                                                                                            factor=self.milisecond_period, kind='linear').squeeze() for srtim in range (self.signals_object.full_stimuli_binary_matrix.shape[0])]),
@@ -452,8 +453,8 @@ class ResultsAnalysis():
               
             elif self.signals_object.vis_stim_protocol =='AllenC':
             
-                self.full_data['visstim_info']['Sparse_Noise']={'Indexes':{'Noise_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.noise_on_transition_indexes]),
-                                                                           'Noise_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/1000)).argmin()   for rep in ori] for ori in self.signals_object.noise_off_transition_indexes]),
+                self.full_data['visstim_info']['Sparse_Noise']={'Indexes':{'Noise_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_on_transition_indexes]),
+                                                                           'Noise_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_off_transition_indexes]),
                                                                                 },
                                                           'Binary_Maytrix':'',
                                                           'Ref_matrix':'',
@@ -550,6 +551,10 @@ class ResultsAnalysis():
         self.preframes=16
         self.stim=33
         self.postframes=16
+        
+        # self.preframes=25
+        # self.stim=50
+        # self.postframes=25
         # ,matlabcell=4 21 75# inhibited by stimulus
         #cell 3 13
         # matlabcell=45# bimodal
@@ -703,17 +708,19 @@ class ResultsAnalysis():
 
                 
                 
-        ax1=subfigs[0,2].subplots(1)    
-        ax1.plot(cell_trace)
-        ax2=subfigs[1,2].subplots(1)    
-        ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
-        ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
-        ax2.legend()
+        # ax1=subfigs[0,2].subplots(1)    
+        # ax1.plot(cell_trace)
+        # ax2=subfigs[1,2].subplots(1)    
+        # ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
+        # ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
+        # ax2.legend()
 
-        ax2.set_title('Mean Evoked Activity')
+        # ax2.set_title('Mean Evoked Activity')
 
-        ax2.set_ylim(0,np.max(mean_evoked_2s))
-        plt.show()
+        # ax2.set_ylim(0,2*np.max(mean_evoked_2s))
+        # # ax2.set_ylim(0,0.2)
+
+        # plt.show()
         
         return mean_evoked_2s, mean_evoked_1s
 
@@ -737,7 +744,7 @@ class ResultsAnalysis():
                                                          'python':'',
                                                          }
                                            }
-            if not  self.pyr_int_identification[plane]['interneuron']['phhton']:
+            if not  self.pyr_int_identification[plane]['interneuron']['python']:
                 self.pyr_int_identification[plane]['interneuron']['python']=self.full_data['imaging_data']['Plane1']['CellIds']
             print('no previous pyr ident')
             
@@ -763,7 +770,6 @@ class ResultsAnalysis():
         for key,dataset in self.calcium_datasets.items():
             dataset.find_associated_fov_tomato_dataset()
             dataset.find_associated_channel_dataset()
-        
             if hasattr(dataset, 'associated_channel_dataset_object'):
                 dataset.associated_tomato_dataset=dataset.associated_channel_dataset_object
             elif hasattr(dataset, 'associated_fov_tomato_dataset_red_object'):

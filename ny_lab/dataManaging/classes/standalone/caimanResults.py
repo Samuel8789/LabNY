@@ -262,7 +262,7 @@ class CaimanResults():
         
                
         fig,ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
-        ax[0].imshow( self.dfdt_thesholded_accepted_matrix, cmap='binary', aspect='auto',
+        ax[0].imshow(self.dfdt_thesholded_accepted_matrix, cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
         ax[1].imshow( self.binarized_dfdt, cmap='binary', aspect='auto',

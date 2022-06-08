@@ -96,11 +96,11 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE VisualStimulations_table
-                SET VisualStimulationProtocol=1
-                WHERE ID IN (20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42)
+                UPDATE ExperimentalAnimals_table
+                SET Patching Date=date(?),  Patching ID=?
+                WHERE ID IN (?)
             """        
-params=()   
+params=(datetime.datetime.today(),2,337)   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
 
 
@@ -109,18 +109,10 @@ MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
 import datetime
 
 query_add_actions=""" 
-INSERT INTO Actions_table(ID,
-Date,
-Action_Type,
-Cage_start,
-Cage_end,
-Mouse_1,
-Mouse_2,
-Mouse_3
-)
-VALUES(?,date(?),?,?,?,?,?,?)
+INSERT INTO Patching_table (ID, ExpAnimanlID,PatchingDate)
+VALUES(?,?,DATE(?))
 """
-params=(730,datetime.datetime.today(),2,307,307,2877,2879,2881)
+params=(13, 371, datetime.datetime.today())
 
 MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
 
@@ -128,7 +120,7 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
 #%% removals
 query_remove="""
 DELETE FROM ExperimentalAnimals_table
-WHERE  ID IN (359,360)
+WHERE  ID IN (372,373,374)
 
 """
 params=()
@@ -136,7 +128,7 @@ MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
 #%% removals
 query_remove="""
 DELETE FROM Windows_table
-WHERE  ID IN (195,196)
+WHERE  ID IN (217,218,219)
 
 """
 params=()

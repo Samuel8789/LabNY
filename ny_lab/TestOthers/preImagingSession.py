@@ -85,6 +85,8 @@ class PreImagingSession():
         print('ssh '+ self.WS1_IP)
         print('ssh '+ self.WS2_IP)
         print('scp -r wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{} G:\\Projects\\TemPrairireSSH'.format(self.sessiondate))
+        print(f'scp -r G:\\Projects\\TemPrairireSSH\\20220525Hakim\\Mice\\SPKU\\ToTrack wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{self.sessiondate}\\Mice\\SPKU')
+
         
     def prepare_empty_session(self):
         
@@ -260,7 +262,7 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20220526'
+    sessiondate='20220531'
     mice=[
 'SPKU',
 'SPKV',

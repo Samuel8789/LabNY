@@ -431,12 +431,12 @@ class VoltageSignals():
           #%%  
 if __name__ == "__main__":
     extra=r'G:\Projects\TemPrairireSSH\20220422\Calibrations\SensoryStimulation\UnprocessedDaq\220422_StimTest_0_AllenC_10minspont10reps_4_22_2022_18_42.mat' 
-    prairiresignals=r'G:\Projects\TemPrairireSSH\20220422\Calibrations\SensoryStimulation\TestAcquisitions\220422_AllenCCalTest-000\220422_AllenCCalTest-000_Cycle00001_VoltageRecording_001.csv'
-    voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals,extra_daq_path=extra)
-    # voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals)
+    prairiresignals=r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Chandelier_Imaging\VRC\SLF\Ai65\SPKQ\imaging\20211113\data aquisitions\FOV_1\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000\raw_volatge_csv\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
+    # voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals,extra_daq_path=extra)
+    voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals)
 
-    voltagesignals.plot_all_signals_daq()
-    voltagesignals.plot_all_signals()
+    # voltagesignals.plot_all_signals_daq()
+    # voltagesignals.plot_all_signals()
     # voltagesignals.signal_extraction_object()
     # extraction=voltagesignals.extraction_object
     

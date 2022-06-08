@@ -38,6 +38,7 @@ class VoltageSignalsExtractions():
         self.visualstim_array={}
         self.vis_stim_protocol=None
         self.rounded_vis_stim=np.empty([0])
+        self.transitions_dictionary={}
 
 
 
@@ -138,7 +139,7 @@ class VoltageSignalsExtractions():
         else:
             protocol=self.vis_stim_protocol
 
-        self.transitions_dictionary={}
+        
         if protocol :  
             
             if 'Allen' in protocol:        
@@ -355,59 +356,60 @@ class VoltageSignalsExtractions():
         
         
         """
-
+        
 
         if not self.transitions_dictionary:
-        
-            fig, ax = plt.subplots(2, sharex=True)
-            line, = ax[0].plot(self.visualstim_array['Prairire']['VisStim']) 
-            line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairire']['VisStim']) 
-            line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairire']['VisStim'],'r') 
-
-            ax[0].plot(self.time_scale['Prairire'][self.start_transitions],self.visualstim_array['Prairire']['VisStim'][self.start_transitions],'rx') 
-            ax[1].plot(self.time_scale['Prairire'][self.start_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.start_transitions],'rx') 
-            ax[0].plot(self.time_scale['Prairire'][self.end_transitions],self.visualstim_array['Prairire']['VisStim'][self.end_transitions],'go') 
-            ax[1].plot(self.time_scale['Prairire'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.end_transitions],'go') 
-
-
-            line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
-            line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
-
-
             
-            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-9).flatten()
+   
+            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-7).flatten()
             # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-9).flatten()+1
             self.start_transitions=np.delete(self.start_transitions, -1)
-            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>6).flatten()  
+            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>7).flatten()  
             # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>9.5).flatten()  +1
 
             self.end_transitions=np.delete(self.end_transitions, 0)
             #eliminate first 
         
             # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>5, self.dfdt_rounded_vis_stim['Prairire']['VisStim']<6.5)).flatten()+1
-            # self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-0.5).flatten()[-1]+1
+            self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-0.3).flatten()[-1]+1
             
-
+            fig, ax = plt.subplots(2, sharex=True)
+            line, = ax[0].plot(self.visualstim_array['Prairire']['VisStim']) 
+            line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairire']['VisStim']) 
+            # line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairire']['VisStim'],'r') 
+            # line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
+            # line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
             
+            ax[0].plot(self.time_scale['Prairire'][self.start_transitions],self.visualstim_array['Prairire']['VisStim'][self.start_transitions],'rx') 
+            ax[1].plot(self.time_scale['Prairire'][self.start_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.start_transitions],'rx') 
+            ax[0].plot(self.time_scale['Prairire'][self.end_transitions],self.visualstim_array['Prairire']['VisStim'][self.end_transitions],'go') 
+            ax[1].plot(self.time_scale['Prairire'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.end_transitions],'go') 
+                      
             """
             for the newest protocols is differnet
             """
             if self.vis_stim_protocol =='AllenA':
-                # self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
-                #                             'first_drifting_set_last': self.end_transitions[0],
-                #                             'second_drifting_set_first':self.start_transitions[6],
-                #                             'second_drifting_set_last':self.end_transitions[5],
-                #                             'third_drifting_set_first':self.start_transitions[10],
-                #                             'third_drifting_set_last':self.last_down_transition+1,
-                #                             'first_movie_set_first':self.start_transitions[2],
-                #                             'first_movie_set_last': self.end_transitions[2],
-                #                             'second_movie_set_first':self.start_transitions[8],
-                #                             'second_movie_set_last': self.end_transitions[7],
-                #                             'short_movie_set_first':self.start_transitions[4],
-                #                             'short_movie_set_last':self.end_transitions[4],
-                #                             'spont_first':self.spont_start_transitions[3],
-                #                             'spont_last':self.end_transitions[6]-1,
-                #                             }
+                self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
+                                            'first_drifting_set_last': self.end_transitions[0],
+                                            
+                                            'first_movie_set_first':self.start_transitions[2],                                   
+                                            'first_movie_set_last': self.end_transitions[2],
+                                            
+                                            'short_movie_set_first':self.start_transitions[4],
+                                            'short_movie_set_last':self.end_transitions[4],
+                                            
+                                            'second_drifting_set_first':self.start_transitions[6],
+                                            'second_drifting_set_last':self.end_transitions[6],
+                                            
+                                            'spont_first':self.start_transitions[7],
+                                            'spont_last':self.end_transitions[7],
+                                            
+                                            'second_movie_set_first':self.start_transitions[8],
+                                            'second_movie_set_last': self.end_transitions[8],
+                                            
+                                            'third_drifting_set_first':self.start_transitions[10],
+                                            'third_drifting_set_last':self.last_down_transition+1,
+                                            }
                 pass
             
             elif self.vis_stim_protocol =='AllenB':
@@ -694,19 +696,31 @@ class VoltageSignalsExtractions():
                 errors_pairs.append((i+1, i+2))
                 voltage_slice_filtered_rounded_corrected[i+1]=voltage_slice_filtered_rounded_corrected[i+2]
                 voltage_slice_filtered_rounded_corrected[i+2]=voltage_slice_filtered_rounded_corrected[i+3]
+                
+                
+        plt.plot(voltage_slice_filtered_rounded)
+        plt.plot(voltage_slice_filtered_rounded_corrected)
+
                         
         diff_voltage_slice_filtered_rounded_corrected = np.diff(voltage_slice_filtered_rounded_corrected)
         diff_voltage_slice_filtered_rounded_corrected_rerounded =np.around(diff_voltage_slice_filtered_rounded_corrected, 1)    
 
-        fig,axa=plt.subplots(len(errors_pairs))
-        for i ,j in  enumerate(errors_pairs) :  
-            l1=axa[i].plot(diff_voltage_slice_filtered_rounded_rerounded[j[0]-10:j[0]+10])
-            l2=axa[i].plot(diff_voltage_slice_filtered_rounded_corrected_rerounded[j[0]-10:j[0]+10])
-
-        fig,axo=plt.subplots(len(errors_pairs))
-        for i ,j in  enumerate(errors_pairs) :  
-            axo[i].plot(voltage_slice_filtered_rounded[j[0]-10:j[0]+10])
-            axo[i].plot(voltage_slice_filtered_rounded_corrected[j[0]-10:j[0]+10])
+        maxplots=8
+        figures=int(np.ceil(len(errors_pairs)/maxplots))
+        
+        for n in range(figures):
+            indexes=np.arange(n*maxplots,(n+1)*maxplots,1, 'int')
+            if n==figures-1:
+                indexes=np.arange(n*maxplots,len(errors_pairs),1, 'int')
+            fig,axa=plt.subplots(len(indexes), sharex=True)
+            for i in  range(len(indexes)) :  
+                l1=axa[i].plot(diff_voltage_slice_filtered_rounded_rerounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
+                l2=axa[i].plot(diff_voltage_slice_filtered_rounded_corrected_rerounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
+    
+            fig,axo=plt.subplots(len(indexes), sharex=True)
+            for i  in range(len(indexes)) :  
+                axo[i].plot(voltage_slice_filtered_rounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
+                axo[i].plot(voltage_slice_filtered_rounded_corrected[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
           
         return voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected_rerounded, errors_pairs
     
@@ -723,17 +737,29 @@ class VoltageSignalsExtractions():
         self.tuning_stim_off_index_full_recording=np.zeros((1))
         self.load_drifting_grating_indexes()
         
+        # concatenati drifitng gratings
         self.combined_gratings_raw=np.concatenate((self.first_drifting_set, self.second_drifting_set, self.third_drifting_set))
 
         
         if not (self.tuning_stim_on_index_full_recording.any() and self.tuning_stim_off_index_full_recording.any()):
 
+            # round and first derivative two methods
+
             temp=np.diff(np.around(sg.medfilt(self.combined_gratings_raw, kernel_size=29),1))
-            temp2=np.around(temp,1)
+            temp2=np.around(temp,3)
             drifting_transition_indexes1=[np.argwhere(temp== voltage) for voltage in self.orientations_and_blank_sweep]
             drifting_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in self.orientations_and_blank_sweep]
+            fix, ax=plt.subplots(1)
+            ax.plot(temp)
+            ax.plot(temp2)
+
             
-            self.drifting_voltage_slice_filtered_rounded_corrected,self.drifting_diff_voltage_slice_filtered_rounded_corrected, self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.drifting_errors_pairs=self.correct_voltage_split_transitions(self.combined_gratings_raw)
+            # this will correct transtions over multiple frame to the corresponding first frame that has a change of voltage(all voltage signals appear after screen flip)
+            
+            self.drifting_voltage_slice_filtered_rounded_corrected,
+            self.drifting_diff_voltage_slice_filtered_rounded_corrected,
+            self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,
+            self.drifting_errors_pairs=self.correct_voltage_split_transitions(self.combined_gratings_raw)
 
             all_on_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() for voltage in self.orientations_and_blank_sweep]
             all_on_transition_indexes2=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded== voltage) for voltage in self.orientations_and_blank_sweep]
@@ -745,17 +771,23 @@ class VoltageSignalsExtractions():
             self.blank_off_transition_indexes=np.vstack( all_off_transition_indexes[-1])+1
             
             oritoplot=40
-            fig,axo=plt.subplots(oritoplot, sharex=(True))
-            for k, j in enumerate(range(oritoplot)):
-                for i  in  range(15) :  
-                    axo[k].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_on_transition_indexes[j,i]-600:self.drifting_off_transition_indexes[j,i]+600])
-                    
+            maxplots=8
+            figures=5
+            for n in range(figures):
+                indexes=np.arange(n*maxplots,(n+1)*maxplots,1, 'int')
+                fig,axa=plt.subplots(len(indexes), sharex=True)
+                for i in  range(len(indexes)) :  
+                    for j  in  range(15) :  
+                        axa[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_on_transition_indexes[indexes[i],j]-600:self.drifting_off_transition_indexes[indexes[i],j]+600])
+                        
          
-            oritoplot=40
-            fig,axo=plt.subplots(oritoplot, sharex=(True))
-            for k, j in enumerate(range(oritoplot)):
-                for i  in  range(15) :  
-                    axo[k].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_off_transition_indexes[j,i]-5:self.drifting_off_transition_indexes[j,i]+5])
+                fig,axo=plt.subplots(len(indexes), sharex=True)
+                for i in  range(len(indexes)) :  
+                    for j  in  range(15) :  
+                        axo[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_off_transition_indexes[indexes[i],j]-2000:self.drifting_off_transition_indexes[indexes[i],j]+2000])
+
+
+
 
             fig,ax=plt.subplots(2)
             ax[0].plot(self.drifting_diff_voltage_slice_filtered_rounded_corrected)
@@ -763,7 +795,9 @@ class VoltageSignalsExtractions():
 
 
             stim_period_lengths=self.drifting_off_transition_indexes-self.drifting_on_transition_indexes
-            plt.hist(stim_period_lengths.flatten(), bins=np.arange(2047, 2051), range=(2047,2051))
+            # plt.hist(stim_period_lengths.flatten(), bins=np.arange(2047, 2051), range=(2047,2051))
+            plt.hist(stim_period_lengths.flatten())
+
             plt.show()
        
             index_start=  self.drifting_on_transition_indexes[-1]
@@ -781,7 +815,7 @@ class VoltageSignalsExtractions():
 
             self.save_drifting_grating_indexes()
             
-        self.create_full_recording_grating_binary_matrix()
+        # self.create_full_recording_grating_binary_matrix()
 
 
 

@@ -1377,7 +1377,7 @@ class ImagingDatabase():
         if hasattr(metadata, 'full_voltage_recording_metadata'):
             IsVoltageRecording=1
             VoltageRecordingChannels=str((metadata.recorded_signals and metadata_object.recorded_signals_csv))
-            VoltageRecordingFrequency=1000
+            VoltageRecordingFrequency=metadata.translated_imaging_metadata['VoltageRecordingFrequency']
 
         CaimanComments=None
     
