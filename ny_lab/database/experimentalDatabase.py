@@ -7,7 +7,7 @@ Created on Mon May 17 08:01:22 2021
 import math 
 import numpy as np
 import datetime
-
+import pandas as pd
 from .fun.databaseCodesTransformations import transform_earlabels_to_codes, get_combination_from_virus, get_next_twolettercode
 
 class ExperimentalDatabase():
@@ -147,6 +147,17 @@ class ExperimentalDatabase():
         self.all_experimental_all_info= self.databse_ref.arbitrary_query_to_df(query_all_experimental_all_info)     
         self.all_experimental_all_info= self.all_experimental_all_info.convert_dtypes(infer_objects=True, convert_string=False, convert_integer=True, convert_boolean=False, convert_floating=False)
 
+        duplicated=np.argwhere(self.all_experimental_all_info.columns.duplicated()).flatten() 
+        newnames=['InjectionID','WindowID', 'WindowCortArea','WinPOst1', 'WInPost2', 'WinNotes']
+        indexes=[i for i in duplicated if i not in [36,62]]
+ 
+        for i,j in enumerate(newnames):
+            
+            self.all_experimental_all_info.columns.values[indexes[i]]=j
+
+        self.all_experimental_all_info=self.all_experimental_all_info.drop(self.all_experimental_all_info.columns[[36, 62]], axis=1)
+
+        
 
     def table_all_animals_in_recovery(self):
  

@@ -23,18 +23,18 @@ clear natural_movie_three_all_warped_frames_full
 
 %% parameters
 % ------ Paradigm sequence ------
-ops.paradigm_sequence = {'Drifting1', 'Intergrey','Movie3', 'Intergrey','Movie1','Intergrey','Drifting2' , 'Spont','Movie3','Intergrey','Drifting3'};  
-ops.paradigm_trial_num =    [ 200,   1,     5,    1,    10,    1,   200,   1,     5,   1,  200];   
-ops.paradigm_stim_time=     [   2,  30,   120,   30,    30,   30,     2, 300,   120,  30,    2];
-ops.paradigm_isi_time=      [   1,   0,     0,    0,     0,    0,     1,   0,     0,   0,    1];
-ops.paradigm_frame_number=  [   1,   1,  3600,    1,   900,    1,     1,   1,  3600,   1,    1];
-ops.paradigm_optotest=      [   1,   0,     0,    0,     0,    0,     0,   0,     0,   0,    0];
+ops.paradigm_sequence = {'Drifting1'}
+ops.paradigm_trial_num =    [ 200]  
+ops.paradigm_stim_time=     [   2];
+ops.paradigm_isi_time=      [   1];
+ops.paradigm_frame_number=  [   1];
 
 ops.isicolor=135;      %appx middle                       % Shade of gray on screen during isi (1 if black, 255/2 if gray)
 isi_color = [ops.isicolor ops.isicolor ops.isicolor];
 if blue
     isi_color = [0 0 ops.isicolor];
 end
+rect=[1920 0 1920+1280 750]
 repetitions=15;
 waitframes=1;
 random_jitter= randi([1 20]);
@@ -55,7 +55,7 @@ black = BlackIndex(screenid);
 grey = white / 2;
 % grey=135;
 
-[win, rect] = Screen('OpenWindow',screenid, isi_color); % rect is the coordinates of the screen
+[win, rect] = Screen('OpenWindow',screenid, isi_color,rect); % rect is the coordinates of the screen
 ops.flipInterval = Screen('GetFlipInterval', win);
 resolution=Screen('Resolution', screenid);
 reswidth=resolution.width;
@@ -128,36 +128,15 @@ ops.paradigm_frame_number=  [   1,   1,  frame_number_movie_3,    1,   frame_num
 %% VoltageSignals
 if ~desktop_testing
     session=daq.createSession('ni');
-    counter_trigger=daq('ni');
-    usb_session=daq.createSession('ni');
-    resetcounters(counter_trigger);
-    addinput(counter_trigger,'Dev1','ctr0','EdgeCount');
-    
     session.addAnalogOutputChannel('Dev1','ao0','Voltage');
     session.addAnalogOutputChannel('Dev1','ao1','Voltage');
-    
-    usb_session.addAnalogOutputChannel('Dev2','ao0','Voltage');
-    usb_session.addAnalogOutputChannel('Dev2','ao1','Voltage');
-
     session.IsContinuous = true;
-    session.Rate = 10000;
+    session.Rate = 5000;
     maxvol=10;
     greyvol=2;
     movievolmax=9;
     movievolmin=4;
 
-else
-    session=daq('ni');
-    session=daq.createSession('ni');
-    session.addAnalogOutputChannel('Dev1','ao1','Voltage');
-%     session.IsContinuous = true;
-%     session.Rate = 10000;
-    session.outputSingleScan([5 0]);
-    session.outputSingleScan([0 0]);
-    maxvol=5;
-    greyvol=1;
-    movievolmax=4.5;
-    movievolmin=3;
 end
 %% create info arrays
 full_info=cell(numel(ops.paradigm_sequence)+1,5);
@@ -215,31 +194,8 @@ diodeBox=30;
 % mydlg = warndlg('Ok to strat VisStim.', 'A Warning Dialog');
 % waitfor(mydlg);
 % disp('VisStimStarted.');startexp=GetSecs();
-%% set up tirgger
-counter_data=read(counter_trigger);
-fprintf('Waiting For DaqRec trigger');
 
-while counter_data.Dev1_ctr0==0
-    counter_data=read(counter_trigger);
-end
-fprintf('Trigering Acquisition');
-% trigger scquisition
-pause(5);
-usb_session.outputSingleScan([5 0]);
-usb_session.outputSingleScan([5 0]);
-pause(1)
-usb_session.outputSingleScan([0 0]);
-usb_session.outputSingleScan([0 0]);
-pause(3);
-% triggerLED start
-usb_session.outputSingleScan([0 5]);
-usb_session.outputSingleScan([0 5]);
-pause(1);
-usb_session.outputSingleScan([0 0]);
-usb_session.outputSingleScan([0 0]);
-pause(5);
-%% set opto tirggers for which trial
-optotrial=5
+
 %% RUN STIMULI
 for parad_num = 1:numel(ops.paradigm_sequence)
     full_info{1+parad_num,2}=GetSecs();
@@ -251,7 +207,6 @@ for parad_num = 1:numel(ops.paradigm_sequence)
     grating=0;
     movi=0;
     
-    optotest=0;
 
  % check what paradigm
     if strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting1')
@@ -259,30 +214,25 @@ for parad_num = 1:numel(ops.paradigm_sequence)
         texindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
         grating=1;
         
-        optotest=ops.paradigm_optotest(parad_num);
     elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting2')
         texindexes=sampled_grating_indexes_parts(2,(~isnan(sampled_grating_indexes_parts(3,:))));
         texture=driftingtex;
         grating=1;
-        optotest=ops.paradigm_optotest(parad_num);
 
     elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting3')
         texindexes=sampled_grating_indexes_parts(3,(~isnan(sampled_grating_indexes_parts(3,:))));
         texture=driftingtex;
         grating=1;
-        optotest=ops.paradigm_optotest(parad_num);
 
     elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Movie1')
         texture=texmov1;
         movi=1;  
         frame_number=frame_number_movie_1*2;
-        optotest=ops.paradigm_optotest(parad_num);
 
     elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Movie3')
         texture=texmov3;
         movi=1;
         frame_number=frame_number_movie_3*2;
-        optotest=ops.paradigm_optotest(parad_num);
     end    
     if exist ('session', 'var')
         session.outputSingleScan([0 0]);
@@ -293,22 +243,14 @@ for parad_num = 1:numel(ops.paradigm_sequence)
          for trl=1:ops.paradigm_trial_num(parad_num) 
 %             grat_volt=4*texindexes(trl)/totalstim;
             grat_volt=movievolmin+(movievolmax-movievolmin)*(texindexes(trl)-1)/(ops.paradigm_trial_num(parad_num)-1);
-            optotriger=0;
-            optotriger2=0;
 
             % select wich grating will tirgger opto
-            if optotest
-                if texindexes(trl)==optotrial
-                    optotriger=5
-                end
-            end
-            
             if texindexes(trl)==0
                 grat_volt=movievolmax+0.5;
             end
             Screen('FillRect', win, isi_color, rect);
             now=GetSecs();
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% strat trial start isi
+            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color);% strat trial start isi
             full_info{1+parad_num,5}{1+trl,2}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()]; % strat trial start isi
             if exist ('session', 'var')
                 session.outputSingleScan([grat_volt 0]);
@@ -329,10 +271,10 @@ for parad_num = 1:numel(ops.paradigm_sequence)
             while (now-VBLTimestamp)<ops.paradigm_isi_time(parad_num)
                       now=GetSecs();
             end          
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% stim start end isi
+            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color);% stim start end isi
             full_info{1+parad_num,5}{1+trl,3}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()]; % stim start end isi
-            session.outputSingleScan([greyvol optotriger]);
-            session.outputSingleScan([greyvol optotriger]);
+            session.outputSingleScan([greyvol 0]);
+            session.outputSingleScan([greyvol 0]);
             pause(0.003)
             session.outputSingleScan([greyvol 0]);
             session.outputSingleScan([greyvol 0]);
@@ -342,7 +284,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
                 while (now-full_info{1+parad_num,5}{1+trl,3}(1))<ops.paradigm_stim_time(parad_num)           
                         now=GetSecs();
                         Screen('DrawTexture', win,texture(texindexes(trl),rem(ct,60)+1));
-                        [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);
+                        [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color);
                         if rem(ct, 2) == 0
                             frame_volt=greyvol+1;
                         else
@@ -362,46 +304,35 @@ for parad_num = 1:numel(ops.paradigm_sequence)
          end     
     elseif movi 
         for trl=1:ops.paradigm_trial_num(parad_num)
-            optotriger=0;
-            if optotest
-                if  optoframe==1
-                    optotriger=5
-                end
-            end
+       
 %                 frame_volt=9*rem(ct,frame_number)/frame_number;
 %                 trial_volt=movievol*trl/ops.paradigm_trial_num(parad_num);
             trial_volt=movievolmin+(movievolmax-movievolmin)*(trl-1)/(ops.paradigm_trial_num(parad_num)-1);
             Screen('DrawTexture', win,texture(1,1));
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win); %strat first frame
+            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color); %strat first frame
             ct=1;
             if exist ('session', 'var')
-                session.outputSingleScan([trial_volt optotriger]);
-                session.outputSingleScan([trial_volt optotriger]);
+                session.outputSingleScan([trial_volt 0]);
+                session.outputSingleScan([trial_volt 0]);
                 pause(0.003)
                 session.outputSingleScan([trial_volt 0]);
                 session.outputSingleScan([trial_volt 0]);
             end
-            optotriger=0;
             full_info{1+parad_num,5}{1+trl,2}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];%strat first frame
             now=GetSecs();
             while (now-full_info{1+parad_num,5}{1+trl,2}(1))<ops.paradigm_stim_time(parad_num)%-ops.paradigm_stim_time(parad_num)/frame_number
                 now=GetSecs();
-                optotriger2=0;
-                if optotest
-                    if  frame_number==optoframe;
-                        optotriger2=5
-                    end
-                end
+          
                 Screen('DrawTexture', win,texture(1,rem(ct,frame_number)+1));
-                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win); %strat frame highre  than one
+                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color); %strat frame highre  than one
                 if rem(ct, 2) == 0
                     frame_volt=greyvol+1;
                 else
                     frame_volt=greyvol-1;
                 end
                 if exist ('session', 'var')
-                    session.outputSingleScan([frame_volt optotriger2]);
-                    session.outputSingleScan([frame_volt optotriger2]);
+                    session.outputSingleScan([frame_volt 0]);
+                    session.outputSingleScan([frame_volt 0]);
                     pause(0.003)
                     session.outputSingleScan([frame_volt 0]);
                     session.outputSingleScan([frame_volt 0]);
@@ -416,7 +347,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
     else
          for trl=1:ops.paradigm_trial_num(parad_num)
             Screen('FillRect', win, isi_color, rect);
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);
+            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win, isi_color);
             full_info{1+parad_num,5}{1+trl,2}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
             if exist ('session', 'var')
                     session.outputSingleScan([greyvol 0]);
@@ -425,14 +356,6 @@ for parad_num = 1:numel(ops.paradigm_sequence)
             it=1;
             while (now- full_info{1+parad_num,5}{1+trl,2}(1))<ops.paradigm_stim_time(parad_num)%-1/60
                 now=GetSecs();
-                if ops.paradigm_optotest(parad_num) && it==iterations && (now-full_info{1+parad_num,5}{1+trl,2}(1))>stim_delay  
-                    session.outputSingleScan([greyvol 5]);
-                    session.outputSingleScan([greyvol 5]);
-                    pause(0.003)
-                    session.outputSingleScan([greyvol 0]);
-                    session.outputSingleScan([greyvol 0]);
-                    it=it+1
-                end 
             end 
 %             [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win,1,1); % extra final flip flip
 %             full_info{1+parad_num,5}{1+trl,3}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
@@ -455,18 +378,6 @@ session.outputSingleScan([0 0]);
 Screen('Close');  
 sca();
 
-%% trigger led and stop acquisition
-
-usb_session.outputSingleScan([0 5])
-pause(1)
-usb_session.outputSingleScan([0 0])
-pause(3)
-% stop acq
-
-usb_session.outputSingleScan([5 0])
-usb_session.outputSingleScan([5 0])
-usb_session.outputSingleScan([0 0])
-usb_session.outputSingleScan([0 0])
 
 
 %%
@@ -522,7 +433,7 @@ clear temp_time;
 
 %% save info
 fprintf('Saving...\n');
-save([save_path,'\', file_name, '.mat'],'ops', 'full_info');
+save([save_path,'\', file_name, '.mat'],'ops', 'full_info','isi_color');
 fprintf('Done\n');
 %% ploting noise timings
 % for j=[2,6,10]

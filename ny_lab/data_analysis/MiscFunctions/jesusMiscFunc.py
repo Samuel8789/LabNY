@@ -21,7 +21,7 @@ from pprint import pprint
 import time
 import copy
 
-def contrast_index( groups,similarity,indices,exclude=False):
+def contrast_index( groups, similarity, indices,exclude=False):
     '''
     % Contrast index
     % Get the Contrast index for g groups given a similarity matrix.
@@ -39,6 +39,11 @@ def contrast_index( groups,similarity,indices,exclude=False):
     % Outputs
     % CstIdx = Contrast index
 
+    '''
+    '''JESUS HAS added some more analysis her.
+    FISRT substart Standad error of the mena form the average sna dget the max values, if
+    if it max values is the max number of clusters 10 then try without sem extraction
+    if that gives the same number of clusters again try the max first derivative
     '''
 
        

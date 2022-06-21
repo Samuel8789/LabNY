@@ -96,7 +96,7 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE ExperimentalAnimals_table
+                UPDATE Acquisitions_table
                 SET Patching Date=date(?),  Patching ID=?
                 WHERE ID IN (?)
             """        
@@ -119,8 +119,8 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
-DELETE FROM ExperimentalAnimals_table
-WHERE  ID IN (372,373,374)
+DELETE FROM FaceCamera_table
+WHERE  ID IN (109)
 
 """
 params=()

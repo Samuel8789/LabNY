@@ -12,6 +12,8 @@ import numpy as np
 import pickle
 import glob
 import scipy.signal as sg
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+
 
 import tifffile
 from PIL import Image
@@ -132,6 +134,18 @@ class CaimanResults():
         self.accepted_cells_number=np.empty((0))
         self.final_accepted_cells_matlabcorrected_indexes=np.empty((0))
         
+    def get_rois_center_of_mass(self):
+          
+        contours= self.data['est']['contours']
+        self.centers_of_mass=[]
+        for i, a_cell in enumerate(contours):
+            coordinates=a_cell[0]
+            cmas=np.mean(coordinates,0)
+            self.centers_of_mass.append(cmas)
+
+        accepted_center_of_mass=np.array(self.centers_of_mass)[self.accepted_indexes_sorter]
+        self.accepted_center_of_mass=np.around(accepted_center_of_mass).astype('uint16')
+
 
 
     def load_YSmat_results(self):
@@ -147,6 +161,12 @@ class CaimanResults():
         self.YrA_matrix=self.data['est']['YrA'][self.accepted_indexes_sorter,:]
         self.raw=self.C_matrix + self.YrA_matrix
         
+    def z_score(self, X):
+       # X: ndarray, shape (n_features, n_samples)
+       ss = StandardScaler(with_mean=True, with_std=True)
+       Xz = ss.fit_transform(X.T).T
+       return Xz
+    
 
     def gaussian_smooth_kernel_convolution(self, signal, sigma):
         dt = 1000/np.double(self.data['ops']['init_params_caiman']['data']['fr'])
@@ -198,6 +218,7 @@ class CaimanResults():
         self.convolved_MCMC=np.squeeze(self.convolved_MCMC)
         self.binarized_MCMC=np.where( self.convolved_MCMC > 0, 1, 0)
         # binarized_MCMC=(mcmc_good_components > 0.0001).astype(np.int_)
+        self.z_scored_binarized_mcmc=self.z_score(self.convolved_MCMC)
         
 
     def get_all_sorting_indexes(self):
@@ -344,6 +365,8 @@ class CaimanResults():
         if self.mat_results_path:
             self.load_dfdt_traces()
             self.load_mcmc_traces()
+            self.get_rois_center_of_mass()
+
                 
 if __name__ == "__main__":
     

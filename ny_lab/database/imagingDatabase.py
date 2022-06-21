@@ -983,7 +983,7 @@ class ImagingDatabase():
             if 'VisStim' in list(set(recorded_signals[0]) & set(recorded_signals[1])):
                 IsVisStimSignal=1   
                 
-  #%% defining which kind of acquisition is              
+#%% defining which kind of acquisition is              
         if 'NonImagingAcquisitions' in acquisition_path:
             IsNonImagingAcquisition=1  
             IsImaging=0
@@ -1062,7 +1062,7 @@ class ImagingDatabase():
                 Isotherfovaq=1   
                 slowstoragepath=os.path.join(os.path.split(slowstoragepath)[0],'OtherAcq',Prairieimagingname)   
                 workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'OtherAcq',Prairieimagingname)         
- #%%              
+#%%              
         FaceCameraID=np.nan 
         if glob.glob( acquisition_path+'\\**\\DisplaySettings.json', recursive=False) :
            IsFaceCamera=1

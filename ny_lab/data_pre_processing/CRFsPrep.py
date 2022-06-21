@@ -38,5 +38,7 @@ class CRFsPrep():
         prepare matlab binary matrix
         give standrad names
         prepare transfer to server
+        CRF running instruction
+            code in data analysis crfs op[en matalab]
         
         '''

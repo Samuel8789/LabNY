@@ -12,6 +12,10 @@ import matplotlib as mpl
 import numpy as np
 import pickle
 import glob
+import gc
+import sys
+from matplotlib.backends.backend_pdf import PdfPages
+
 
 import tkinter as Tkinter
 import random
@@ -148,6 +152,9 @@ class ResultsAnalysis():
         self.new_full_data=new_full_data
         self.acquisition_voltage_signals_object=acquisition_voltage_signals_object
         self.metadata_object=metadata_object
+        self.preframes=16
+        self.stim=33
+        self.postframes=16
         
         self.jesus_runs={}
         self.temporary_processing=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
@@ -212,20 +219,35 @@ class ResultsAnalysis():
 
         if self.acquisition_object:
             mouse_slow_path=self.acquisition_object.mouse_imaging_session_object.mouse_object.mouse_slow_subproject_path
-            self.jesus_runs_path=os.path.join(mouse_slow_path,'data','JesusRuns')
-            self.caiman_runs_path=os.path.join(mouse_slow_path,'data','CaimanRuns')
-            self.nmf_runs_path=os.path.join(mouse_slow_path,'data','NMFAnalysis')
-            self.allen_runs_path=os.path.join(mouse_slow_path,'data','AllenAnalysis')
+            
+            self.data_paths={ 'jesus_runs_path':os.path.join(mouse_slow_path,'data','JesusRuns'),
+             'caiman_runs_path':os.path.join(mouse_slow_path,'data','CaimanRuns'),
+             'nmf_runs_path':os.path.join(mouse_slow_path,'data','NMFAnalysis'),
+             'allen_runs_path':os.path.join(mouse_slow_path,'data','AllenAnalysis'),
+             'CRFs_runs_path':os.path.join(mouse_slow_path,'data','CRFsResults'),
+             'own_tuning_runs_path':os.path.join(mouse_slow_path,'data','MyOwnTuningAnalysis'),
+             'pca_runs_path':os.path.join(mouse_slow_path,'data','PCA'),
+                }
+            
+            for data_path in self.data_paths.values():
+                if not os.path.isdir(data_path):
+                    os.mkdir(data_path)
+
             self.data_analysis_path=os.path.join(mouse_slow_path,'data')
             self.full_data_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'full_data.pkl'])  
             self.pyr_int_identif_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'pyr_int_identification.pkl'])  
             
         else:
-            self.jesus_runs_path=self.temporary_processing
-            self.caiman_runs_path=self.temporary_processing
-            self.nmf_runs_path=self.temporary_processing
-            self.allen_runs_path=self.temporary_processing
-            self.data_analysis_path=self.temporary_processing
+            
+            self.data_paths={ 'jesus_runs_path':self.temporary_processing,
+             'caiman_runs_path':self.temporary_processing,
+             'nmf_runs_path':self.temporary_processing,
+             'allen_runs_path':self.temporary_processing,
+             'CRFs_runs_path':self.temporary_processing,
+             'own_tuning_runs_path':self.temporary_processing,
+             'pca_runs_path':self.temporary_processing,
+                }
+            
             self.full_data_path_name=None
             self.pyr_int_identif_path_name=None
             
@@ -390,15 +412,20 @@ class ResultsAnalysis():
                 # self.full_data['imaging_data']['All_planes_rough']['CellIds']='' TO DO
                 self.full_data['imaging_data']['All_planes_timestamped']={}
                 self.full_data['imaging_data']['All_planes_timestamped']['Traces']= {key:np.empty((0, len(self.full_data['imaging_data']['Plane1']['Timestamps'][0]))) for key in plane_traces.keys()}
-            
+
             for matrix_name, matrix in  self.full_data['imaging_data'][plane]['Traces'].items():
                 if matrix.any():
                     self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name]=np.concatenate((self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name],  matrix), axis=0)
         
+        # cell_numbers={k:len(plane['CellIds']) for k,plane in self.full_data['imaging_data'].items() if 'Plane' in k }
+        self.full_data['imaging_data']['Frame_number']= self.full_data['imaging_data'][plane]['Traces']['demixed'].shape[1]
+        self.full_data['imaging_data']['All_planes_rough']['CellIds']={k:plane['CellIds'] for k,plane in self.full_data['imaging_data'].items() if 'Plane' in k }
+        self.full_data['imaging_data']['All_planes_rough']['Timestamps']= self.full_data['imaging_data']['Plane1']['Timestamps']
+        self.full_data['imaging_data']['All_planes_rough']['CellNumber']= sum(len(plane) for plane in  self.full_data['imaging_data']['All_planes_rough']['CellIds'].values())
 
 #%% signal data managing
     def resample(self, x, factor, kind='linear'):
-        n = int(np.ceil(x.size / factor))
+        n = int(np.floor(x.size / factor))
         f = interpolate.interp1d(np.linspace(0, 1, x.size), x, kind)
         return f(np.linspace(0, 1, n))     
 
@@ -430,9 +457,9 @@ class ResultsAnalysis():
                                                                                 'Blank_sweep_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_on_index_full_recording]),
                                                                                 'Blank_sweep_off':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.blank_sweep_off_index_full_recording])
                                                                                 },
-                                                                     'Binary_Maytrix_downsampled':np.vstack([self.resample(self.signals_object.full_stimuli_binary_matrix[srtim], 
-                                                                                                                           factor=self.milisecond_period, kind='linear').squeeze() for srtim in range (self.signals_object.full_stimuli_binary_matrix.shape[0])]),
-                                                                     'Binary_Maytrix_recreated':'',
+                                                                     # 'Binary_Maytrix_downsampled':np.vstack([self.resample(self.signals_object.full_stimuli_binary_matrix[srtim], 
+                                                                     #                                                       factor=self.milisecond_period, kind='linear').squeeze() for srtim in range (self.signals_object.full_stimuli_binary_matrix.shape[0])]),
+                                                                     # 'Binary_Maytrix_recreated':'',
                                                                      'Resampled_sliced_speed':self.resample(np.concatenate((self.signals_object.first_drifting_set_speed, 
                                                                                                                             self.signals_object.second_drifting_set_speed, 
                                                                                                                             self.signals_object.third_drifting_set_speed)), factor=self.milisecond_period, kind='linear').squeeze(),
@@ -441,10 +468,10 @@ class ResultsAnalysis():
                                                                                                                               self.signals_object.third_drifting_set)), factor=self.milisecond_period, kind='linear').squeeze()
                                                                      
                                                                      }
-                self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated']=np.zeros((self.signals_object.full_stimuli_binary_matrix.shape ))
-                for i, row in enumerate(self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on']):
-                    for j, trial in enumerate(row):
-                        self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][i,j]:self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_off'][i,j]]=1
+                # self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated']=np.zeros((self.signals_object.full_stimuli_binary_matrix.shape ))
+                # for i, row in enumerate(self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on']):
+                #     for j, trial in enumerate(row):
+                #         self.full_data['visstim_info']['Drifting_Gratings']['Binary_Maytrix_recreated'][i,self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_on'][i,j]:self.full_data['visstim_info']['Drifting_Gratings']['Indexes']['Drift_off'][i,j]]=1
                 
             
                 self.full_data['visstim_info']['Movie3']={'Indexes':'',
@@ -482,8 +509,8 @@ class ResultsAnalysis():
                                                             }
 
     def create_stim_table(self):
-        self.stimulus_table={}
-        self.stimulus_table['drifting_gratings']=self.drifting_grating_stim_table()
+        
+        self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']=self.drifting_grating_stim_table()
 
     def drifting_grating_stim_table(self):
         if (not self.nondatabase) and self.signals_object.vis_stim_protocol:
@@ -525,6 +552,92 @@ class ResultsAnalysis():
             return sorted_df.reset_index(drop=True)
             
 #%% plotting
+    def plot_all_planes_by_cell_type(self):
+        
+        pixel_per_bar = 4
+        dpi = 100
+        
+        
+        n1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][1]
+        n2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][1]
+        n3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][1]
+        allplanepyramidalindex=np.concatenate((n1,n2,n3))
+        in1=self.pyr_int_ids_and_indexes['Plane1']['int'][1]
+        in2=self.pyr_int_ids_and_indexes['Plane2']['int'][1]
+        in3=self.pyr_int_ids_and_indexes['Plane3']['int'][1]
+        allplaneinterneuronindex=np.concatenate((in1,in2,in3))
+
+        #pyramidal dfdt
+        
+        
+        fig, ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_df/dt')
+
+        
+         
+        #pyramidal mcmcm
+        
+        fig,ax = plt.subplots(3,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[0].title.set_text('Raw_MCMC')
+        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[1].title.set_text('Smoothed_MCMC_{}'.format(self.MCMC_sigma))
+        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[2].title.set_text('Binarized_smoothed_MCMC_{}_{}'.format(0, self.MCMC_sigma ))
+        ax[-1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_MCMC')
+        
+
+        #interneuron dfdt
+       
+         
+        fig, ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
+        ax[1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_df/dt')
+    
+
+
+       
+       #interneuron mcmcm
+        fig,ax = plt.subplots(3,  figsize=(16,9), dpi=dpi, sharex=True)
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax[0].title.set_text('Raw_MCMC')
+        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[1].title.set_text('Smoothed_MCMC_{}'.format(self.MCMC_sigma))
+        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[2].title.set_text('Binarized_smoothed_MCMC_{}_{}'.format(0, self.MCMC_sigma ))
+        ax[-1].set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_MCMC')
+               
+        
+        
+        
+
+
+
     def some_ploting(self):
         dataset_name=list(self.caiman_results.keys())[0]
         fig, ax=plt.subplots(3)
@@ -548,9 +661,7 @@ class ResultsAnalysis():
         # trace_type='dfdt_smoothed'
         # trace_type='denoised'
         # trace_type='mcmc_smoothed'
-        self.preframes=16
-        self.stim=33
-        self.postframes=16
+    
         
         # self.preframes=25
         # self.stim=50
@@ -561,13 +672,19 @@ class ResultsAnalysis():
         # matlabcell=47 49# very sharp dip at begining of stim
 
 
-        if matlabcell:
-            cell=np.argwhere(self.full_data['imaging_data'][plane]['CellIds']==matlabcell)[0][0]
-        matlabcell=self.full_data['imaging_data'][plane]['CellIds'][cell]
+        # if matlabcell:
+        #     cell=np.argwhere(self.full_data['imaging_data'][plane]['CellIds']==matlabcell)[0][0]  
+        
+        
+        # matlabcell=self.full_data['imaging_data'][plane]['CellIds'][cell]
+        
+        
+        
+        
             
         if self.pyr_int_ids_and_indexes:
-            pyr=np.argwhere(self.pyr_int_ids_and_indexes['pyr'][1]).flatten()
-            inter=np.argwhere(self.pyr_int_ids_and_indexes['int'][1]).flatten()
+            pyr=np.argwhere(self.pyr_int_ids_and_indexes[plane]['pyr'][1]).flatten()
+            inter=np.argwhere(self.pyr_int_ids_and_indexes[plane]['int'][1]).flatten()
             if  cell in    pyr:
                 celltype='Pyramidal Cell'
             elif  cell in    inter:
@@ -575,7 +692,7 @@ class ResultsAnalysis():
                 
         celltype='Interneuron'
 
-        print(plane+'\nMatlab cell: '+str( matlabcell)+'\nPython cell :'+str(cell)+'\n' + celltype)
+        # print(plane+'\nMatlab cell: '+str( matlabcell)+'\nPython cell :'+str(cell)+'\n' + celltype)
         
         #  self.plot_blank_sweeps(cell,trace_type,plane)
         #  self.plot_directions(cell,trace_type,plane)
@@ -610,14 +727,14 @@ class ResultsAnalysis():
         ax[0].plot(cell_trace)
    
         test=np.vstack(
-            [cell_trace[self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].blank_sweep==1].start.values.astype( 'uint16' )[sweep]-self.preframes:
-                        self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].blank_sweep==1].end.values.astype( 'uint16' )[sweep]+self.postframes]
-             for sweep in range(len(self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].blank_sweep==1].start.values.astype( 'uint16' )))])
+            [cell_trace[self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].start.values.astype( 'uint16' )[sweep]-self.preframes:
+                        self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].end.values.astype( 'uint16' )[sweep]+self.postframes]
+             for sweep in range(len(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].start.values.astype( 'uint16' )))])
         
         
         meantraces=np.mean(test, axis=0)
         
-        for i, row in self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].blank_sweep==1].iterrows():
+        for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].iterrows():
             ax[1].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
             
         ax[1].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
@@ -641,11 +758,11 @@ class ResultsAnalysis():
     
             trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
              if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
-             else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] for i, row in self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].orientation==ori].iterrows() ])
+             else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori].iterrows() ])
 
             meantraces=np.mean(trial, axis=0)
                 
-            for i, row in self.stimulus_table['drifting_gratings'][(self.stimulus_table['drifting_gratings'].orientation==ori)&(self.stimulus_table['drifting_gratings'].blank_sweep==0)].iterrows():
+            for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
                 ax[1].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
             ax[1].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
             ax[1].axvspan(self.preframes,self.preframes+self.stim, facecolor='b', alpha=0.3)
@@ -658,8 +775,8 @@ class ResultsAnalysis():
             
     def plot_orientation(self, cell, trace_type, plane):
         
-        pyr=np.argwhere(self.pyr_int_ids_and_indexes['pyr'][1]).flatten()
-        inter=np.argwhere(self.pyr_int_ids_and_indexes['int'][1]).flatten()
+        pyr=np.argwhere(self.pyr_int_ids_and_indexes[plane]['pyr'][1]).flatten()
+        inter=np.argwhere(self.pyr_int_ids_and_indexes[plane]['int'][1]).flatten()
         if  cell in    pyr:
             celltype='Pyramidal Cell'
         elif  cell in    inter:
@@ -685,11 +802,11 @@ class ResultsAnalysis():
             trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
              if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
              else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] 
-             for i, row in self.stimulus_table['drifting_gratings'][self.stimulus_table['drifting_gratings'].orientation.isin([ori, ori+180])].iterrows() ])
+             for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])
 
             meantraces=np.mean(trial, axis=0)
                 
-            for i, row in self.stimulus_table['drifting_gratings'][(self.stimulus_table['drifting_gratings'].orientation==ori)&(self.stimulus_table['drifting_gratings'].blank_sweep==0)].iterrows():
+            for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
                 axs[n][0].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
             axs[n][0].set_title(ori)
 
@@ -725,7 +842,206 @@ class ResultsAnalysis():
         return mean_evoked_2s, mean_evoked_1s
 
 
-#%% int pyr ident            
+#%% INDEXING AND IDENTITI
+
+    def convert_full_planes_idx_to_single_plane_final_indx(self,full_raster_pyhton_cell_idx, plane):
+        caiman_sorter_idx=self.full_data['imaging_data'][plane]['CellIds']
+        try:
+            if 'All' in plane:
+                total_cells=sum(len(plane) for plane in caiman_sorter_idx.values())
+                first_idx_plane=np.concatenate((np.zeros((1)),np.cumsum([len(plane) for plane in caiman_sorter_idx.values()])[:-1])).astype('uint16')
+                plane_asignation=[(full_raster_pyhton_cell_idx>=i,full_raster_pyhton_cell_idx<i) for i in first_idx_plane]
+                plane_idx = len(plane_asignation) - next(i for i, val in enumerate(reversed(plane_asignation), 1) if val == (True, False)) 
+                indexed_plane_sorter_idx=caiman_sorter_idx[f'Plane{plane_idx+1}']
+
+            else:
+                total_cells=len(caiman_sorter_idx)
+                plane_idx= int(plane[-1])-1
+                indexed_plane_sorter_idx=caiman_sorter_idx
+                
+            single_plane_selected_pyhton_cell_idx=full_raster_pyhton_cell_idx-first_idx_plane[plane_idx]
+            single_plane_sorter_pyhton_idx=indexed_plane_sorter_idx[single_plane_selected_pyhton_cell_idx]
+            matlab_sorter_cell_id=single_plane_sorter_pyhton_idx+1
+        
+            return  f'Plane{plane_idx+1}', total_cells, full_raster_pyhton_cell_idx, single_plane_selected_pyhton_cell_idx, single_plane_sorter_pyhton_idx,matlab_sorter_cell_id
+                 
+        except:
+            print('CHeck your indexes and planes')
+            return None,None,None,None,None,None
+        
+         
+    
+    def get_full_raster_indx_from_matlab_sorter_idx(self, matlab_sorter_idx, plane):
+        
+        single_plane_sorter_pyhton_idx=matlab_sorter_idx-1
+        try:
+            single_plane_selected_pyhton_cell_idx=np.argwhere(self.full_data['imaging_data']['All_planes_rough']['CellIds'][plane]==single_plane_sorter_pyhton_idx)[0][0]
+            first_idx_plane=np.concatenate((np.zeros((1)),np.cumsum([len(plane) for plane in self.full_data['imaging_data']['All_planes_rough']['CellIds'].values()])[:-1])).astype('uint16')
+            full_raster_pyhton_cell_idx=single_plane_selected_pyhton_cell_idx+first_idx_plane[ int(plane[-1])-1]
+            return  full_raster_pyhton_cell_idx
+        except:
+            
+            print('Cell Not Accepted')
+            return None
+            
+            
+    def indetify_full_rater_idx_cell_identity(self, raster_pyhton_cell_idx, plane):
+        
+        if raster_pyhton_cell_idx<len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]):
+
+            if self.pyr_int_ids_and_indexes[plane]['pyr'][1][raster_pyhton_cell_idx]:
+                cell_identity='Tomato -'
+            elif  self.pyr_int_ids_and_indexes[plane]['int'][1][raster_pyhton_cell_idx]:
+                cell_identity='Tomato +'
+            else:
+                print('Checking')
+            return cell_identity
+        else:
+            print('CHeck your indexes and planes')
+            return None
+        
+    def define_pre_post_frames(self, dur_frames, isi_frames):
+        duration_dict={
+            'preframes':isi_frames,
+            'stim':dur_frames,
+            'postframes':isi_frames}
+        
+        return   duration_dict
+    
+ 
+
+    def get_trial_from_drifting_angle(self, direction_list, temporal_frequency_list):
+        
+        selected_stim_table=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin(direction_list)) & 
+                                                                         (self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].temporal_frequency.isin(temporal_frequency_list))]
+
+        
+        return selected_stim_table
+    
+
+    def extract_trial_indexing_array(self,selected_stim_table, duration_dict):
+        
+        isi_start=selected_stim_table['start'].values-duration_dict['preframes']
+        post_isis_end=selected_stim_table['end'].values+duration_dict['postframes']
+        
+        trial_indexig_ranges=[]
+        for i in range(len(isi_start)):
+            trial_indexig_ranges.append(np.arange(isi_start[i],post_isis_end[i]))
+            
+        return    trial_indexig_ranges   
+        
+   
+
+    def get_paradigm_range(self, paradigm):    
+
+        if paradigm=='Full':
+            paradimg_range=np.arange(0,self.full_data['imaging_data']['Frame_number']+1)
+            
+            
+        elif paradigm=='Drifting_Gratings':
+            
+            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['first_drifting_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['first_drifting_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['second_drifting_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['second_drifting_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['third_drifting_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['third_drifting_set_last'])) 
+            
+            paradimg_range=paradimg_range=np.r_[indexes]
+
+            
+        elif paradigm=='Spontaneous':
+            paradigm_start=self.vistsiminfo['Spontaneous']['stimulus_table'].iloc[[0]]['start'].values[0]
+            paradigm_end=self.vistsiminfo['Spontaneous']['stimulus_table'].iloc[[-1]]['end'].values[0]
+            paradimg_range=np.arange(paradigm_start,paradigm_end+1)
+            
+        elif paradigm=='Movie1':
+            
+            paradimg_range=np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['short_movie_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['short_movie_set_last'])
+            
+        elif paradigm=='Movie3':
+            
+            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['first_movie_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['first_movie_set_last']),                       
+             np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['second_movie_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['second_movie_set_last']))
+            paradimg_range=paradimg_range=np.r_[indexes]
+
+
+
+        return paradimg_range
+    
+    
+       
+    def create_cell_selection_ranges(self,selected_cells, plane) :
+
+        if isinstance(selected_cells, list):
+            
+            cell_indexes=np.r_[selected_cells]
+
+            
+        elif self.pyr_int_ids_and_indexes:
+        
+            if selected_cells=='Pyramidal':
+                cell_indexes= self.pyr_int_ids_and_indexes[plane]['pyr'][1]
+                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))[cell_indexes]
+
+            elif selected_cells=='Interneurons':
+                cell_indexes= self.pyr_int_ids_and_indexes[plane]['int'][1]
+                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))[cell_indexes]
+
+            elif selected_cells=='All':
+                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))
+
+        else:
+            cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))
+
+            
+        all_index_info=[ self.convert_full_planes_idx_to_single_plane_final_indx(full_raster_pyhton_cell_idx,plane)  for full_raster_pyhton_cell_idx in cell_indexes]
+            
+        all_index_info=[(cell, self.indetify_full_rater_idx_cell_identity(cell[2], plane)) for cell in all_index_info]
+                
+        return cell_indexes, all_index_info
+    
+    def get_raster_with_selections(self,trace_type,plane,selected_cells, paradigm=None, drifting_options=None):
+        selected_plane_activity_traces=None
+        selected_cells_traces=None
+        selected_plane_trials_traces=None
+        selected_cells_paradigm_traces=None
+        
+        cell_range, all_index_info= self.create_cell_selection_ranges(selected_cells, plane) 
+        
+        selected_plane_activity_traces=self.full_data['imaging_data'][plane]['Traces'][trace_type]
+        selected_cells_traces=selected_plane_activity_traces[cell_range,:]
+        
+        if drifting_options:
+            direction_list=drifting_options[0]
+            temporal_frequency_list=drifting_options[1]
+            seleceted_dur_frames=drifting_options[2]
+            seleceted_dur_isi=drifting_options[3]
+        
+            selected_stim_table=self.get_trial_from_drifting_angle(direction_list, temporal_frequency_list)
+            duration_dict=self.define_pre_post_frames(seleceted_dur_frames,seleceted_dur_isi)
+            trial_indexig_ranges=self.extract_trial_indexing_array(selected_stim_table, duration_dict)
+            
+            selected_plane_trials_traces=[]
+            
+            for trial_range in trial_indexig_ranges:
+                selected_plane_trials_traces.append(selected_cells_traces[:,trial_range])
+
+
+        
+        if paradigm:
+            paradimg_range=self.get_paradigm_range(paradigm)
+         
+            selected_cells_paradigm_traces=selected_cells_traces[:,paradimg_range]
+            
+            
+        options_array=[trace_type,plane,selected_cells,all_index_info, paradigm, drifting_options]
+        
+        return selected_plane_activity_traces, selected_cells_traces, selected_cells_paradigm_traces, selected_plane_trials_traces,options_array    
+        
    
     def check_pyr_int_identif_files(self) :
         self.pyr_int_identif_list=glob.glob(self.data_analysis_path+'\\**pyr_int_identif**', recursive=False)
@@ -755,28 +1071,107 @@ class ResultsAnalysis():
                 # Pickle the 'data' dictionary using the highest protocol available.
                 pickle.dump(self.pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
 
-
+    # have to dredo dthis
     def get_pyr_int_indexing_dict(self):
-        if not self.nondatabase and   self.pyr_int_identification:
-            self.pyr_int_identification['Plane1']['pyramidals']['python']=np.setxor1d(self.pyr_int_identification['Plane1']['interneuron']['python'],self.full_data['imaging_data']['Plane1']['CellIds'])
+        if not self.nondatabase and  self.pyr_int_identification:
+            self.pyr_int_ids_and_indexes={}
+            for plane in self.pyr_int_identification.keys():
+                self.pyr_int_ids_and_indexes[plane]={'pyr':(self.pyr_int_identification[plane]['pyramidals']['python'], 
+                                        np.in1d(self.full_data['imaging_data'][plane]['CellIds'], self.pyr_int_identification[plane]['pyramidals']['python'])),
+                                  'int':(np.array(self.pyr_int_identification[plane]['interneuron']['python']),
+                                        np.in1d(self.full_data['imaging_data'][plane]['CellIds'], self.pyr_int_identification[plane]['interneuron']['python']))}
+                
+                
+            n1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][1]
+            n2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][1]
+            n3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][1]
+            nn1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][0]
+            nn2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][0]
+            nn3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][0]
             
-            self.pyr_int_ids_and_indexes={'pyr':(self.pyr_int_identification['Plane1']['pyramidals']['python'], 
-                                    np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['pyramidals']['python'])),
-                             'int':(np.array(self.pyr_int_identification['Plane1']['interneuron']['python']),
-                                    np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['interneuron']['python']))}
+            in1=self.pyr_int_ids_and_indexes['Plane1']['int'][1]
+            in2=self.pyr_int_ids_and_indexes['Plane2']['int'][1]
+            in3=self.pyr_int_ids_and_indexes['Plane3']['int'][1]
+            inn1=self.pyr_int_ids_and_indexes['Plane1']['int'][0]
+            inn2=self.pyr_int_ids_and_indexes['Plane2']['int'][0]
+            inn3=self.pyr_int_ids_and_indexes['Plane3']['int'][0]
+            
+            
+            self.pyr_int_ids_and_indexes['All_planes_rough']  = {'pyr':(np.concatenate((nn1,nn2,nn3)), 
+                                    np.concatenate((n1,n2,n3))),
+                              'int':(np.concatenate((inn1,inn2,inn3)), 
+                                                      np.concatenate((in1,in2,in3)))}
+                
+                  
+       
+      
+            
+            
+            
+            # self.pyr_int_identification['Plane1']['pyramidals']['python']=np.setxor1d(self.pyr_int_identification['Plane1']['interneuron']['python'],self.full_data['imaging_data']['Plane1']['CellIds'])
+            
+            # self.pyr_int_ids_and_indexes={'pyr':(self.pyr_int_identification['Plane1']['pyramidals']['python'], 
+            #                         np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['pyramidals']['python'])),
+            #                  'int':(np.array(self.pyr_int_identification['Plane1']['interneuron']['python']),
+            #                         np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['interneuron']['python']))}
 
-    def identify_in_pyr(self):
+
+    def convert_excel_identitty_file(self):
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        aqname=''
+        datapath=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data'
+        identfile='SPKGcellidentiity.xlsx'
+        fullfilepath=os.path.join(datapath, identfile)
+
+        pyr_int_identif_path_name='_'.join(['211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000', timestr,'pyr_int_identification.pkl'])  
+
+
+        planes=['Plane1', 'Plane2', 'Plane3']
+        pyr_int_identification={}
+        df1 = pd.read_excel(fullfilepath, sheet_name="Plane1", engine="openpyxl")
+        df2 = pd.read_excel(fullfilepath, sheet_name="Plane2", engine="openpyxl")
+        df3 = pd.read_excel(fullfilepath, sheet_name="Plane3", engine="openpyxl")
+        dfs=[df1,df2,df3]
+
+        pyramidal_count={}
+        interneuron_count={}
+        for i,plane in enumerate(planes):
+            pyr_int_identification[plane]={'interneuron':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist()),
+                                                           'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist())-1
+                                                           },
+                                            'pyramidals':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist()),
+                                                          'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist())-1
+                                                          }
+                                            }
+
+
+
+            pyramidal_count[plane]=pyr_int_identification[plane]['pyramidals']['python'].shape[0]
+            interneuron_count[plane]=pyr_int_identification[plane]['interneuron']['python'].shape[0]
+
+
+
+
+
+        datapath=os.path.join(datapath, pyr_int_identif_path_name)
+        if not os.path.isfile(datapath):
+            with open(datapath, 'wb') as f:
+                # Pickle the 'data' dictionary using the highest protocol available.
+                pickle.dump(pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
+
+
+    # def identify_in_pyr(self):
             
-        for key,dataset in self.calcium_datasets.items():
-            dataset.find_associated_fov_tomato_dataset()
-            dataset.find_associated_channel_dataset()
-            if hasattr(dataset, 'associated_channel_dataset_object'):
-                dataset.associated_tomato_dataset=dataset.associated_channel_dataset_object
-            elif hasattr(dataset, 'associated_fov_tomato_dataset_red_object'):
-                dataset.associated_tomato_dataset=dataset.associated_fov_tomato_dataset_red_object
-            else:
-                print('No associated channel')
-        for caiman_res in  self.caiman_results.values(): caiman_res.plot_registered_two_color_projections()
+    #     for key,dataset in self.calcium_datasets.items():
+    #         dataset.find_associated_fov_tomato_dataset()
+    #         dataset.find_associated_channel_dataset()
+    #         if hasattr(dataset, 'associated_channel_dataset_object'):
+    #             dataset.associated_tomato_dataset=dataset.associated_channel_dataset_object
+    #         elif hasattr(dataset, 'associated_fov_tomato_dataset_red_object'):
+    #             dataset.associated_tomato_dataset=dataset.associated_fov_tomato_dataset_red_object
+    #         else:
+    #             print('No associated channel')
+    #     for caiman_res in  self.caiman_results.values(): caiman_res.plot_registered_two_color_projections()
         
 #%% activity slicing
     def slice_matrix_by_paradigm_indexes(self, matrix, indexes):
@@ -909,268 +1304,461 @@ class ResultsAnalysis():
         # plt.title('UMAP projection of the Penguin dataset', fontsize=24)
        
 #%% PCA
-    def do_PCA(self, mean_sweep_response, sweep_response, driftgrattable):
-        
+    def do_PCA(self, mean_sweep_response, sweep_response, driftgrattable, params):
+        self.timestr = time.strftime("%Y%m%d-%H%M%S")
+        self.params=params
         trial_mean_peak=mean_sweep_response
-        trial_traces=sweep_response
+        self.trial_traces=sweep_response
         filename=r'C:/Users/sp3660/Desktop/PCAanim.mp4'
+        trial_frames_number=65
+        self.start_stim=0
+        self.end_stim=2
+        self.frames_pre_stim = 16
+        self.frames_post_stim = 16
         
-        start_stim=0
-        end_stim=2
-        frames_pre_stim = 30
-        frames_post_stim = 30
+        full_trials=np.zeros((self.trial_traces.shape[0],self.trial_traces.shape[1],self.trial_traces.iloc[0,0].shape[0]))
         
-        full_trials=np.zeros((trial_traces.shape[0],trial_traces.shape[1],trial_traces.iloc[0,0].shape[0]))
-        
-        for i in range(trial_traces.shape[0]): #iterate over rows
-            for j in range(trial_traces.shape[1]):
-                full_trials[i,j,:]=trial_traces.iloc[i,j]
+        for i in range(self.trial_traces.shape[0]): #iterate over rows
+            for j in range(self.trial_traces.shape[1]):
+                full_trials[i,j,:]=self.trial_traces.iloc[i,j]
                 
        
-        trials=[]
+        self.trials=[]
         for i in range(full_trials.shape[0]):
-            trials.append(full_trials[i,:,:])
+            self.trials.append(full_trials[i,:,:])
        
-        trial_type=driftgrattable['orientation'].values.tolist()
-        trial_types=np.arange(0,360,int(360/8))
-        time=np.linspace(-1,3,120)
-        trial_size   = trials[0].shape[1]
-        Nneurons     = trials[0].shape[0]
-        t_type_ind = [np.argwhere(np.array(trial_type) == t_type)[:, 0] for t_type in trial_types]
-        print('Number of trials: {}'.format(len(trials)))
-        print('Types of trials (orientations): {}'.format(trial_types)) 
-        print('Dimensions of single trial array (# neurons by # time points): {}'.format(trials[0].shape))
-        print('Trial types (orientations): {}'.format(trial_types))
-        print('Trial type of the first 3 trials: {}'.format(trial_type[0:3]))
+        self.trial_type=driftgrattable['orientation'].values.tolist()
+        self.trial_types=np.arange(0,360,int(360/8))
+        self.time=np.linspace(-1,3,trial_frames_number)
+        self.trial_size   = self.trials[0].shape[1]
+        Nneurons     = self.trials[0].shape[0]
+        self.t_type_ind = [np.argwhere(np.array(self.trial_type) == t_type)[:, 0] for t_type in self.trial_types]
+        print('Number of trials: {}'.format(len(self.trials)))
+        print('Types of trials (orientations): {}'.format(self.trial_types)) 
+        print('Dimensions of single trial array (# neurons by # time points): {}'.format(self.trials[0].shape))
+        print('Trial types (orientations): {}'.format(self.trial_types))
+        print('Trial type of the first 3 trials: {}'.format(self.trial_types[0:3]))
        
        
-        shade_alpha  = 0.2
-        lines_alpha   = 0.8
-        pal= sns.color_palette('husl', 8)
+        self.shade_alpha  = 0.2
+        self.lines_alpha   = 0.8
+        self.pal= sns.color_palette("tab10", 8)
         # config InlineBackend.figure_format = 'svg'
         
-        def add_stim_to_plot(ax, shade_alpha, lines_alpha):
-            ax.axvspan(start_stim, end_stim, alpha=shade_alpha,
-                       color='gray')
-            ax.axvline(start_stim, alpha=lines_alpha, color='gray', ls='--')
-            ax.axvline(end_stim, alpha=lines_alpha, color='gray', ls='--')
-            
-        def add_orientation_legend(ax):
-            custom_lines = [Line2D([0], [0], color=pal[k], lw=4) for
-                            k in range(len(trial_types))]
-            labels = ['{}$^\circ$'.format(t) for t in trial_types]
-            ax.legend(custom_lines, labels,
-                      frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
-            plt.tight_layout(rect=[0,0,0.9,1])
-            
-        def z_score(X):
-           # X: ndarray, shape (n_features, n_samples)
-           ss = StandardScaler(with_mean=True, with_std=True)
-           Xz = ss.fit_transform(X.T).T
-           return Xz
-       
-        def get_concatentaed_trial_PCA(pal, trials, trial_types, t_type_ind, frames_pre_stim, frames_post_stim):
-            Xr = np.vstack([t[:, frames_pre_stim:-frames_post_stim].mean(axis=1) for t in trials]).T
-            # or take the max
-            # Xr = np.vstack([t[:, frames_pre_stim:-frames_post_stim].max(axis=1) for t in trials]).T
-            # or the baseline-corrected mean
-            # Xr = np.vstack([t[:, frames_pre_stim:-frames_post_stim].mean(axis=1) - t[:, 0:frames_pre_stim].mean(axis=1) for t in trials]).T
-            Xr_sc = z_score(Xr)
-            
-            pca = PCA(n_components=15)
-            Xp = pca.fit_transform(Xr_sc.T).T
-            
-            projections = [(0, 1), (1, 2), (0, 2), (2,3)]
-            fig, axes = plt.subplots(1, len(projections), figsize=[9, 3], sharey='row', sharex='row')
-            for ax, proj in zip(axes, projections):
-                for t, t_type in enumerate(trial_types):
-                    x = Xp[proj[0], t_type_ind[t]]
-                    y = Xp[proj[1], t_type_ind[t]]
-                    ax.scatter(x, y, c=pal[t], s=25, alpha=0.8)
-                    ax.set_xlabel('PC {}'.format(proj[0]+1))
-                    ax.set_ylabel('PC {}'.format(proj[1]+1))
-            sns.despine(fig=fig, top=True, right=True)
-            add_orientation_legend(axes[2])
-            
-            return Xr, Xr_sc, pca, Xp
-            
-                                           
-        def get_concatentaed_trial_averaged_PCA(pal, trial_traces,trial_types,  time):
-            
-            trial_averages = []
-            for ind in t_type_ind:
-                trial_averages.append(np.array(trials)[ind].mean(axis=0))
-            Xa = np.hstack(trial_averages)
-            
-            n_components = 15
-            Xa = z_score(Xa) #Xav_sc = center(Xav)
-            pca = PCA(n_components=n_components)
-            Xa_p = pca.fit_transform(Xa.T).T
-            plt.plot(pca.explained_variance_ratio_)
+        self.get_concatentaed_trial_PCA()
+        self.get_concatentaed_trial_averaged_PCA()
+        self.get_trial_concatenated_PCA()
+        self.get_hybrid_PCA()
+        self.animation_2d_scatter()
+        Xa_p=self.get_3d_PCA()
+        self.animate_3d_trial_averaged(Xa_p)
+        self.animate_3d_single_trial()
+        
+        
+        
+    def add_stim_to_plot(self, ax):
+        ax.axvspan(self.start_stim, self.end_stim, alpha=self.shade_alpha,
+                   color='gray')
+        ax.axvline(self.start_stim, alpha=self.lines_alpha, color='gray', ls='--')
+        ax.axvline(self.end_stim, alpha=self.lines_alpha, color='gray', ls='--')
+        
+    def add_orientation_legend(self, ax):
+        custom_lines = [Line2D([0], [0], color=self.pal[k], lw=4) for
+                        k in range(len(self.trial_types))]
+        labels = ['{}$^\circ$'.format(t) for t in self.trial_types]
+        ax.legend(custom_lines, labels,
+                  frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
+        plt.tight_layout(rect=[0,0,0.9,1])
+        
+    def z_score(self, X):
+       # X: ndarray, shape (n_features, n_samples)
+       ss = StandardScaler(with_mean=True, with_std=True)
+       Xz = ss.fit_transform(X.T).T
+       return Xz
 
-            
-            
-            comp_to_plot=3
-            fig, axes = plt.subplots(1, comp_to_plot, figsize=[20, 2.8], sharey='row')
-            for comp in range(comp_to_plot):
-                ax = axes[comp]
-                for kk, type in enumerate(trial_types):
-                    x = Xa_p[comp, kk * trial_size :(kk+1) * trial_size]
-                    x = gaussian_filter1d(x, sigma=3)
-                    ax.plot(time, x, c=pal[kk])
-                add_stim_to_plot(ax, shade_alpha, lines_alpha)
-                ax.set_ylabel('PC {}'.format(comp+1))
-            add_orientation_legend(axes[2])
-            axes[1].set_xlabel('Time (s)')
-            sns.despine(fig=fig, right=True, top=True)
-            plt.tight_layout(rect=[0, 0, 0.9, 1])
-                                            
-            # find the indices of the three largest elements of the second eigenvector
-            units = np.abs(pca.components_[1, :].argsort())[::-1][0:3]
-            f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=False, sharex=True)
-            for ax, unit in zip(axes, units):
-                ax.set_title('Neuron {}'.format(unit))
-                alldfs=[]
-                for t, ind in enumerate(t_type_ind):
-                    x = np.array(trials)[ind][:, unit, :]
-                    df=pd.DataFrame(x.T)
-                    df.reset_index(inplace=True)
-                    df['index']=time
-                    df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
-                    df2['Orientation'] =trial_types[t]
-                    alldfs.append(df2)
-                finaldf = pd.concat(alldfs)
-                finaldf.rename(columns = {'index':'time'}, inplace = True)
-                finaldf.reset_index(drop=True, inplace=True)
-                sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=pal)
-                    
-            for ax in axes:
-                add_stim_to_plot(ax, shade_alpha, lines_alpha)
+    def get_concatentaed_trial_PCA(self):
+        
+        Xr = np.vstack([t[:, self.frames_pre_stim:-self.frames_post_stim].mean(axis=1) for t in self.trials]).T
+        # or take the max
+        # Xr = np.vstack([t[:, self.frames_pre_stim:-self.frames_post_stim].max(axis=1) for t in self.trials]).T
+        # or the baseline-corrected mean
+        # Xr = np.vstack([t[:, self.frames_pre_stim:-self.frames_post_stim].mean(axis=1) - t[:, 0:self.frames_pre_stim].mean(axis=1) for t in self.trials]).T
+        Xr_sc = self.z_score(Xr)
+        
+        pca = PCA(n_components=15)
+        Xp = pca.fit_transform(Xr_sc.T).T
+        
+        projections = [(0, 1), (1, 2), (0, 2)]
+        fig, axes = plt.subplots(1, len(projections), figsize=[9, 3], sharey='row', sharex='row')
+        for ax, proj in zip(axes, projections):
+            for t, t_type in enumerate(self.trial_types):
+                x = Xp[proj[0], self.t_type_ind[t]]
+                y = Xp[proj[1], self.t_type_ind[t]]
+                ax.scatter(x, y, c=self.pal[t], s=25, alpha=0.8)
+                ax.set_xlabel('PC {}'.format(proj[0]+1))
+                ax.set_ylabel('PC {}'.format(proj[1]+1))
+        sns.despine(fig=fig, top=True, right=True)
+        self.add_orientation_legend(axes[2])
+        
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_mean_trial_PCA.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
+
+        
+        return Xr, Xr_sc, pca, Xp
+                                                      
+    def get_concatentaed_trial_averaged_PCA(self):
+        
+        trial_averages = []
+        for ind in self.t_type_ind:
+            trial_averages.append(np.array(self.trials)[ind].mean(axis=0))
+        Xa = np.hstack(trial_averages)
+        
+        n_components = 15
+        Xa = self.z_score(Xa) #Xav_sc = center(Xav)
+        pca = PCA(n_components=n_components)
+        Xa_p = pca.fit_transform(Xa.T).T
+        plt.plot(pca.explained_variance_ratio_)
+
+
+        comp_to_plot=3
+        fig, axes = plt.subplots(1, comp_to_plot, figsize=[20, 2.8], sharey='row')
+        for comp in range(comp_to_plot):
+            ax = axes[comp]
+            for kk, type in enumerate(self.trial_types):
+                x = Xa_p[comp, kk * self.trial_size :(kk+1) * self.trial_size]
+                x = gaussian_filter1d(x, sigma=3)
+                ax.plot(self.time, x, c=self.pal[kk])
+            self.add_stim_to_plot(ax)
+            ax.set_ylabel('PC {}'.format(comp+1))
+        self.add_orientation_legend(axes[2])
+        axes[1].set_xlabel('Time (s)')
+        sns.despine(fig=fig, right=True, top=True)
+        plt.tight_layout(rect=[0, 0, 0.9, 1])
+                                        
+        # find the indices of the three largest elements of the second eigenvector
+        units = np.abs(pca.components_[1, :].argsort())[::-1][0:3]
+        f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=False, sharex=True)
+        for ax, unit in zip(axes, units):
+            ax.set_title('Neuron {}'.format(unit))
+            alldfs=[]
+            for t, ind in enumerate(self.t_type_ind):
+                x = np.array(self.trials)[ind][:, unit, :]
+                df=pd.DataFrame(x.T)
+                df.reset_index(inplace=True)
+                df['index']=self.time
+                df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
+                df2['Orientation'] =self.trial_types[t]
+                alldfs.append(df2)
+            finaldf = pd.concat(alldfs)
+            finaldf.rename(columns = {'index':'time'}, inplace = True)
+            finaldf.reset_index(drop=True, inplace=True)
+            sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=self.pal)
                 
-            axes[1].set_xlabel('Time (s)')
-            sns.despine(fig=f, right=True, top=True)
-            add_orientation_legend(axes[2])
+        for ax in axes:
+            self.add_stim_to_plot(ax)
             
-            return Xa, pca, Xa_p
-       
-            
-        def get_trial_concatenated_PCA(pal, trial_traces, filename, trial_types, trial_type, time): 
-            n_components = 15
-       
-            Xl = np.hstack(trials)
-            Xl = z_score(Xl)
-            pca = PCA(n_components=15)
-            Xl_p = pca.fit_transform(Xl.T).T
-            gt = {comp : {t_type : [] for t_type in trial_types} for comp in range(n_components)}
-       
-            for comp in range(n_components):
-                for i, t_type in enumerate(trial_type):
-                    if not np.isnan(t_type):
-                        t = Xl_p[comp, trial_size * i: trial_size * (i + 1)]
-                        gt[comp][t_type].append(t)
-            
-            for comp in range(n_components):
-                for t_type in trial_types:
-                    if not np.isnan(t_type):
-                        gt[comp][t_type] = np.vstack(gt[comp][t_type])
-                                         
-            f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=False, sharex=True)
-            for comp in range(3):
-                ax = axes[comp]
-                alldfs=[]
-                for t, t_type in enumerate(trial_types):
-                    x=gt[comp][t_type]
-                    df=pd.DataFrame(x.T)
-                    df.reset_index(inplace=True)
-                    df['index']=time
-                    df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
-                    df2['Orientation'] =t_type
-                    alldfs.append(df2)
-                finaldf = pd.concat(alldfs)
-                finaldf.rename(columns = {'index':'time'}, inplace = True)
-                finaldf.reset_index(drop=True, inplace=True)
-                sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=pal)
-                add_stim_to_plot(ax, shade_alpha, lines_alpha)
-                ax.set_ylabel('PC {}'.format(comp+1))
-            axes[1].set_xlabel('Time (s)')
-            sns.despine(right=True, top=True)
-            add_orientation_legend(axes[2])
+        axes[1].set_xlabel('Time (s)')
+        sns.despine(fig=f, right=True, top=True)
+        self.add_orientation_legend(axes[2])
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_trial_averaged_PCA.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
 
-        def get_hybrid_PCA(pal, trial_traces, filename, trial_types, trial_type):     
-            # fit PCA on trial averages
-            trial_averages = []
-            for ind in t_type_ind:
-                trial_averages.append(np.array(trials)[ind].mean(axis=0))
-            Xav = np.hstack(trial_averages)
-            
-            ss = StandardScaler(with_mean=True, with_std=True)
-            Xav_sc = ss.fit_transform(Xav.T).T
-            pca = PCA(n_components=15) 
-            pca.fit(Xav_sc.T) # only call the fit method
-            
-            projected_trials = []
-            for trial in trials:
-                # scale every trial using the same scaling applied to the averages 
-                trial = ss.transform(trial.T).T
-                # project every trial using the pca fit on averages
-                proj_trial = pca.transform(trial.T).T
-                projected_trials.append(proj_trial)
-       
-            gt = {comp: {t_type: [] for t_type in trial_types}
-                  for comp in range(n_components)}
-            
-            for comp in range(n_components):
-                for i, t_type in enumerate(trial_type   ):
-                    if not np.isnan(t_type):
-                        t = projected_trials[i][comp, :]
-                        gt[comp][t_type].append(t)
-                            
-            f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=True, sharex=True)
-            for comp in range(3):
-                ax = axes[comp]
-                for t, t_type in enumerate(trial_types):
-                    x=np.vstack(gt[comp][t_type])
-                    df=pd.DataFrame(x.T)
-                    df.reset_index(inplace=True)
-                    df['index']=time
-                    df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
-                    df2['Orientation'] =t_type
-                    alldfs.append(df2)
-                finaldf = pd.concat(alldfs)
-                finaldf.rename(columns = {'index':'time'}, inplace = True)
-                finaldf.reset_index(drop=True, inplace=True)
-                sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=pal)
-                add_stim_to_plot(ax, shade_alpha, lines_alpha)
-                ax.set_ylabel('PC {}'.format(comp+1))
-            axes[1].set_xlabel('Time (s)')
-            sns.despine(right=True, top=True)
-            add_orientation_legend(axes[2])
-            
-        def get_3d_PCA(frames_pre_stim):
-            # prepare trial averages
-            trial_averages = []
-            for ind in t_type_ind:
-                trial_averages.append(np.array(trials)[ind].mean(axis=0))
-            Xa = np.hstack(trial_averages)
-            
-            # standardize and apply PCA
-            Xa = z_score(Xa) 
-            pca = PCA(n_components=15)
-            Xa_p = pca.fit_transform(Xa.T).T
-            
-            # pick the components corresponding to the x, y, and z axes
-            component_x = 0
-            component_y = 1
-            component_z = 2
-            component_x = 3
+        
+        return Xa, pca, Xa_p
+             
+    def get_trial_concatenated_PCA(self): 
+        n_components = 15
+   
+        Xl = np.hstack(self.trials)
+        Xl = self.z_score(Xl)
+        pca = PCA(n_components=15)
+        Xl_p = pca.fit_transform(Xl.T).T
+        gt = {comp : {t_type : [] for t_type in self.trial_types} for comp in range(n_components)}
+        plt.plot(pca.explained_variance_ratio_)
+   
+        for comp in range(n_components):
+            for i, t_type in enumerate(self.trial_type):
+                if not np.isnan(t_type):
+                    t = Xl_p[comp, self.trial_size * i: self.trial_size * (i + 1)]
+                    gt[comp][t_type].append(t)
+        
+        for comp in range(n_components):
+            for t_type in self.trial_types:
+                if not np.isnan(t_type):
+                    gt[comp][t_type] = np.vstack(gt[comp][t_type])
+                                     
+        f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=False, sharex=True)
+        f.suptitle('trial concatenated PCA' )
 
+        for comp in range(3):
+            ax = axes[comp]
+            alldfs=[]
+            for t, t_type in enumerate(self.trial_types):
+                x=gt[comp][t_type]
+                df=pd.DataFrame(x.T)
+                df.reset_index(inplace=True)
+                df['index']=self.time
+                df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
+                df2['Orientation'] =t_type
+                alldfs.append(df2)
+            finaldf = pd.concat(alldfs)
+            finaldf.rename(columns = {'index':'time'}, inplace = True)
+            finaldf.reset_index(drop=True, inplace=True)
+            sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=self.pal)
+            self.add_stim_to_plot(ax)
+            ax.set_ylabel('PC {}'.format(comp+1))
+        axes[1].set_xlabel('Time (s)')
+        sns.despine(right=True, top=True)
+        self.add_orientation_legend(axes[2])
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_single_trial_PCA.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
+
+
+
+    def get_hybrid_PCA(self):    
+        n_components = 15
+
+        # fit PCA on trial averages
+        trial_averages = []
+        for ind in self.t_type_ind:
+            trial_averages.append(np.array(self.trials)[ind].mean(axis=0))
+        Xav = np.hstack(trial_averages)
+        
+        ss = StandardScaler(with_mean=True, with_std=True)
+        Xav_sc = ss.fit_transform(Xav.T).T
+        pca = PCA(n_components=15) 
+        pca.fit(Xav_sc.T) # only call the fit method
+        plt.plot(pca.explained_variance_ratio_)
+        
+
+        
+        self.projected_trials = []
+        for trial in self.trials:
+            # scale every trial using the same scaling applied to the averages 
+            trial = ss.transform(trial.T).T
+            # project every trial using the pca fit on averages
+            proj_trial = pca.transform(trial.T).T
+            self.projected_trials.append(proj_trial)
+   
+        gt = {comp: {t_type: [] for t_type in self.trial_types}
+              for comp in range(n_components)}
+        
+        for comp in range(n_components):
+            for i, t_type in enumerate(self.trial_type  ):
+                if not np.isnan(t_type):
+                    t = self.projected_trials[i][comp, :]
+                    gt[comp][t_type].append(t)
+                        
+        f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=True, sharex=True)
+        f.suptitle('Hybrid PCA' )
+
+        for comp in range(3):
+            alldfs=[]
+            ax = axes[comp]
+            for t, t_type in enumerate(self.trial_types):
+                x=np.vstack(gt[comp][t_type])
+                df=pd.DataFrame(x.T)
+                df.reset_index(inplace=True)
+                df['index']=self.time
+                df2 = pd.melt(df, id_vars='index', value_vars=np.arange(0,73))
+                df2['Orientation'] =t_type
+                alldfs.append(df2)
+            finaldf = pd.concat(alldfs)
+            finaldf.rename(columns = {'index':'time'}, inplace = True)
+            finaldf.reset_index(drop=True, inplace=True)
+            sns.lineplot(x="time", y="value",hue='Orientation', data=finaldf, ax=ax, legend=False, palette=self.pal)
+            self.add_stim_to_plot(ax)
+            ax.set_ylabel('PC {}'.format(comp+1))
+        axes[1].set_xlabel('Time (s)')
+        sns.despine(right=True, top=True)
+        self.add_orientation_legend(axes[2])
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_hybrid_PCA.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
+
+        
+    def get_3d_PCA(self ):
+        # prepare trial averages
+        trial_averages = []
+        for ind in self.t_type_ind:
+            trial_averages.append(np.array(self.trials)[ind].mean(axis=0))
+        Xa = np.hstack(trial_averages)
+        
+        # standardize and apply PCA
+        Xa = self.z_score(Xa) 
+        pca = PCA(n_components=15)
+        Xa_p = pca.fit_transform(Xa.T).T
+        
+        # pick the components corresponding to the x, y, and z axes
+        component_x = 0
+        component_y = 1
+        component_z = 2
+
+        
+        # create a boolean mask so we can plot activity during stimulus as 
+        # solid line, and pre and post stimulus as a dashed line
+        stim_mask = ~np.logical_and(np.arange(self.trial_size) >= self.frames_pre_stim,
+                       np.arange(self.trial_size) < (self.trial_size-self.frames_post_stim))
+        
+        # utility function to clean up and label the axes
+        def style_3d_ax(ax):
+            ax.set_xticks([])
+            ax.set_yticks([])
+            ax.set_zticks([])
+            ax.xaxis.pane.fill = False
+            ax.yaxis.pane.fill = False
+            ax.zaxis.pane.fill = False
+            ax.xaxis.pane.set_edgecolor('w')
+            ax.yaxis.pane.set_edgecolor('w')
+            ax.zaxis.pane.set_edgecolor('w')
+            ax.set_xlabel('PC 1')
+            ax.set_ylabel('PC 2')
+            ax.set_zlabel('PC 3')
+        
+        sigma = 3 # smoothing amount
+        
+        # set up a figure with two 3d subplots, so we can have two different views
+        fig = plt.figure(figsize=[9, 4])
+        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+        ax2 = fig.add_subplot(1, 2, 2, projection='3d')
+        axs = [ax1, ax2]
+        
+        for ax in axs:
+            for t, t_type in enumerate(self.trial_types):
+        
+                # for every trial type, select the part of the component
+                # which corresponds to that trial type:
+                x = Xa_p[component_x, t * self.trial_size :(t+1) * self.trial_size]
+                y = Xa_p[component_y, t * self.trial_size :(t+1) * self.trial_size]
+                z = Xa_p[component_z, t * self.trial_size :(t+1) * self.trial_size]
+                
+                # apply some smoothing to the trajectories
+                x = gaussian_filter1d(x, sigma=sigma)
+                y = gaussian_filter1d(y, sigma=sigma)
+                z = gaussian_filter1d(z, sigma=sigma)
+        
+                # use the mask to plot stimulus and pre/post stimulus separately
+                z_stim = z.copy()
+                z_stim[stim_mask] = np.nan
+                z_prepost = z.copy()
+                z_prepost[~stim_mask] = np.nan
+        
+                ax.plot(x, y, z_stim, c = self.pal[t])
+                ax.plot(x, y, z_prepost, c=self.pal[t], ls=':')
+                
+                # plot dots at initial point
+                ax.scatter(x[0], y[0], z[0], c=self.pal[t], s=14)
+                
+                # make the axes a bit cleaner
+                style_3d_ax(ax)
+                
+        # specify the orientation of the 3d plot        
+        ax1.view_init(elev=22, azim=30)
+        ax2.view_init(elev=22, azim=110)
+        plt.tight_layout()
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_trial_averaged_PCA_3d.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
+
+
+        
+        return Xa_p
+ 
+    def animation_2d_scatter(self):    
+        # smooth the single projected trials 
+        for i in range(len(self.projected_trials)):
+            for c in range(self.projected_trials[0].shape[0]):
+                self.projected_trials[i][c, :] = gaussian_filter1d(self.projected_trials[i][c, :], sigma=3)
+        
+        # for every time point (imaging frame) get the position in PCA space of every trial
+        pca_frame = []
+        for t in range(self.trial_size):
+            # projected data for all trials at time t 
+            Xp = np.hstack([tr[:, None, t] for tr in self.projected_trials]).T
+            pca_frame.append(Xp)
             
-            # create a boolean mask so we can plot activity during stimulus as 
-            # solid line, and pre and post stimulus as a dashed line
-            stim_mask = ~np.logical_and(np.arange(trial_size) >= frames_pre_stim,
-                           np.arange(trial_size) < (trial_size-frames_post_stim))
+        subspace = (1, 2) # pick the subspace given by the second and third components
             
-            # utility function to clean up and label the axes
+        # set up the figure
+        fig, ax = plt.subplots(1, 1, figsize=[6, 6]); plt.close()
+        ax.set_xlim(( -16, 16))
+        ax.set_ylim((-16, 16))
+        ax.set_xlabel('PC 2')
+        ax.set_xticks([-10, 0, 10])
+        ax.set_yticks([-10, 0, 10])
+        ax.set_ylabel('PC 3')
+        sns.despine(fig=fig, top=True, right=True)
+        
+        # generate empty scatter plot to be filled by data at every time point
+        scatters = []
+        for t, t_type in enumerate(self.trial_types):
+            scatter, = ax.plot([], [], 'o', lw=2, color=self.pal[t]);
+            scatters.append(scatter)
+        
+        # red dot to indicate when stimulus is being presented
+        stimdot, = ax.plot([], [], 'o', c='r', markersize=35, alpha=0.5)
+        
+        # annotate with stimulus and time information
+        text     = ax.text(6.3, 9, 'Stimulus OFF \nt = {:.2f}'.format(self.time[0]), fontdict={'fontsize':14})
+        
+        # this is the function to be called at every animation frame
+        def animate(i):
+            for t, t_type in enumerate(self.trial_types):
+                # find the x and y position of all trials of a given type
+                x = pca_frame[i][self.t_type_ind[t], subspace[0]]
+                y = pca_frame[i][self.t_type_ind[t], subspace[1]]
+                # update the scatter
+                scatters[t].set_data(x, y)
+                
+            # update stimulus and time annotation
+            if (i > self.frames_pre_stim) and (i < (self.trial_size-self.frames_post_stim)):
+                stimdot.set_data(10, 14)
+                text.set_text('Stimulus ON \nt = {:.2f}'.format(self.time[i]))
+            else:
+                stimdot.set_data([], [])
+                text.set_text('Stimulus OFF \nt = {:.2f}'.format(self.time[i]))
+            return (scatter,)
+        
+        # generate the animation
+        anim = animation.FuncAnimation(fig, animate, 
+                                       frames=len(pca_frame), interval=30, 
+                                       blit=False)
+        
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_mean_response_animation_PCA.mp4')
+        anim.save(filename, writer = 'ffmpeg', fps = 10)
+
+                    
+    def animate_3d_trial_averaged(self,Xa_p):
+        sigma = 3 # smoothing amount
+        component_x = 0
+        component_y = 1
+        component_z = 2
+                 
+        pca_frame = []
+        for t in range(self.trial_size):
+            # projected data for all trials at time t 
+            Xp = np.hstack([tr[:, None, t] for tr in self.projected_trials]).T
+            pca_frame.append(Xp)
+            
+        subspace = (1, 2) # pick 
+
+        # apply some smoothing to the trajectories
+        for c in range(Xa_p.shape[0]):
+            Xa_p[c, :] =  gaussian_filter1d(Xa_p[c, :], sigma=sigma)
+        
+        # create the figure
+        fig = plt.figure(figsize=[9, 9]); plt.close()
+        ax = fig.add_subplot(1, 1, 1, projection='3d')
+        
+        def animate(i):
             def style_3d_ax(ax):
                 ax.set_xticks([])
                 ax.set_yticks([])
@@ -1185,218 +1773,108 @@ class ResultsAnalysis():
                 ax.set_ylabel('PC 2')
                 ax.set_zlabel('PC 3')
             
-            sigma = 3 # smoothing amount
+            ax.clear() # clear up trajectories from previous iteration
+            style_3d_ax(ax)
+            ax.view_init(elev=22, azim=30)
+        
+            for t, t_type in enumerate(self.trial_types):
             
-            # set up a figure with two 3d subplots, so we can have two different views
-            fig = plt.figure(figsize=[9, 4])
-            ax1 = fig.add_subplot(1, 2, 1, projection='3d')
-            ax2 = fig.add_subplot(1, 2, 2, projection='3d')
-            axs = [ax1, ax2]
-            
-            for ax in axs:
-                for t, t_type in enumerate(trial_types):
-            
-                    # for every trial type, select the part of the component
-                    # which corresponds to that trial type:
-                    x = Xa_p[component_x, t * trial_size :(t+1) * trial_size]
-                    y = Xa_p[component_y, t * trial_size :(t+1) * trial_size]
-                    z = Xa_p[component_z, t * trial_size :(t+1) * trial_size]
-                    
-                    # apply some smoothing to the trajectories
-                    x = gaussian_filter1d(x, sigma=sigma)
-                    y = gaussian_filter1d(y, sigma=sigma)
-                    z = gaussian_filter1d(z, sigma=sigma)
-            
-                    # use the mask to plot stimulus and pre/post stimulus separately
-                    z_stim = z.copy()
-                    z_stim[stim_mask] = np.nan
-                    z_prepost = z.copy()
-                    z_prepost[~stim_mask] = np.nan
-            
-                    ax.plot(x, y, z_stim, c = pal[t])
-                    ax.plot(x, y, z_prepost, c=pal[t], ls=':')
-                    
-                    # plot dots at initial point
-                    ax.scatter(x[0], y[0], z[0], c=pal[t], s=14)
-                    
-                    # make the axes a bit cleaner
-                    style_3d_ax(ax)
-                    
-            # specify the orientation of the 3d plot        
-            ax1.view_init(elev=22, azim=30)
-            ax2.view_init(elev=22, azim=110)
-            plt.tight_layout()
-     
-        def animation_2d_scatter(projected_trials):    
-            # smooth the single projected trials 
-            for i in range(len(projected_trials)):
-                for c in range(projected_trials[0].shape[0]):
-                    projected_trials[i][c, :] = gaussian_filter1d(projected_trials[i][c, :], sigma=3)
-            
-            # for every time point (imaging frame) get the position in PCA space of every trial
-            pca_frame = []
-            for t in range(trial_size):
-                # projected data for all trials at time t 
-                Xp = np.hstack([tr[:, None, t] for tr in projected_trials]).T
-                pca_frame.append(Xp)
+                x = Xa_p[component_x, t * self.trial_size :(t+1) * self.trial_size][0:i]
+                y = Xa_p[component_y, t * self.trial_size :(t+1) * self.trial_size][0:i]
+                z = Xa_p[component_z, t * self.trial_size :(t+1) * self.trial_size][0:i]
+                        
+                stim_mask = ~np.logical_and(np.arange(z.shape[0]) >= self.frames_pre_stim,
+                             np.arange(z.shape[0]) < (self.trial_size-self.frames_pre_stim))
+        
+                z_stim = z.copy()
+                z_stim[stim_mask] = np.nan
+                z_prepost = z.copy()
+                z_prepost[~stim_mask] = np.nan
                 
-            subspace = (1, 2) # pick the subspace given by the second and third components
-                
-            # set up the figure
-            fig, ax = plt.subplots(1, 1, figsize=[6, 6]); plt.close()
-            ax.set_xlim(( -16, 16))
-            ax.set_ylim((-16, 16))
-            ax.set_xlabel('PC 2')
-            ax.set_xticks([-10, 0, 10])
-            ax.set_yticks([-10, 0, 10])
-            ax.set_ylabel('PC 3')
-            sns.despine(fig=fig, top=True, right=True)
-            
-            # generate empty scatter plot to be filled by data at every time point
-            scatters = []
-            for t, t_type in enumerate(trial_types):
-                scatter, = ax.plot([], [], 'o', lw=2, color=pal[t]);
-                scatters.append(scatter)
-            
-            # red dot to indicate when stimulus is being presented
-            stimdot, = ax.plot([], [], 'o', c='r', markersize=35, alpha=0.5)
-            
-            # annotate with stimulus and time information
-            text     = ax.text(6.3, 9, 'Stimulus OFF \nt = {:.2f}'.format(time[0]), fontdict={'fontsize':14})
-            
-            # this is the function to be called at every animation frame
-            def animate(i):
-                for t, t_type in enumerate(trial_types):
-                    # find the x and y position of all trials of a given type
-                    x = pca_frame[i][t_type_ind[t], subspace[0]]
-                    y = pca_frame[i][t_type_ind[t], subspace[1]]
-                    # update the scatter
-                    scatters[t].set_data(x, y)
-                    
-                # update stimulus and time annotation
-                if (i > frames_pre_stim) and (i < (trial_size-frames_post_stim)):
-                    stimdot.set_data(10, 14)
-                    text.set_text('Stimulus ON \nt = {:.2f}'.format(time[i]))
-                else:
-                    stimdot.set_data([], [])
-                    text.set_text('Stimulus OFF \nt = {:.2f}'.format(time[i]))
-                return (scatter,)
-            
-            # generate the animation
-            anim = animation.FuncAnimation(fig, animate, 
-                                           frames=len(pca_frame), interval=30, 
-                                           blit=False)
-            
-            anim.save(filename, writer = 'ffmpeg', fps = 10)
-            
-            
-       
-        def animate_3d_trial_averaged():
-            
-            pca_frame = []
-            for t in range(trial_size):
-                # projected data for all trials at time t 
-                Xp = np.hstack([tr[:, None, t] for tr in projected_trials]).T
-                pca_frame.append(Xp)
-                
-            subspace = (1, 2) # pick 
-
-            # apply some smoothing to the trajectories
-            for c in range(Xa_p.shape[0]):
-                Xa_p[c, :] =  gaussian_filter1d(Xa_p[c, :], sigma=sigma)
-            
-            # create the figure
-            fig = plt.figure(figsize=[9, 9]); plt.close()
-            ax = fig.add_subplot(1, 1, 1, projection='3d')
-            
-            def animate(i):
-                
-                ax.clear() # clear up trajectories from previous iteration
-                style_3d_ax(ax)
-                ax.view_init(elev=22, azim=30)
-            
-                for t, t_type in enumerate(trial_types):
-                
-                    x = Xa_p[component_x, t * trial_size :(t+1) * trial_size][0:i]
-                    y = Xa_p[component_y, t * trial_size :(t+1) * trial_size][0:i]
-                    z = Xa_p[component_z, t * trial_size :(t+1) * trial_size][0:i]
-                            
-                    stim_mask = ~np.logical_and(np.arange(z.shape[0]) >= frames_pre_stim,
-                                 np.arange(z.shape[0]) < (trial_size-frames_pre_stim))
-            
-                    z_stim = z.copy()
-                    z_stim[stim_mask] = np.nan
-                    z_prepost = z.copy()
-                    z_prepost[~stim_mask] = np.nan
-                    
-                    ax.plot(x, y, z_stim, c = pal[t])
-                    ax.plot(x, y, z_prepost, c=pal[t], ls=':')
-            
-                ax.set_xlim(( -8, 8))
-                ax.set_ylim((-8, 8))
-                ax.set_zlim((-6, 6))
-            
-                return []
-            
-            
-            anim = animation.FuncAnimation(fig, animate,
-                                           frames=len(pca_frame), interval=30
-                                           )
-            
-            anim.save(filename, writer = 'ffmpeg', fps = 10)
-            
-        def animate_3d_single_trial():
+                ax.plot(x, y, z_stim, c = self.pal[t])
+                ax.plot(x, y, z_prepost, c=self.pal[t], ls=':')
+        
+            ax.set_xlim(( -8, 8))
+            ax.set_ylim((-8, 8))
+            ax.set_zlim((-6, 6))
+        
+            return []
+        
+        
+        anim = animation.FuncAnimation(fig, animate,
+                                       frames=len(pca_frame), interval=30
+                                       )
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_trial_averaged_animation_PCA.mp4')
+        anim.save(filename, writer = 'ffmpeg', fps = 10)
+        
+    def animate_3d_single_trial(self):
+        pca_frame = []
+        for t in range(self.trial_size):
+            # projected data for all trials at time t 
+            Xp = np.hstack([tr[:, None, t] for tr in self.projected_trials]).T
+            pca_frame.append(Xp)
+        
+        component_x = 0
+        component_y = 1
+        component_z = 2
    
-            # set up a dictionary to color each line
-            col = {trial_types[i] : pal[i] for i in range(len(trial_types))}
+        # set up a dictionary to color each line
+        col = {float(self.trial_types[i]) : self.pal[i] for i in range(len(self.trial_types))}
+        
+        
+        fig = plt.figure(figsize=[9, 9]); plt.close()
+        ax = fig.add_subplot(1, 1, 1, projection='3d')
+        
+        def animate(i):
+            def style_3d_ax(ax):
+                ax.set_xticks([])
+                ax.set_yticks([])
+                ax.set_zticks([])
+                ax.xaxis.pane.fill = False
+                ax.yaxis.pane.fill = False
+                ax.zaxis.pane.fill = False
+                ax.xaxis.pane.set_edgecolor('w')
+                ax.yaxis.pane.set_edgecolor('w')
+                ax.zaxis.pane.set_edgecolor('w')
+                ax.set_xlabel('PC 1')
+                ax.set_ylabel('PC 2')
+                ax.set_zlabel('PC 3')
             
-            
-            fig = plt.figure(figsize=[9, 9]); plt.close()
-            ax = fig.add_subplot(1, 1, 1, projection='3d')
-            
-            def animate(i):
-                
-                ax.clear()
-                style_3d_ax(ax)
-                ax.view_init(elev=22, azim=30)
-                for t, (trial, t_type) in enumerate(zip(projected_trials[0:40], trial_type[0:40])):
+            ax.clear()
+            style_3d_ax(ax)
+            ax.view_init(elev=22, azim=30)
+            for t, (trial, t_type) in enumerate(zip(self.projected_trials, self.trial_types)):
+                if not np.isnan(t_type):
                     
                     x = trial[component_x, :][0:i]
                     y = trial[component_y, :][0:i]
                     z = trial[component_z, :][0:i]
                     
-                    stim_mask = ~np.logical_and(np.arange(z.shape[0]) >= frames_pre_stim,
-                                 np.arange(z.shape[0]) < (trial_size-frames_pre_stim))
+                    stim_mask = ~np.logical_and(np.arange(z.shape[0]) >= self.frames_pre_stim,
+                                 np.arange(z.shape[0]) < (self.trial_size-self.frames_pre_stim))
             
                     z_stim = z.copy()
                     z_stim[stim_mask] = np.nan
                     z_prepost = z.copy()
                     z_prepost[~stim_mask] = np.nan
                     
-                    ax.plot(x, y, z_stim, c = col[t_type])
-                    ax.plot(x, y, z_prepost, c=col[t_type], ls=':')
+                    ax.plot(x, y, z_stim, c = col[int(t_type)])
+                    ax.plot(x, y, z_prepost, c=col[int(t_type)], ls=':')
             
-                ax.set_xlim(( -12, 12))
-                ax.set_ylim((-12, 12))
-                ax.set_zlim((-13, 13))
-                ax.view_init(elev=22, azim=30)
-            
-                return []
-            
-            anim = animation.FuncAnimation(fig, animate, frames=len(pca_frame), interval=30,blit=True)
-            
-            anim.save(filename, writer = 'ffmpeg', fps = 10)
-                        
-            
-        get_concatentaed_trial_PCA(pal, trials, trial_types, t_type_ind, frames_pre_stim, frames_post_stim)
-        get_concatentaed_trial_averaged_PCA(pal, trial_traces, time)
-        get_trial_concatenated_PCA(pal, trial_traces, filename, trial_types, trial_type)
-        get_hybrid_PCA(pal, trial_traces, filename, trial_types, trial_type)
-        animation_2d_scatter(projected_trials)
-        get_3d_PCA(frames_pre_stim)
-        animate_3d_trial_averaged()
-        animate_3d_single_trial()
-
+            ax.set_xlim(( -12, 12))
+            ax.set_ylim((-12, 12))
+            ax.set_zlim((-13, 13))
+            ax.view_init(elev=22, azim=30)
+        
+            return []
+        
+        anim = animation.FuncAnimation(fig, animate, frames=len(pca_frame), interval=30,blit=True)
+        filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_single_trial_animation_PCA.mp4')
+        anim.save(filename, writer = 'ffmpeg', fps = 10)
+        
+                    
+        
+    
             
             
 #%% allen
@@ -1406,81 +1884,48 @@ class ResultsAnalysis():
     def load_CRFs_analysis(self):
         self.crf_analysis=CRFsResults(self)
         pass
+    
+    def save_for_matlab_CRFs(self):
+        pass
+    
+    def build_binary_grating_array(self):
+        pass
+        
+        
+        
+    
 #%% yuriy
     def load_yuriy_analysis(self):
         self.yuriy_analysis=EnsemblesYuriy(self)
     
 #%% jesus    
-    def load_jesus_analysis(self, binary_raster_to_proces, plane, segment, cell_type):   
+    def run_jesus_analysis(self, activity_arrays):   
         # self.load_jesus_results()
 
-        # get raster
-        if binary_raster_to_proces=='MCMC':
-            if plane=='All':
-                selected_full_raster= self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary']
-            else:
-                selected_full_raster=self.full_data['imaging_data'][plane]['Traces']['mcmc_binary']
-        elif binary_raster_to_proces=='dfdt':
-            if plane=='All':
-                selected_full_raster= self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary']
-            else:
-                selected_full_raster=self.full_data['imaging_data'][plane]['Traces']['dfdt_binary']   
-
-
-
-        #slice by paradigm
-        if segment=='Full':
-            indexes=((0,selected_full_raster.shape[1]+1),)
-        elif segment=='DriftingGratings':
-            indexes=((self.full_data['visstim_info']['Paradigm_Indexes']['first_drifting_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['first_drifting_set_last']),
-            (self.full_data['visstim_info']['Paradigm_Indexes']['second_drifting_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['second_drifting_set_last']),
-            (self.full_data['visstim_info']['Paradigm_Indexes']['third_drifting_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['third_drifting_set_last'])) 
-        elif segment=='Spontaneous':
-            indexes_alt= ((self.full_data['visstim_info']['Spontaneous']['stimulus_table']['start'].values.tolist()[0], self.full_data['visstim_info']['Spontaneous']['stimulus_table']['end'].values.tolist()[0]))
-            indexes=([self.full_data['visstim_info']['Paradigm_Indexes']['spont_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont_last']],)
-            
-
-        paradigm_sliced_raster= self.slice_matrix_by_paradigm_indexes(selected_full_raster, indexes)
-        
-        #slice bycells
-        if self.pyr_int_ids_and_indexes:
-            if cell_type=='Pyr':
-                cell_indexes= self.pyr_int_ids_and_indexes['pyr'][1]
-            elif cell_type=='Int':
-                cell_indexes= self.pyr_int_ids_and_indexes['int'][1]
-            elif cell_type=='All':
-                cell_indexes= np.full(self.pyr_int_ids_and_indexes['int'][1].shape, True)
-                cell_indexes=np.arange(paradigm_sliced_raster.shape[0])
-
-        else:
-            cell_indexes=np.arange(paradigm_sliced_raster.shape[0])
-
-            
-
-
-        final_raster=paradigm_sliced_raster[cell_indexes,:]
+        final_raster=activity_arrays[2]
         plt.imshow(final_raster, aspect='auto')
-        plt.title('_'.join([binary_raster_to_proces, plane, segment, cell_type]))
+        plt.title('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
         plt.show()
         self.jesus_binary_spikes=final_raster
+        pprint('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
         self.jesus_analysis=JesusEnsemblesResults(self)
+        pprint('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
+
         # self.jesus_runs[ self.run_number+'_'+self.acquisition_object.aquisition_name+'_'+binary_raster_to_proces+'_'+plane+'_'+segment]=[binary_raster_to_proces, plane, segment, self.jesus_binary_spikes, self.jesus_analysis.analysis]
-        self.jesus_run=[binary_raster_to_proces, plane, segment,cell_type, self.jesus_analysis.analysis]
+                
+        self.jesus_run=[activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4],activity_arrays[4][2], self.jesus_analysis.analysis]
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        self.jesus_runs_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,binary_raster_to_proces, plane, segment,cell_type,'jesus_results.pkl'])  
+        self.jesus_runs_path_name='_'.join([self.acquisition_object.aquisition_name, timestr, activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4],activity_arrays[4][2],'jesus_results.pkl'])  
 
 
         self.save_jesus_runs()
         
     def save_jesus_runs(self):
         print('Saving jesus run')
-        datapath=os.path.join(self.jesus_runs_path, self.jesus_runs_path_name)
+        datapath=os.path.join( self.data_paths[ 'jesus_runs_path'], self.jesus_runs_path_name)
         
-        if not os.path.isdir(self.jesus_runs_path):
-            os.mkdir(self.jesus_runs_path)
+        if not os.path.isdir( self.data_paths[ 'jesus_runs_path']):
+            os.mkdir( self.data_paths[ 'jesus_runs_path'])
             
     
         with open(datapath, 'wb') as f:
@@ -1488,33 +1933,18 @@ class ResultsAnalysis():
             pickle.dump(self.jesus_run, f, pickle.HIGHEST_PROTOCOL)
         
     def check_all_jesus_results(self) :
-        self.jesus_results_list=glob.glob(self.jesus_runs_path+'\\**', recursive=False)
+        self.jesus_results_list=glob.glob( self.data_paths[ 'jesus_runs_path']+'\\**.pkl', recursive=False)
             
-        # pyr_results=[i for i in  analysis.jesus_results_list if 'Pyr' in i]
-        # int_results=[i for i in  analysis.jesus_results_list if '_Int_' in i]
-        # full_results=[i for i in  analysis.jesus_results_list if '_Full' in i]
-        # drift_grat_results=[i for i in  analysis.jesus_results_list if 'DriftingGratings' in i]
-        # mcmc_results=[i for i in  analysis.jesus_results_list if 'mcmc' in i]
-        # dfdtresults=[i for i in  analysis.jesus_results_list if 'dfdt' in i]
-        # all_results=[i for i in  analysis.jesus_results_list if '_All' in i]
+     
+    def unload_all_runs(self):
         
-        # deconv='MCMC'
-        # deconv='dfdt'
-        # all_divisions=0
-        # index=0
-        # cell_type='Pyr'
-        # cell_type='Int'
-        
-      
-        
-        # def intersection(lst1, lst2):
-        #     return list(set(lst1) & set(lst2))
-        
-        # pyr_grat=intersection(pyr_results, drift_grat_results)
-        # int_grat=intersection(int_results, drift_grat_results)
-        # all_grat=intersection(all_results, drift_grat_results)
-
-        
+        for k,i in self.jesus_runs.items():
+            del i
+        del  self.jesus_runs
+        gc.collect()
+        sys.stdout.flush()
+        self.jesus_runs={}
+        print('runs unloaded')
         
     def load_jesus_results(self, path):
         if path:
@@ -1528,7 +1958,15 @@ class ResultsAnalysis():
     def load_classicalsvd_analysis(self):
         self.svd_analysis=SVDEnsemblesResults(self)
         pass
-
+    
+    def save_multi_image(self, filename):
+       pp = PdfPages(filename)
+       fig_nums = plt.get_fignums()
+       figs = [plt.figure(n) for n in fig_nums]
+       for fig in figs:
+          fig.savefig(pp, format='pdf')
+       pp.close()
+       plt.close('all')
       
 #%% if main
 if __name__ == "__main__":

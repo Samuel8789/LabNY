@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
 """
-Created on Sun May 23 08:26:29 2021
+Created on Fri Jun 17 17:33:07 2022
 
 @author: sp3660
 """
+
 
 import logging 
 module_logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ from ..functions.functionsDataOrganization import check_channels_and_planes, rec
 # from ..functions.select_face_camera import select_face_camera
 
 
-class PrairieImagingSession():
+class DualColorImagingSession():
 
     """
     Clas Representing a single praririe imaging seesion. It had to include every parameter important for the imaging
@@ -28,8 +29,7 @@ class PrairieImagingSession():
         
     """
     def __init__(self, ImagingDatabaseObject=None, session_raw_path=False, session_ID=False, data_managing_object=False ):
-        # module_logger.info('Instantiating ' +__name__)
-
+        
         
         self.ImagingDatabase=ImagingDatabaseObject
         self.datamanagingobject=data_managing_object
@@ -75,8 +75,7 @@ class PrairieImagingSession():
             self.session_imaged_mice_paths=self.session_imaged_mice_info.MouseRawPath
             self.session_imaged_mice_codes=self.session_imaged_mice_info.Code
             self.session_imaged_mice_codes=self.session_imaged_mice_codes.values.tolist()
-     
-#%%            
+            
     def load_all_yet_to_database_mice(self):
         module_logger.info('Loading mice not in database ' +self.imaging_session_name)
         for mouse_code in self.session_imaged_mice_codes:
@@ -109,3 +108,4 @@ class PrairieImagingSession():
     def cleaning_up_calibrations(self, session_path):  
           
           recursively_eliminate_empty_folders(session_path)       
+ 

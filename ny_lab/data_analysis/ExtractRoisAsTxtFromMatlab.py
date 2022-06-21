@@ -7,15 +7,13 @@ Created on Wed Aug  4 10:12:25 2021
 
 
 
-
-
 import h5py
 import glob
 import os
 import matplotlib.pyplot as plt
 from scipy import signal
 import caiman as cm
-dataset_path='\\\?\\'+r'D:\Projects\LabNY\Full_Mice_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPJA\imaging\20210720\data aquisitions\FOV_1\210720_SPJA_FOV1_3planeAllenA_920_50024_narrow_without-000\planes\Plane1\Green'
+dataset_path='\\\?\\'+r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\imaging\20211015\data aquisitions\FOV_1\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\planes\Plane3\Green'
 moviedatapath=glob.glob(dataset_path+'\**.mmap')[0]
 file_path=glob.glob(dataset_path+'\**.mat')[0]
 components_path=os.path.join(dataset_path,'SpatialComponents')

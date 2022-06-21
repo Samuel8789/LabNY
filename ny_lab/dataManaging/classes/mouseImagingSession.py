@@ -213,6 +213,12 @@ class MouseImagingSession():
                 module_logger.info('processing acquisitions'+ aq_folder)
                 self.process_aquisition_folder(aq)
             recursively_eliminate_empty_folders(aq_folder) 
+            
+            
+        recursively_eliminate_empty_folders(self.mouse_raw_imaging_session_path) 
+        
+        
+        
 
     def correctComplexacquisitonsNames(self, ComplexAcqname):
         
@@ -393,7 +399,8 @@ class MouseImagingSession():
             shutil.move(file, daqdir)   
   
 
-    
+        recursively_eliminate_empty_folders(aq) 
+
 #%% raw loading functions 
 
     def load_raw_nonimaging_Aquisitions(self):   

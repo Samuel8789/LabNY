@@ -63,7 +63,7 @@ class PreImagingSession():
         self.eyecam_dir_WS2=r'C:\Users\rylab\Documents\Sam\EyeCamera'
         self.stimdaq_dir_WS2=r'C:\Users\rylab\Documents\Sam\stim_scripts-master\behavior\NI_DAQ\output_data'
         self.prairireraw1=r'E:\Sam'
-        self.prairireraw2=r'F:\Samuel'
+        self.prairireraw2=r'F:\Sam'
         self.prairireraw3=r'G:\Sam'
         self.permanent=r'F:\Projects\LabNY\Imaging'
         direchange='cd '
@@ -77,15 +77,26 @@ class PreImagingSession():
         self.sshfolder=r'G:\Projects\TemPrairireSSH'
         
         self.prairireraw=[r'E:\Sam',r'F:\Samuel',r'G:\Sam']
+        print('prepare_empty_session'.upper())
 
         self.prepare_empty_session()
+        print('prepare_session'.upper())
+
         self.prepare_session()
+        print('copy_session_to_ssh'.upper())
         self.copy_session_to_ssh()
+        
+        print('copy sessionto permanent folder'.upper())
+        print(f'Xcopy /E /I {os.path.join(self.sshfolder,self.sessiondate)} {os.path.join(self.permanent, self.session_year,self.sessiondate)}')
+        
         self.remove_session_from_computer()
         print('ssh '+ self.WS1_IP)
         print('ssh '+ self.WS2_IP)
         print('scp -r wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{} G:\\Projects\\TemPrairireSSH'.format(self.sessiondate))
         print(f'scp -r G:\\Projects\\TemPrairireSSH\\20220525Hakim\\Mice\\SPKU\\ToTrack wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{self.sessiondate}\\Mice\\SPKU')
+        
+        print('remove session from ssh folder'.upper())
+        print(f'rmdir /s {os.path.join(self.sshfolder,self.sessiondate)}')
 
         
     def prepare_empty_session(self):
@@ -262,13 +273,11 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20220531'
+    sessiondate='20220618'
     mice=[
-'SPKU',
-'SPKV',
-	'SPKW',
-	'SPKX',
-	'SPKY',
+    'SPNP',
+    'SPNQ',
+
 ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()

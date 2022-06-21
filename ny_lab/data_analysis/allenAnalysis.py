@@ -207,7 +207,13 @@ class AllenAnalysis():
         self.drift_obj.sweeplength = self.sweeplength
         self.drift_obj.interlength = self.interlength
         
-        self.sweep_response, self.mean_sweep_response,  self.pval = self.deconvolved_get_sweep_response(self, plane, matrix)
+
+        
+        self.sweep_response, self.mean_sweep_response,  self.pval = self.deconvolved_get_sweep_response( plane, matrix)
+        # self.response=self.get_response()
+        # self.peak=self.get_peak()
+
+
 
         
         
@@ -257,306 +263,303 @@ class AllenAnalysis():
        
 
 
-        def get_response(self):
-            ''' Computes the mean response for each cell to each stimulus
-            condition.  Return is
-            a (# orientations, # temporal frequencies, # cells, 3) np.ndarray.
-            The final dimension
-            contains the mean response to the condition (index 0), standard
-            error of the mean of the response
-            to the condition (index 1), and the number of trials with a
-            significant response (p < 0.05)
-            to that condition (index 2).
+    def get_response(self):
+        ''' Computes the mean response for each cell to each stimulus
+        condition.  Return is
+        a (# orientations, # temporal frequencies, # cells, 3) np.ndarray.
+        The final dimension
+        contains the mean response to the condition (index 0), standard
+        error of the mean of the response
+        to the condition (index 1), and the number of trials with a
+        significant response (p < 0.05)
+        to that condition (index 2).
 
-            Returns
-            -------
-            Numpy array storing mean responses.
-            '''
-            DriftingGratings._log.info("Calculating mean responses")
+        Returns
+        -------
+        Numpy array storing mean responses.
+        '''
+        DriftingGratings._log.info("Calculating mean responses")
 
-            response = np.empty(
-                (self.drift_obj.number_ori, self.drift_obj.number_tf, self.numbercells + 1, 3))
+        response = np.empty(
+            (self.drift_obj.number_ori, self.drift_obj.number_tf, self.numbercells + 1, 3))
 
-            def ptest(x):
-                if x.empty:
-                    return np.nan
-                return len(np.where(x < (0.05 / (8 * 5)))[0])
+        def ptest(x):
+            if x.empty:
+                return np.nan
+            return len(np.where(x < (0.05 / (8 * 5)))[0])
 
-            for ori in self.drift_obj.orivals:
-                ori_pt = np.where(self.drift_obj.orivals == ori)[0][0]
-                for tf in self.drift_obj.tfvals:
-                    tf_pt = np.where(self.drift_obj.tfvals == tf)[0][0]
-                    subset_response = self.mean_sweep_response[
-                        (self.drift_obj.stim_table.temporal_frequency == tf) & (
-                                    self.drift_obj.stim_table.orientation == ori)]
-                    subset_pval = self.pval[
-                        (self.drift_obj.stim_table.temporal_frequency == tf) & (
+        for ori in self.drift_obj.orivals:
+            ori_pt = np.where(self.drift_obj.orivals == ori)[0][0]
+            for tf in self.drift_obj.tfvals:
+                tf_pt = np.where(self.drift_obj.tfvals == tf)[0][0]
+                subset_response = self.mean_sweep_response[
+                    (self.drift_obj.stim_table.temporal_frequency == tf) & (
                                 self.drift_obj.stim_table.orientation == ori)]
-                    response[ori_pt, tf_pt, :, 0] = subset_response.mean(axis=0)
-                    response[ori_pt, tf_pt, :, 1] = subset_response.std(
-                        axis=0) / sqrt(len(subset_response))
-                    response[ori_pt, tf_pt, :, 2] = subset_pval.apply(
-                        ptest, axis=0)
-            return response
+                subset_pval = self.pval[
+                    (self.drift_obj.stim_table.temporal_frequency == tf) & (
+                            self.drift_obj.stim_table.orientation == ori)]
+                response[ori_pt, tf_pt, :, 0] = subset_response.mean(axis=0)
+                response[ori_pt, tf_pt, :, 1] = subset_response.std(
+                    axis=0) / sqrt(len(subset_response))
+                response[ori_pt, tf_pt, :, 2] = subset_pval.apply(
+                    ptest, axis=0)
+        return response
         
-        self.response=get_response(self)
         
-        def get_peak(self):
-            ''' Computes metrics related to each cell's peak response condition.
-     
-            Returns
-            -------
-            Pandas data frame containing the following columns (_dg suffix is
-            for drifting grating):
-                * ori_dg (orientation)
-                * tf_dg (temporal frequency)
-                * reliability_dg
-                * osi_dg (orientation selectivity index)
-                * dsi_dg (direction selectivity index)
-                * peak_dff_dg (peak dF/F)
-                * ptest_dg
-                * p_run_dg
-                * run_modulation_dg
-                * cv_dg (circular variance)
-            '''
-            DriftingGratings._log.info('Calculating peak response properties')
-     
-            peak = pd.DataFrame(index=range(self.drift_obj.numbercells),
-                                columns=('ori_dg', 'tf_dg', 'reliability_dg',
-                                         'osi_dg', 'dsi_dg', 'peak_dff_dg',
-                                         'ptest_dg', 'p_run_dg',
-                                         'run_modulation_dg',
-                                         'cv_os_dg', 'cv_ds_dg', 'tf_index_dg',
-                                         'cell_specimen_id'))
-            cids = self.drift_obj.data_set.get_cell_specimen_ids()
-     
-            orivals_rad = np.deg2rad(self.drift_obj.orivals)
-            for nc in range(self.drift_obj.numbercells):
-                cell_peak = np.where(self.response[:, 1:, nc, 0] == np.nanmax(
-                    self.response[:, 1:, nc, 0]))
-                prefori = cell_peak[0][0]
-                preftf = cell_peak[1][0] + 1
-                peak.cell_specimen_id.iloc[nc] = cids[nc]
-                peak.ori_dg.iloc[nc] = prefori
-                peak.tf_dg.iloc[nc] = preftf
-     
-                pref = self.response[prefori, preftf, nc, 0]
-                orth1 = self.response[np.mod(prefori + 2, 8), preftf, nc, 0]
-                orth2 = self.response[np.mod(prefori - 2, 8), preftf, nc, 0]
-                orth = (orth1 + orth2) / 2
-                null = self.response[np.mod(prefori + 4, 8), preftf, nc, 0]
-     
-                tuning = self.response[:, preftf, nc, 0]
-                tuning = np.where(tuning > 0, tuning, 0)
-                # new circular variance below
-                CV_top_os = np.empty((8), dtype=np.complex128)
-                CV_top_ds = np.empty((8), dtype=np.complex128)
-                for i in range(8):
-                    CV_top_os[i] = (tuning[i] * np.exp(1j * 2 * orivals_rad[i]))
-                    CV_top_ds[i] = (tuning[i] * np.exp(1j * orivals_rad[i]))
-                peak.cv_os_dg.iloc[nc] = np.abs(CV_top_os.sum()) / tuning.sum()
-                peak.cv_ds_dg.iloc[nc] = np.abs(CV_top_ds.sum()) / tuning.sum()
-     
-                peak.osi_dg.iloc[nc] = (pref - orth) / (pref + orth)
-                peak.dsi_dg.iloc[nc] = (pref - null) / (pref + null)
-                peak.peak_dff_dg.iloc[nc] = pref
-     
-                groups = []
-                for ori in self.drift_obj.orivals:
-                    for tf in self.drift_obj.tfvals[1:]:
-                        groups.append(
-                            self.mean_sweep_response[
-                                (self.drift_obj.stim_table.temporal_frequency == tf) &
-                                (self.drift_obj.stim_table.orientation == ori)][str(nc)])
-                groups.append(self.mean_sweep_response[
-                                  self.drift_obj.stim_table.temporal_frequency == 0][
-                                  str(nc)])
-                _, p = st.f_oneway(*groups)
-                peak.ptest_dg.iloc[nc] = p
-     
-                subset = self.mean_sweep_response[
-                    (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
-                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
-     
-                # running modulation
-                subset_stat = subset[subset.dx < 1]
-                subset_run = subset[subset.dx >= 1]
-                if (len(subset_run) > 2) & (len(subset_stat) > 2):
-                    (_, peak.p_run_dg.iloc[nc]) = st.ttest_ind(subset_run[str(nc)],
-                                                               subset_stat[
-                                                                   str(nc)],
-                                                               equal_var=False)
-     
-                    if subset_run[str(nc)].mean() > subset_stat[str(nc)].mean():
-                        peak.run_modulation_dg.iloc[nc] = (subset_run[
-                                                               str(nc)].mean() -
+    def get_peak(self):
+        ''' Computes metrics related to each cell's peak response condition.
+ 
+        Returns
+        -------
+        Pandas data frame containing the following columns (_dg suffix is
+        for drifting grating):
+            * ori_dg (orientation)
+            * tf_dg (temporal frequency)
+            * reliability_dg
+            * osi_dg (orientation selectivity index)
+            * dsi_dg (direction selectivity index)
+            * peak_dff_dg (peak dF/F)
+            * ptest_dg
+            * p_run_dg
+            * run_modulation_dg
+            * cv_dg (circular variance)
+        '''
+        DriftingGratings._log.info('Calculating peak response properties')
+ 
+        peak = pd.DataFrame(index=range(self.drift_obj.numbercells),
+                            columns=('ori_dg', 'tf_dg', 'reliability_dg',
+                                     'osi_dg', 'dsi_dg', 'peak_dff_dg',
+                                     'ptest_dg', 'p_run_dg',
+                                     'run_modulation_dg',
+                                     'cv_os_dg', 'cv_ds_dg', 'tf_index_dg',
+                                     'cell_specimen_id'))
+        cids = self.drift_obj.data_set.get_cell_specimen_ids()
+ 
+        orivals_rad = np.deg2rad(self.drift_obj.orivals)
+        for nc in range(self.drift_obj.numbercells):
+            cell_peak = np.where(self.response[:, 1:, nc, 0] == np.nanmax(
+                self.response[:, 1:, nc, 0]))
+            prefori = cell_peak[0][0]
+            preftf = cell_peak[1][0] + 1
+            peak.cell_specimen_id.iloc[nc] = cids[nc]
+            peak.ori_dg.iloc[nc] = prefori
+            peak.tf_dg.iloc[nc] = preftf
+ 
+            pref = self.response[prefori, preftf, nc, 0]
+            orth1 = self.response[np.mod(prefori + 2, 8), preftf, nc, 0]
+            orth2 = self.response[np.mod(prefori - 2, 8), preftf, nc, 0]
+            orth = (orth1 + orth2) / 2
+            null = self.response[np.mod(prefori + 4, 8), preftf, nc, 0]
+ 
+            tuning = self.response[:, preftf, nc, 0]
+            tuning = np.where(tuning > 0, tuning, 0)
+            # new circular variance below
+            CV_top_os = np.empty((8), dtype=np.complex128)
+            CV_top_ds = np.empty((8), dtype=np.complex128)
+            for i in range(8):
+                CV_top_os[i] = (tuning[i] * np.exp(1j * 2 * orivals_rad[i]))
+                CV_top_ds[i] = (tuning[i] * np.exp(1j * orivals_rad[i]))
+            peak.cv_os_dg.iloc[nc] = np.abs(CV_top_os.sum()) / tuning.sum()
+            peak.cv_ds_dg.iloc[nc] = np.abs(CV_top_ds.sum()) / tuning.sum()
+ 
+            peak.osi_dg.iloc[nc] = (pref - orth) / (pref + orth)
+            peak.dsi_dg.iloc[nc] = (pref - null) / (pref + null)
+            peak.peak_dff_dg.iloc[nc] = pref
+ 
+            groups = []
+            for ori in self.drift_obj.orivals:
+                for tf in self.drift_obj.tfvals[1:]:
+                    groups.append(
+                        self.mean_sweep_response[
+                            (self.drift_obj.stim_table.temporal_frequency == tf) &
+                            (self.drift_obj.stim_table.orientation == ori)][str(nc)])
+            groups.append(self.mean_sweep_response[
+                              self.drift_obj.stim_table.temporal_frequency == 0][
+                              str(nc)])
+            _, p = st.f_oneway(*groups)
+            peak.ptest_dg.iloc[nc] = p
+ 
+            subset = self.mean_sweep_response[
+                (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
+                (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
+ 
+            # running modulation
+            subset_stat = subset[subset.dx < 1]
+            subset_run = subset[subset.dx >= 1]
+            if (len(subset_run) > 2) & (len(subset_stat) > 2):
+                (_, peak.p_run_dg.iloc[nc]) = st.ttest_ind(subset_run[str(nc)],
                                                            subset_stat[
-                                                               str(nc)].mean()) \
-                                                          / np.abs(
-                            subset_run[str(nc)].mean())
-                    elif subset_run[str(nc)].mean() < subset_stat[str(nc)].mean():
-                        peak.run_modulation_dg.iloc[nc] = \
-                            (-1 * (subset_stat[str(nc)].mean() -
-                                   subset_run[str(nc)].mean()) /
-                             np.abs(subset_stat[str(nc)].mean()))
-     
-                else:
-                    peak.p_run_dg.iloc[nc] = np.NaN
-                    peak.run_modulation_dg.iloc[nc] = np.NaN
-     
-                # reliability
-                subset = self.sweep_response[
-                    (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
-                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
-                corr_matrix = np.empty((len(subset), len(subset)))
-                for i in range(len(subset)):
-                    for j in range(len(subset)):
-                        r, p = st.pearsonr(subset[str(nc)].iloc[i][30:90],
-                                           subset[str(nc)].iloc[j][30:90])
-                        corr_matrix[i, j] = r
-                mask = np.ones((len(subset), len(subset)))
-                for i in range(len(subset)):
-                    for j in range(len(subset)):
-                        if i >= j:
-                            mask[i, j] = np.NaN
-                corr_matrix *= mask
-                peak.reliability_dg.iloc[nc] = np.nanmean(corr_matrix)
-     
-                # TF index
-                tf_tuning = self.response[prefori, 1:, nc, 0]
-                trials = self.mean_sweep_response[
-                    (self.drift_obj.stim_table.temporal_frequency != 0) &
-                    (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])
-                ][str(nc)].values
-                SSE_part = np.sqrt(
-                    np.sum((trials - trials.mean()) ** 2) / (len(trials) - 5))
-                peak.tf_index_dg.iloc[nc] = (np.ptp(tf_tuning)) / (
-                            np.ptp(tf_tuning) + 2 * SSE_part)
-     
-            return peak
-        
-        self.peak=get_peak(self)
-        def row_from_cell_id(self, csid=None, idx=None):
-
-            if csid is not None and not np.isnan(csid):
-                return self.drift_obj.data_set.get_cell_specimen_ids().tolist().index(csid)
-            elif idx is not None:
-                return idx
+                                                               str(nc)],
+                                                           equal_var=False)
+ 
+                if subset_run[str(nc)].mean() > subset_stat[str(nc)].mean():
+                    peak.run_modulation_dg.iloc[nc] = (subset_run[
+                                                           str(nc)].mean() -
+                                                       subset_stat[
+                                                           str(nc)].mean()) \
+                                                      / np.abs(
+                        subset_run[str(nc)].mean())
+                elif subset_run[str(nc)].mean() < subset_stat[str(nc)].mean():
+                    peak.run_modulation_dg.iloc[nc] = \
+                        (-1 * (subset_stat[str(nc)].mean() -
+                               subset_run[str(nc)].mean()) /
+                         np.abs(subset_stat[str(nc)].mean()))
+ 
             else:
-                raise Exception("Could not find row for csid(%s) idx(%s)"
-                                % (str(csid), str(idx)))
-        
-        def open_star_plot(self, cell_specimen_id=None, include_labels=False,
-                           cell_index=None):
-            cell_index = self.row_from_cell_id(cell_specimen_id, cell_index)
+                peak.p_run_dg.iloc[nc] = np.NaN
+                peak.run_modulation_dg.iloc[nc] = np.NaN
+ 
+            # reliability
+            subset = self.sweep_response[
+                (self.drift_obj.stim_table.temporal_frequency == self.drift_obj.tfvals[preftf]) &
+                (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
+            corr_matrix = np.empty((len(subset), len(subset)))
+            for i in range(len(subset)):
+                for j in range(len(subset)):
+                    r, p = st.pearsonr(subset[str(nc)].iloc[i][30:90],
+                                       subset[str(nc)].iloc[j][30:90])
+                    corr_matrix[i, j] = r
+            mask = np.ones((len(subset), len(subset)))
+            for i in range(len(subset)):
+                for j in range(len(subset)):
+                    if i >= j:
+                        mask[i, j] = np.NaN
+            corr_matrix *= mask
+            peak.reliability_dg.iloc[nc] = np.nanmean(corr_matrix)
+ 
+            # TF index
+            tf_tuning = self.response[prefori, 1:, nc, 0]
+            trials = self.mean_sweep_response[
+                (self.drift_obj.stim_table.temporal_frequency != 0) &
+                (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])
+            ][str(nc)].values
+            SSE_part = np.sqrt(
+                np.sum((trials - trials.mean()) ** 2) / (len(trials) - 5))
+            peak.tf_index_dg.iloc[nc] = (np.ptp(tf_tuning)) / (
+                        np.ptp(tf_tuning) + 2 * SSE_part)
+ 
+        return peak
+    
+    def row_from_cell_id(self, csid=None, idx=None):
 
-            df = self.mean_sweep_response[str(cell_index)]
-            st = self.drift_obj.data_set.get_stimulus_table('drifting_gratings')
-            mask = st.dropna(subset=['orientation']).index
+        if csid is not None and not np.isnan(csid):
+            return self.drift_obj.data_set.get_cell_specimen_ids().tolist().index(csid)
+        elif idx is not None:
+            return idx
+        else:
+            raise Exception("Could not find row for csid(%s) idx(%s)"
+                            % (str(csid), str(idx)))
+    
+    def open_star_plot(self, cell_specimen_id=None, include_labels=False,
+                       cell_index=None):
+        cell_index = self.row_from_cell_id(cell_specimen_id, cell_index)
 
-            data = df.values
+        df = self.mean_sweep_response[str(cell_index)]
+        st = self.drift_obj.data_set.get_stimulus_table('drifting_gratings')
+        mask = st.dropna(subset=['orientation']).index
 
-            cmin = self.response[0, 0, cell_index, 0]
-            cmax = max(cmin, data.mean() + data.std() * 3)
+        data = df.values
 
-            fp = cplots.FanPlotter.for_drifting_gratings()
-            fp.plot(r_data=st.temporal_frequency.loc[mask].values,
-                    angle_data=st.orientation.loc[mask].values,
-                    data=df.loc[mask].values,
-                    clim=[cmin, cmax])
-            fp.show_axes(closed=True)
+        cmin = self.response[0, 0, cell_index, 0]
+        cmax = max(cmin, data.mean() + data.std() * 3)
 
-            if include_labels:
-                fp.show_r_labels()
-                fp.show_angle_labels()
+        fp = cplots.FanPlotter.for_drifting_gratings()
+        fp.plot(r_data=st.temporal_frequency.loc[mask].values,
+                angle_data=st.orientation.loc[mask].values,
+                data=df.loc[mask].values,
+                clim=[cmin, cmax])
+        fp.show_axes(closed=True)
 
-        def plot_orientation_selectivity(self,
-                                         si_range=oplots.SI_RANGE,
-                                         n_hist_bins=oplots.N_HIST_BINS,
-                                         color=oplots.STIM_COLOR,
-                                         p_value_max=oplots.P_VALUE_MAX,
-                                         peak_dff_min=oplots.PEAK_DFF_MIN):
-            # responsive cells
-            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
-                        self.peak.peak_dff_dg > peak_dff_min)
+        if include_labels:
+            fp.show_r_labels()
+            fp.show_angle_labels()
 
-            # orientation selective cells
-            osi_cells = vis_cells & ( self.peak.osi_dg > si_range[0][0]) & (
-                        self.peak.osi_dg < si_range[0][1])
-
-            peak_osi =  self.peak.loc[osi_cells]
-            osis = peak_osi.osi_dg.values
-
-            oplots.plot_selectivity_cumulative_histogram(osis,
-                                                         "orientation "
-                                                         "selectivity index",
-                                                         si_range=si_range[0],
-                                                         n_hist_bins=n_hist_bins,
-                                                         color=color)
-
-        def plot_direction_selectivity(self,
-                                       si_range=oplots.SI_RANGE,
-                                       n_hist_bins=oplots.N_HIST_BINS,
-                                       color=oplots.STIM_COLOR,
-                                       p_value_max=oplots.P_VALUE_MAX,
-                                       peak_dff_min=oplots.PEAK_DFF_MIN):
-
-            # responsive cells
-            vis_cells = (self.peak.ptest_dg < p_value_max) & (
-                        self.peak.peak_dff_dg > peak_dff_min)
-
-            # direction selective cells
-            dsi_cells = vis_cells & (self.peak.dsi_dg > si_range[0]) & (
-                        self.peak.dsi_dg < si_range[1])
-
-            peak_dsi = self.peak.loc[dsi_cells]
-            dsis = peak_dsi.dsi_dg.values
-
-            oplots.plot_selectivity_cumulative_histogram(dsis,
-                                                         "direction selectivity "
-                                                         "index",
-                                                         si_range=si_range,
-                                                         n_hist_bins=n_hist_bins,
-                                                         color=color)
-
-        def plot_preferred_direction(self,
-                                     include_labels=False,
+    def plot_orientation_selectivity(self,
                                      si_range=oplots.SI_RANGE,
+                                     n_hist_bins=oplots.N_HIST_BINS,
                                      color=oplots.STIM_COLOR,
                                      p_value_max=oplots.P_VALUE_MAX,
                                      peak_dff_min=oplots.PEAK_DFF_MIN):
-            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
-                        self.peak.peak_dff_dg > peak_dff_min)
-            pref_dirs =  self.peak.loc[vis_cells].ori_dg.values
-            pref_dirs = [self.drift_obj.orivals[pref_dir] for pref_dir in pref_dirs]
+        # responsive cells
+        vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                    self.peak.peak_dff_dg > peak_dff_min)
 
-            angles, counts = np.unique(pref_dirs, return_counts=True)
-            oplots.plot_radial_histogram(angles,
-                                         counts,
-                                         include_labels=include_labels,
-                                         all_angles=self.drift_obj.orivals,
-                                         direction=-1,
-                                         offset=0.0,
-                                         closed=True,
-                                         color=color)
+        # orientation selective cells
+        osi_cells = vis_cells & ( self.peak.osi_dg > si_range[0][0]) & (
+                    self.peak.osi_dg < si_range[0][1])
 
-        def plot_preferred_temporal_frequency(self,
-                                              si_range=oplots.SI_RANGE,
-                                              color=oplots.STIM_COLOR,
-                                              p_value_max=oplots.P_VALUE_MAX,
-                                              peak_dff_min=oplots.PEAK_DFF_MIN):
+        peak_osi =  self.peak.loc[osi_cells]
+        osis = peak_osi.osi_dg.values
 
-            vis_cells = (self.peak.ptest_dg < p_value_max) & (
-                        self.peak.peak_dff_dg > peak_dff_min)
-            pref_tfs = self.peak.loc[vis_cells].tf_dg.values
+        oplots.plot_selectivity_cumulative_histogram(osis,
+                                                     "orientation "
+                                                     "selectivity index",
+                                                     si_range=si_range[0],
+                                                     n_hist_bins=n_hist_bins,
+                                                     color=color)
 
-            oplots.plot_condition_histogram(pref_tfs,
-                                            self.tfvals[1:],
-                                            color=color)
+    def plot_direction_selectivity(self,
+                                   si_range=oplots.SI_RANGE,
+                                   n_hist_bins=oplots.N_HIST_BINS,
+                                   color=oplots.STIM_COLOR,
+                                   p_value_max=oplots.P_VALUE_MAX,
+                                   peak_dff_min=oplots.PEAK_DFF_MIN):
 
-            plt.xlabel("temporal frequency (Hz)")
-            plt.ylabel("number of cells")
-         
+        # responsive cells
+        vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                    self.peak.peak_dff_dg > peak_dff_min)
+
+        # direction selective cells
+        dsi_cells = vis_cells & (self.peak.dsi_dg > si_range[0]) & (
+                    self.peak.dsi_dg < si_range[1])
+
+        peak_dsi = self.peak.loc[dsi_cells]
+        dsis = peak_dsi.dsi_dg.values
+
+        oplots.plot_selectivity_cumulative_histogram(dsis,
+                                                     "direction selectivity "
+                                                     "index",
+                                                     si_range=si_range,
+                                                     n_hist_bins=n_hist_bins,
+                                                     color=color)
+
+    def plot_preferred_direction(self,
+                                 include_labels=False,
+                                 si_range=oplots.SI_RANGE,
+                                 color=oplots.STIM_COLOR,
+                                 p_value_max=oplots.P_VALUE_MAX,
+                                 peak_dff_min=oplots.PEAK_DFF_MIN):
+        vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                    self.peak.peak_dff_dg > peak_dff_min)
+        pref_dirs =  self.peak.loc[vis_cells].ori_dg.values
+        pref_dirs = [self.drift_obj.orivals[pref_dir] for pref_dir in pref_dirs]
+
+        angles, counts = np.unique(pref_dirs, return_counts=True)
+        oplots.plot_radial_histogram(angles,
+                                     counts,
+                                     include_labels=include_labels,
+                                     all_angles=self.drift_obj.orivals,
+                                     direction=-1,
+                                     offset=0.0,
+                                     closed=True,
+                                     color=color)
+
+    def plot_preferred_temporal_frequency(self,
+                                          si_range=oplots.SI_RANGE,
+                                          color=oplots.STIM_COLOR,
+                                          p_value_max=oplots.P_VALUE_MAX,
+                                          peak_dff_min=oplots.PEAK_DFF_MIN):
+
+        vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                    self.peak.peak_dff_dg > peak_dff_min)
+        pref_tfs = self.peak.loc[vis_cells].tf_dg.values
+
+        oplots.plot_condition_histogram(pref_tfs,
+                                        self.tfvals[1:])
+
+        plt.xlabel('temporal frequency (Hz)')
+        plt.ylabel('number of cells')
+     
         # peak_info=self.drift_obj.get_peak() #gives error
         # reponse_info=self.drift_obj.get_response() # not proper dimensions
         # noise_cor=self.drift_obj.get_noise_correlation()
