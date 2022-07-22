@@ -398,7 +398,8 @@ class ResultsAnalysis():
                           'foopsi_binary':selected_plane_caiman.binarized_foospi,
                           'mcmc_raw':selected_plane_caiman.MCMC_matrix,
                           'mcmc_smoothed': selected_plane_caiman.convolved_MCMC,
-                          'mcmc_binary':selected_plane_caiman.binarized_MCMC}
+                          'mcmc_binary':selected_plane_caiman.binarized_MCMC,
+                          'mcmc_scored_binary':selected_plane_caiman.z_scored_binarized_mcmc_binarized}
             
             self.full_data['imaging_data'][plane]['Traces']=plane_traces
             self.full_data['imaging_data'][plane]['Timestamps']=(self.all_planes_timestamps[plane][0:-1], (np.arange(0,len(self.all_planes_timestamps[plane][0:-1]))/self.full_data['imaging_data']['Frame_rate'])+self.full_data['imaging_data']['Interplane_period']*plane_number)
@@ -553,7 +554,8 @@ class ResultsAnalysis():
             
 #%% plotting
     def plot_all_planes_by_cell_type(self):
-        
+        plt.close('all')
+
         pixel_per_bar = 4
         dpi = 100
         
@@ -566,6 +568,24 @@ class ResultsAnalysis():
         in2=self.pyr_int_ids_and_indexes['Plane2']['int'][1]
         in3=self.pyr_int_ids_and_indexes['Plane3']['int'][1]
         allplaneinterneuronindex=np.concatenate((in1,in2,in3))
+        
+        
+        #all scored mcmc binary
+        
+        
+        fig, ax = plt.subplots(1,  figsize=(16,9), dpi=dpi, sharex=True)    
+        ax.imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_scored_binary'][:,:], cmap='binary', aspect='auto',
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
+        ax.set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle('Raster_scored_mcmc')
+        
+        filename = os.path.join( os.path.split(self.data_paths['pca_runs_path'])[0],f'allcells_Raster_scored_mcmc.pdf')
+        self.save_multi_image(filename)
+        plt.close('all')
+
+
 
         #pyramidal dfdt
         
@@ -796,7 +816,7 @@ class ResultsAnalysis():
             # trace_type='denoised'
             C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
             cell_trace=C_mat[cell,:]
-            
+            fluorescence=self.full_data['imaging_data'][plane]['Traces']['denoised'][cell,:]
           
     
             trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
@@ -825,19 +845,19 @@ class ResultsAnalysis():
 
                 
                 
-        # ax1=subfigs[0,2].subplots(1)    
-        # ax1.plot(cell_trace)
-        # ax2=subfigs[1,2].subplots(1)    
-        # ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
-        # ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
-        # ax2.legend()
+        ax1=subfigs[0,2].subplots(1)    
+        ax1.plot(fluorescence)
+        ax2=subfigs[1,2].subplots(1)    
+        ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
+        ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
+        ax2.legend()
 
-        # ax2.set_title('Mean Evoked Activity')
+        ax2.set_title('Mean Evoked Activity')
 
-        # ax2.set_ylim(0,2*np.max(mean_evoked_2s))
-        # # ax2.set_ylim(0,0.2)
+        ax2.set_ylim(0,2*np.max(mean_evoked_2s))
+        ax2.set_ylim(0,0.2)
 
-        # plt.show()
+        plt.show()
         
         return mean_evoked_2s, mean_evoked_1s
 
@@ -1345,15 +1365,21 @@ class ResultsAnalysis():
         self.pal= sns.color_palette("tab10", 8)
         # config InlineBackend.figure_format = 'svg'
         
-        self.get_concatentaed_trial_PCA()
-        self.get_concatentaed_trial_averaged_PCA()
-        self.get_trial_concatenated_PCA()
-        self.get_hybrid_PCA()
+        # Xr, Xr_sc, pca, Xp=self.get_concatentaed_trial_PCA()
+        mean_response_pca=self.get_concatentaed_trial_PCA()
+        # Xa, pca, Xa_p=self.get_concatentaed_trial_averaged_PCA()
+        trial_averaged_pca=self.get_concatentaed_trial_averaged_PCA()
+        # Xl, pca, Xl_p=self.get_trial_concatenated_PCA()
+        single_trial_pca=self.get_trial_concatenated_PCA()
+        Xav_sc, pca, projected_trials, gt=self.get_hybrid_PCA()
+        hybrid_pca=self.get_hybrid_PCA()
         self.animation_2d_scatter()
-        Xa_p=self.get_3d_PCA()
+        Xa, pca, Xa_p=self.get_3d_PCA()
         self.animate_3d_trial_averaged(Xa_p)
         self.animate_3d_single_trial()
         
+        
+        return mean_response_pca, trial_averaged_pca, single_trial_pca, hybrid_pca
         
         
     def add_stim_to_plot(self, ax):
@@ -1406,7 +1432,7 @@ class ResultsAnalysis():
         plt.close('all')
 
         
-        return Xr, Xr_sc, pca, Xp
+        return  Xr_sc, pca, Xp
                                                       
     def get_concatentaed_trial_averaged_PCA(self):
         
@@ -1519,6 +1545,7 @@ class ResultsAnalysis():
         self.save_multi_image(filename)
         plt.close('all')
 
+        return Xl, pca, Xl_p
 
 
     def get_hybrid_PCA(self):    
@@ -1582,6 +1609,8 @@ class ResultsAnalysis():
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_hybrid_PCA.pdf')
         self.save_multi_image(filename)
         plt.close('all')
+        
+        return Xav_sc, pca,  self.projected_trials, gt
 
         
     def get_3d_PCA(self ):
@@ -1670,7 +1699,7 @@ class ResultsAnalysis():
 
 
         
-        return Xa_p
+        return  Xa, pca, Xa_p
  
     def animation_2d_scatter(self):    
         # smooth the single projected trials 

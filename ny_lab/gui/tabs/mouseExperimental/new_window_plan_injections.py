@@ -108,11 +108,11 @@ class new_window_plan_injections(tk.Toplevel):
  
 
     def plan_injection_button(self):
-            self.vir1code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir1.get()]['VirusCode'].tolist()
+            self.vir1code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir1.get()[3:]]['VirusCode'].tolist()
             if len(self.vir1code)>1:
                 self.vir1code= [self.vir1code[-1]]
-            self.vir2code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir2.get()]['VirusCode'].tolist()
-            self.vir3code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir3.get()]['VirusCode'].tolist()
+            self.vir2code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir2.get()[3:]]['VirusCode'].tolist()
+            self.vir3code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir3.get()[3:]]['VirusCode'].tolist()
             self.vir1dil=self.virus1_dilution.get()
             self.vir2dil=self.virus2_dilution.get()
             self.vir3dil=self.virus3_dilution.get()

@@ -212,7 +212,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
             end
             ct=0;
             full_info{parad_num+1,5}{trl+1,2}=GetSecs();          
-            grat_volt=4*texindexes(trl)/totalstim;
+            grat_volt=4*texindexes(trl)/z;
             if texindexes(trl)==0
                 grat_volt=4.5;
             end

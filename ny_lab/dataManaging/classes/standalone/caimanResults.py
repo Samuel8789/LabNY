@@ -219,6 +219,8 @@ class CaimanResults():
         self.binarized_MCMC=np.where( self.convolved_MCMC > 0, 1, 0)
         # binarized_MCMC=(mcmc_good_components > 0.0001).astype(np.int_)
         self.z_scored_binarized_mcmc=self.z_score(self.convolved_MCMC)
+        self.mcmcscoredsigma=3
+        self.z_scored_binarized_mcmc_binarized=np.where( self.z_scored_binarized_mcmc > self.mcmcscoredsigma, 1, 0)
         
 
     def get_all_sorting_indexes(self):

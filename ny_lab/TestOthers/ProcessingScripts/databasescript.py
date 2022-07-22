@@ -7,7 +7,6 @@ Created on Tue May 11 08:56:19 2021
 import sys
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/MainClasses/Mouse Managing')
-from MouseDatabaseClass import MouseDatabase
 import datetime
 
 #%%
@@ -96,11 +95,11 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE Acquisitions_table
-                SET Patching Date=date(?),  Patching ID=?
-                WHERE ID IN (?)
+                UPDATE Breedings_table
+                SET Female2=NULL
+                WHERE ID IN (204)
             """        
-params=(datetime.datetime.today(),2,337)   
+params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
 
 
@@ -119,16 +118,16 @@ MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
-DELETE FROM FaceCamera_table
-WHERE  ID IN (109)
+DELETE FROM Injections_table
+WHERE  ID IN (268,269,270,271,272)
 
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
 #%% removals
 query_remove="""
-DELETE FROM Windows_table
-WHERE  ID IN (217,218,219)
+DELETE FROM ExperimentalAnimals_table
+WHERE  ID IN (392,393,394,395,396)
 
 """
 params=()

@@ -87,11 +87,11 @@ class SummaryImages:
     
                 if not os.path.isfile(self.projection_paths_dic[k]):  
                     if 'average' in k:
-                        self.projection_dic[k]=rawmov.mean(axis=0)
+                        self.projection_dic[k]=np.squeeze(rawmov.mean(axis=0))
                     elif 'max' in k:
-                        self.projection_dic[k]=rawmov.max(axis=0)
+                        self.projection_dic[k]=np.squeeze(rawmov.max(axis=0))
                     elif 'std' in k:
-                        self.projection_dic[k]=rawmov.std(axis=0)
+                        self.projection_dic[k]=np.squeeze(rawmov.std(axis=0))
                     # elif 'correlations' in k:
                     #     self.projection_dic[k]=cm.movie(rawmov.local_correlations())
                         
@@ -108,7 +108,7 @@ class SummaryImages:
         if self.projection_paths_dic:
             for key, x in  self.projection_paths_dic.items():
                 with tifffile.TiffFile(x) as tffl:
-                     self.projection_dic[key] = tffl.asarray()
+                     self.projection_dic[key] = np.squeeze(tffl.asarray())
                  
     def unload_summary_images(self):
         try:

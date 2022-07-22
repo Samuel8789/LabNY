@@ -828,8 +828,8 @@ class MouseDatasetsPanel(tk.Toplevel):
 
     def plot_widefield(self, *a):
         
-        widefieldob=self.selected_mouse_object.all_mouse_acquisitions[list(self.selected_mouse_object.all_mouse_acquisitions.keys())[-1]].mouse_imaging_session_object.\
-                widefield_image[list(self.selected_mouse_object.all_mouse_acquisitions[list(self.selected_mouse_object.all_mouse_acquisitions.keys())[-1]].mouse_imaging_session_object.\
+        widefieldob=self.selected_mouse_object.imaging_sessions_objects[list(self.selected_mouse_object.imaging_sessions_objects.keys())[-1]].\
+                widefield_image[list(self.selected_mouse_object.imaging_sessions_objects[list(self.selected_mouse_object.imaging_sessions_objects.keys())[-1]].\
                         widefield_image.keys())[0]]      
         
         if self.selected_acquisition_object:

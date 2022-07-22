@@ -101,7 +101,17 @@ class MouseDatabase():
             fig, ax =plt.subplots(figsize=(12,4))
             ax.axis('tight')
             ax.axis('off')
-            the_table = ax.table(cellText=fragment2.values, colLabels=fragment2.columns,loc='center')
+            
+            
+            if not fragment2.empty:
+                the_table = ax.table(cellText=fragment2.values, colLabels=fragment2.columns,loc='center')
+
+            else:
+                fragment2=fragment2.reindex(list(range(0, 1))).reset_index(drop=True)
+                the_table = ax.table(cellText=fragment2.values, colLabels=fragment2.columns,loc='center')
+
+
+            
             cells = the_table.properties()["celld"]
             lastecell=sorted(list(cells.keys()))[-1]
 
@@ -129,7 +139,12 @@ class MouseDatabase():
             fig, ax =plt.subplots(figsize=(12,4))
             ax.axis('tight')
             ax.axis('off')
-            the_table = ax.table(cellText=df.values, colLabels=df.columns,loc='center')
+            if not df.empty:
+                the_table = ax.table(cellText=df.values, colLabels=df.columns,loc='center')
+            else:
+                df=df.reindex(list(range(0, 1))).reset_index(drop=True)
+                the_table = ax.table(cellText=df.values, colLabels=df.columns,loc='center')
+
             cells = the_table.properties()["celld"]
             lastecell=sorted(list(cells.keys()))[-1]
 

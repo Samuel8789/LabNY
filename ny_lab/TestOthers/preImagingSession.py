@@ -273,11 +273,11 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20220618'
+    sessiondate='20220722'
     mice=[
-    'SPNP',
-    'SPNQ',
-
+    'SPOK',
+    'SPOM',
+    'SPOO',
 ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()

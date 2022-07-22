@@ -167,9 +167,9 @@ for parad_num=1:numel(ops.paradigm_sequence)
             if contains(ops.paradigm_sequence{parad_num}, 'Drifting1')
                 gratingindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
             elseif contains(ops.paradigm_sequence{parad_num}, 'Drifting2')
-                gratingindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
+                gratingindexes=sampled_grating_indexes_parts(2,(~isnan(sampled_grating_indexes_parts(2,:))));
             elseif contains(ops.paradigm_sequence{parad_num}, 'Drifting3')
-                gratingindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
+                gratingindexes=sampled_grating_indexes_parts(3,(~isnan(sampled_grating_indexes_parts(3,:))));
             end
             for k = 1:length(gratingindexes);
                 full_info{1+parad_num,5}{k+1,6} = gratingindexes(k);
@@ -235,8 +235,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
     end
     if grating
          for trl=1:ops.paradigm_trial_num(parad_num) 
-            grat_volt=4*texindexes(trl)/totalstim;
-            grat_volt=movievolmin+(movievolmax-movievolmin)*(trl-1)/(ops.paradigm_trial_num(parad_num)-1)
+            grat_volt=movievolmin+(movievolmax-movievolmin)*texindexes(trl)/totalstim;
 
             if texindexes(trl)==0
                 grat_volt=movievolmax+0.5;

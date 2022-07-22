@@ -184,7 +184,7 @@ class AllenAnalysis():
 
 #%% Allen analsysys
     def path_managing(self):
-        self.allen_results_path=self.analysis_object.allen_runs_path
+        self.allen_results_path=self.analysis_object.data_paths['allen_runs_path']
         noise_correlations_filename=self.analysis_object.acquisition_object.aquisition_name+'_noise_correlations'
         signal_correlations_filename=self.analysis_object.acquisition_object.aquisition_name+'_signal_correlations'
         represent_similarty_matrix_filename=self.analysis_object.acquisition_object.aquisition_name+'_represent_similarty'
@@ -199,6 +199,8 @@ class AllenAnalysis():
     def do_AllenA_analysis(self, plane, matrix):
         
         self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']=self.stimulus_table['drifting_gratings']
+        
+        
         self.mock_allen_dataset=AllenDatasetEquivalent(self.full_data, plane)
         self.drift_obj=DriftingGratings(self.mock_allen_dataset)
         self.sweeplength = 33
@@ -237,7 +239,7 @@ class AllenAnalysis():
         self.numbercells=len(C_mat)
         self.celltraces=C_mat
         
-        self.dxcm=self.mock_allen_dataset.get_running_speed()
+        _,self.dxcm=self.mock_allen_dataset.get_running_speed()
         sweep_response = pd.DataFrame(index=self.stimulus_table['drifting_gratings'].index.values,
                                       columns=list(map(str, range(
                                           self.numbercells + 1))))
@@ -333,8 +335,8 @@ class AllenAnalysis():
                                      'run_modulation_dg',
                                      'cv_os_dg', 'cv_ds_dg', 'tf_index_dg',
                                      'cell_specimen_id'))
-        cids = self.drift_obj.data_set.get_cell_specimen_ids()
- 
+        # cids = self.drift_obj.data_set.get_cell_specimen_ids()
+        cids=np.arange(self.drift_obj.numbercells)
         orivals_rad = np.deg2rad(self.drift_obj.orivals)
         for nc in range(self.drift_obj.numbercells):
             cell_peak = np.where(self.response[:, 1:, nc, 0] == np.nanmax(
@@ -384,8 +386,8 @@ class AllenAnalysis():
                 (self.drift_obj.stim_table.orientation == self.drift_obj.orivals[prefori])]
  
             # running modulation
-            subset_stat = subset[subset.dx < 1]
-            subset_run = subset[subset.dx >= 1]
+            subset_stat = subset[subset.dx < 1000]
+            subset_run = subset[subset.dx >= 1000]
             if (len(subset_run) > 2) & (len(subset_stat) > 2):
                 (_, peak.p_run_dg.iloc[nc]) = st.ttest_ind(subset_run[str(nc)],
                                                            subset_stat[
@@ -473,20 +475,27 @@ class AllenAnalysis():
         if include_labels:
             fp.show_r_labels()
             fp.show_angle_labels()
-
+        plt.show()
+        
     def plot_orientation_selectivity(self,
                                      si_range=oplots.SI_RANGE,
                                      n_hist_bins=oplots.N_HIST_BINS,
                                      color=oplots.STIM_COLOR,
                                      p_value_max=oplots.P_VALUE_MAX,
-                                     peak_dff_min=oplots.PEAK_DFF_MIN):
+                                     peak_dff_min=oplots.PEAK_DFF_MIN,
+                                     cell_type='All'):
+        if cell_type=='All':
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min)
+
+        else:
         # responsive cells
-        vis_cells = ( self.peak.ptest_dg < p_value_max) & (
-                    self.peak.peak_dff_dg > peak_dff_min)
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) & (self.peak.Tomato==cell_type)
 
         # orientation selective cells
-        osi_cells = vis_cells & ( self.peak.osi_dg > si_range[0][0]) & (
-                    self.peak.osi_dg < si_range[0][1])
+        osi_cells = vis_cells & ( self.peak.osi_dg > si_range[0]) & (
+                    self.peak.osi_dg < si_range[1])
 
         peak_osi =  self.peak.loc[osi_cells]
         osis = peak_osi.osi_dg.values
@@ -494,20 +503,26 @@ class AllenAnalysis():
         oplots.plot_selectivity_cumulative_histogram(osis,
                                                      "orientation "
                                                      "selectivity index",
-                                                     si_range=si_range[0],
+                                                     si_range=si_range,
                                                      n_hist_bins=n_hist_bins,
                                                      color=color)
+        plt.show()
+
 
     def plot_direction_selectivity(self,
                                    si_range=oplots.SI_RANGE,
                                    n_hist_bins=oplots.N_HIST_BINS,
                                    color=oplots.STIM_COLOR,
                                    p_value_max=oplots.P_VALUE_MAX,
-                                   peak_dff_min=oplots.PEAK_DFF_MIN):
-
+                                   peak_dff_min=oplots.PEAK_DFF_MIN,
+                                   cell_type='All'):
+        if cell_type=='All':
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) 
+        else:
         # responsive cells
-        vis_cells = (self.peak.ptest_dg < p_value_max) & (
-                    self.peak.peak_dff_dg > peak_dff_min)
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) & (self.peak.Tomato==cell_type)
 
         # direction selective cells
         dsi_cells = vis_cells & (self.peak.dsi_dg > si_range[0]) & (
@@ -522,15 +537,23 @@ class AllenAnalysis():
                                                      si_range=si_range,
                                                      n_hist_bins=n_hist_bins,
                                                      color=color)
+        plt.show()
+
 
     def plot_preferred_direction(self,
                                  include_labels=False,
                                  si_range=oplots.SI_RANGE,
                                  color=oplots.STIM_COLOR,
                                  p_value_max=oplots.P_VALUE_MAX,
-                                 peak_dff_min=oplots.PEAK_DFF_MIN):
-        vis_cells = ( self.peak.ptest_dg < p_value_max) & (
-                    self.peak.peak_dff_dg > peak_dff_min)
+                                 peak_dff_min=oplots.PEAK_DFF_MIN,
+                                 cell_type='All'):
+        if cell_type=='All':
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) 
+        else:
+            vis_cells = ( self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) & (self.peak.Tomato==cell_type)
+            
         pref_dirs =  self.peak.loc[vis_cells].ori_dg.values
         pref_dirs = [self.drift_obj.orivals[pref_dir] for pref_dir in pref_dirs]
 
@@ -543,56 +566,69 @@ class AllenAnalysis():
                                      offset=0.0,
                                      closed=True,
                                      color=color)
+        plt.show()
+
 
     def plot_preferred_temporal_frequency(self,
                                           si_range=oplots.SI_RANGE,
                                           color=oplots.STIM_COLOR,
                                           p_value_max=oplots.P_VALUE_MAX,
-                                          peak_dff_min=oplots.PEAK_DFF_MIN):
-
-        vis_cells = (self.peak.ptest_dg < p_value_max) & (
-                    self.peak.peak_dff_dg > peak_dff_min)
+                                          peak_dff_min=oplots.PEAK_DFF_MIN,
+                                          cell_type='All'):
+        if cell_type=='All':
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                        self.peak.peak_dff_dg > peak_dff_min) 
+        else:
+            vis_cells = (self.peak.ptest_dg < p_value_max) & (
+                    self.peak.peak_dff_dg > peak_dff_min) & (self.peak.Tomato==cell_type)
+            
         pref_tfs = self.peak.loc[vis_cells].tf_dg.values
+        
+     
+            
+            
+            
 
         oplots.plot_condition_histogram(pref_tfs,
-                                        self.tfvals[1:])
+                                        self.drift_obj.tfvals[1:])
 
         plt.xlabel('temporal frequency (Hz)')
         plt.ylabel('number of cells')
+        plt.show()
      
-        # peak_info=self.drift_obj.get_peak() #gives error
-        # reponse_info=self.drift_obj.get_response() # not proper dimensions
-        # noise_cor=self.drift_obj.get_noise_correlation()
-        # rep_sim=self.drift_obj.get_representational_similarity()
-        # sig_cor=self.drift_obj.get_signal_correlation()
-        # # open_star_plot(cell_specimen_id=)
-        
-        # plt.imshow(sig_cor[0])
-        # plt.imshow(rep_sim[0])
-        # plt.imshow(noise_cor[0][:,:,0,0])
-        # plt.imshow(noise_cor[2])
-        # plt.imshow(noise_cor[3])
-        
-        # cell=2
-        # cell_resp=reponse_info[:,1:,cell,:]
-        # goodresp=reponse_info[:,1:,:,2]
-        # plt.imshow(goodresp[:,:,cell], aspect='auto')
-        
-        # test=self.mock_allen_dataset.get_corrected_fluorescence_traces()
-        # test2=self.mock_allen_dataset.get_cell_specimen_ids()
-        # plt.plot(test[0], test[1][cell,:])
-        
-        
-        
-        # filt=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']['orientation']==45
-        # self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]
-        # filt2=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]['temporal_frequency']==8
-        # filtered=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt][filt2]
-        
-        # trial=558
-        
-        
-        # plt.plot(test[0][filtered.start[trial]-10:filtered.end[trial]+10], test[1][cell, filtered.start[trial]-10:filtered.end[trial]+10])
+    # peak_info=self.drift_obj.get_peak() #gives error
+    # reponse_info=self.drift_obj.get_response() # not proper dimensions
+    # noise_cor=self.drift_obj.get_noise_correlation()
+    # rep_sim=self.drift_obj.get_representational_similarity()
+    # sig_cor=self.drift_obj.get_signal_correlation()
+    # # open_star_plot(cell_specimen_id=)
+    
+    # plt.imshow(sig_cor[0])
+    # plt.imshow(rep_sim[0])
+    # plt.imshow(noise_cor[0][:,:,0,0])
+    # plt.imshow(noise_cor[2])
+    # plt.imshow(noise_cor[3])
+    
+    # cell=2
+    # cell_resp=reponse_info[:,1:,cell,:]
+    # goodresp=reponse_info[:,1:,:,2]
+    # plt.imshow(goodresp[:,:,cell], aspect='auto')
+    
+    # test=self.mock_allen_dataset.get_corrected_fluorescence_traces()
+    # test2=self.mock_allen_dataset.get_cell_specimen_ids()
+    # plt.plot(test[0], test[1][cell,:])
+    
+    
+    
+    # filt=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']['orientation']==45
+    # self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]
+    # filt2=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt]['temporal_frequency']==8
+    # filtered=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][filt][filt2]
+    
+    # trial=558
+    
+    
+    # plt.plot(test[0][filtered.start[trial]-10:filtered.end[trial]+10], test[1][cell, filtered.start[trial]-10:filtered.end[trial]+10])
 
 
 
