@@ -10,6 +10,7 @@
 *.png
 *.svg
 *.hdf5
+*.avi
 
 # OSX / *nix default autosave extension
 *.m~
