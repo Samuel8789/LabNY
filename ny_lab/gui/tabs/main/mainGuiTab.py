@@ -15,7 +15,7 @@ from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
 import time
 from ....database import MouseDatabase
-
+import os
 
 
 class MainGuiTab(tk.Frame):
@@ -65,7 +65,7 @@ class MainGuiTab(tk.Frame):
 #%%   
         self.frame2= self.frames[self.frames_names[1]]
         
-        file_path=r'C:\Users\sp3660\Dropbox\Projects\LabNY\mouse_maps.jpg'
+        file_path=os.path.join(self.gui_ref.lab.dropbox_path, 'Projects','LabNY','mouse_maps.jpg')
         self.img = mpimg.imread(file_path)
 
         self.frame2.fig = Figure(figsize=(5, 5), dpi=100)
