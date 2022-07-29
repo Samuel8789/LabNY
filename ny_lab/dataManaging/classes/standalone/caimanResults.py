@@ -197,7 +197,6 @@ class CaimanResults():
         self.dfdt_thesholded_accepted_matrix=copy.copy( self.dfdt_accepted_matrix)
         self.dfdt_thesholded_accepted_matrix[ self.dfdt_thesholded_accepted_matrix< self.std_filter]= self.std_filter[ self.dfdt_thesholded_accepted_matrix< self.std_filter]
         self.dfdt_thesholded_accepted_matrix=  self.dfdt_thesholded_accepted_matrix- self.std_filter
-        plt.plot(self.dfdt_thesholded_accepted_matrix[:,0])
         self.binarized_dfdt=np.where( self.dfdt_thesholded_accepted_matrix > 0, 1, 0)
 
     def load_foopsi_traces(self):
