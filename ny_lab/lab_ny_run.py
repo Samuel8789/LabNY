@@ -25,27 +25,29 @@ class RunNYLab(Project):
         #loadmicedatabase     
         
         self.databasefile=os.path.join(Project.all_paths_for_this_system['Dropbox'],'LabNY', 'MouseDatabase.db')
-        # self.data_paths_names=['Raw','Pre_proccessed_slow', 'Analysis_Fast_1', 'Analysis_Fast_2']    
-        self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others']    
-
-
         module_logger.info('Loading Mouse Database')
         self.database=MouseDatabase(self.databasefile, self)   
         #load all mice info       
         self.all_mouse_info=self.database.allEXPERIMENTAL
-        self.data_paths_roots={}
-        self.load_datbaseSaved_paths_roots()
-        try:
-            # self.raw_data_path='\\\?\\' + os.path.join(self.all_paths_for_this_system[self.project_raw_data_path],'LabNY')
-            # self.main_directory= '\\\?\\' +os.path.join(self.all_paths_for_this_system[self.project_primary_data_path],'LabNY')
-            # self.secondary_disk='\\\?\\' +os.path.join(self.all_paths_for_this_system[ self.project_secondary_data_path],'LabNY')
- 
-            
-            self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots[name]], 'LabNY') for name in self.data_paths_names}
+        if Project.computer=='DESKTOP-OKLQSQS':
+            self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others']    
+                
+            self.data_paths_roots={}
+            self.load_datbaseSaved_paths_roots()
+            try:
 
-        except KeyError:
-            self.change_and_save_selected_paths_roots()
-            self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}     
+                self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots[name]], 'LabNY') for name in self.data_paths_names}
+    
+            except KeyError:
+                self.change_and_save_selected_paths_roots()
+                self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}     
+                
+        else:
+            self.data_paths_names=['ResultsContainers']
+            self.data_paths_project={name: os.path.join(self.all_paths_for_this_system['Dropbox'], 'LabNY','ResultsContainers') for name in self.data_paths_names}     
+
+
+     
             
             
             
@@ -86,9 +88,7 @@ class RunNYLab(Project):
         
         self.data_paths_roots={name:select_values_gui(list(self.all_paths_for_this_system.keys()), name) for name  in self.data_paths_names}
         
-    def manage_different_computers(self):
-        # if not la computer then simplified dataManaging
-        pass
+
         
 
 if __name__ == "__main__":

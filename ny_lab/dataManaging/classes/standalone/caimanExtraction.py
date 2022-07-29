@@ -161,11 +161,11 @@ class CaimanExtraction():
                 self.volume_period=self.metadata.translated_imaging_metadata['FinalVolumePeriod']
                 
             if self.objective=='MBL Olympus 20x':
-                self.halfsize=2.5
+                self.halfsize=4
             elif '25' in self.objective:
                self.halfsize=5          
                if '20x' in self.bidishifted_movie_path:
-                    self.halfsize=2.5  
+                    self.halfsize=4  
         except:
             module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
 
