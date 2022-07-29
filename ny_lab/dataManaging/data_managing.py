@@ -27,7 +27,7 @@ import datetime
 class DataManaging():
 
     
-    def __init__(self, project_object):
+    def __init__(self, project_object, full=True):
         module_logger.info('Instantiating ' +__name__)
 
         
@@ -36,66 +36,77 @@ class DataManaging():
 
         self.Database_ref=self.LabProjectObject.database
         # self.update_all_imaging_data_paths()
-        
-        self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects']
-        self.data_paths_data={name:os.path.join(self.LabProjectObject.data_paths_project[name], self.data_paths[i])  for i , name in enumerate(self.LabProjectObject.data_paths_names)}     
+        if full:
+            self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects']
+            self.data_paths_data={name:os.path.join(self.LabProjectObject.data_paths_project[name], self.data_paths[i])  for i , name in enumerate(self.LabProjectObject.data_paths_names)}     
+    
+            
+            # self.raw_data= self.data_paths_data['Raw']
+            # self.analysis_fast_1_data_path=self.data_paths_data['Analysis_Fast_1']
+            # self.analysis_fast_2_data_path=self.data_paths_data['Analysis_Fast_2']
+            # self.pre_processed_data_path=self.data_paths_data['Pre_proccessed_slow']
+            
+    
+            # self.primary_data_directory=self.analysis_fast_1_data_path
+            # self.secondary_data_path=self.pre_processed_data_path
+                 
+            """
+            1read primary data
+            2read fullsecondary data
+            3read imaging foldes
+            4build mouse objects
+            5get mouse objects in primary data
+            6select mouse data to trasnfer
+            7trasnfer mouse data to primary
+            8find new imagingsession
+            9 process imaging sessin to ful data
+            """
+    
+            module_logger.info('Building Prairire Imaging Sessions')
+    
+            self.all_existing_sessions={}
+            self.read_all_imaging_sessions_from_directories() 
+            # this checks all sessions in the F drive
+            self.all_existing_sessions_database=[]
+            self.read_all_imaging_sessions_from_database()
+            # this checks all sessions in the the database dont build prairire imagibg sessions
+            self.all_existing_sessions_database_objects={}
+            self.build_all_paririe_session_from_database()
+            self.all_existing_unprocessed_sessions=[]
+            self.all_existing_unprocessed_session2={}
+            self.read_all_imaging_sessions_not_in_database()
+            self.all_existing_sessions_not_database_objects={}
+            self.build_all_prairie_sessions_not_in_database()
+            
+            # this builds all prairie imaging sessions based on the database list
+            module_logger.info('Building Mouse Objects')
+            self.all_non_imaged_mice_objects={}
+            self.all_imaged_mice_objects={}
+            self.build_all_mice_objects_from_database()
+            self.find_imaged_mouse_codes_not_in_database()
+            self.build_all_unimaged_mice_objects_from_database()
+            self.all_experimetal_mice_objects={**self.all_imaged_mice_objects, **self.all_non_imaged_mice_objects}
+            # self.get_all_deep_caiman_objects()
+            
+            
+            module_logger.info('Reading directory structure')
+            self.read_all_data_path_structures()
+            
+                    
+            self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
+            module_logger.info('Data managing done')
+            print('Data managing done')
+        else:
+            self.all_existing_sessions_database=[]
+            self.read_all_imaging_sessions_from_database()
+            self.all_existing_sessions_database_objects={}
+            self.build_all_paririe_session_from_database()
+            self.all_non_imaged_mice_objects={}
+            self.all_imaged_mice_objects={}
+            self.build_all_mice_objects_from_database()
+            self.all_experimetal_mice_objects={**self.all_imaged_mice_objects, **self.all_non_imaged_mice_objects}
 
-        
-        # self.raw_data= self.data_paths_data['Raw']
-        # self.analysis_fast_1_data_path=self.data_paths_data['Analysis_Fast_1']
-        # self.analysis_fast_2_data_path=self.data_paths_data['Analysis_Fast_2']
-        # self.pre_processed_data_path=self.data_paths_data['Pre_proccessed_slow']
-        
-
-        # self.primary_data_directory=self.analysis_fast_1_data_path
-        # self.secondary_data_path=self.pre_processed_data_path
-             
-        """
-        1read primary data
-        2read fullsecondary data
-        3read imaging foldes
-        4build mouse objects
-        5get mouse objects in primary data
-        6select mouse data to trasnfer
-        7trasnfer mouse data to primary
-        8find new imagingsession
-        9 process imaging sessin to ful data
-        """
-
-        module_logger.info('Building Prairire Imaging Sessions')
-
-        self.all_existing_sessions={}
-        self.read_all_imaging_sessions_from_directories() 
-        # this checks all sessions in the F drive
-        self.all_existing_sessions_database=[]
-        self.read_all_imaging_sessions_from_database()
-        # this checks all sessions in the the database dont build prairire imagibg sessions
-        self.all_existing_sessions_database_objects={}
-        self.build_all_paririe_session_from_database()
-        self.all_existing_unprocessed_sessions=[]
-        self.all_existing_unprocessed_session2={}
-        self.read_all_imaging_sessions_not_in_database()
-        self.all_existing_sessions_not_database_objects={}
-        self.build_all_prairie_sessions_not_in_database()
-        
-        # this builds all prairie imaging sessions based on the database list
-        module_logger.info('Building Mouse Objects')
-        self.all_non_imaged_mice_objects={}
-        self.all_imaged_mice_objects={}
-        self.build_all_mice_objects_from_database()
-        self.find_imaged_mouse_codes_not_in_database()
-        self.build_all_unimaged_mice_objects_from_database()
-        self.all_experimetal_mice_objects={**self.all_imaged_mice_objects, **self.all_non_imaged_mice_objects}
-        # self.get_all_deep_caiman_objects()
-        
-        
-        module_logger.info('Reading directory structure')
-        self.read_all_data_path_structures()
-        
-                
-        self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
-        module_logger.info('Data managing done')
-        print('Data managing done')
+            pass
 
 #%% building mouse objects and prairire imaging sessions        
     def build_all_mice_objects_from_database(self):
@@ -823,3 +834,30 @@ class DataManaging():
               for dataset in tododeepgreensatasets.values():
                   dataset.do_deep_caiman()
         self.get_all_deep_caiman_objects()
+        
+#%% cloud transfers        
+    def copy_full_data_to_dropbox(self, mouse_code):
+        pass
+    
+    def copy_data_dir_to_dropbox(self, mouse_code):
+        mouse_object=self.all_imaged_mice_objects[mouse_code]
+        os.path.join(mouse_object.mouse_slow_subproject_path, 'data')
+        
+        
+        
+        
+    def copy_jesus_runs_to_dropbox(self, mouse_code):
+        pass
+    def copy_pca_to_dropbox(self, mouse_code):
+        pass
+    def copy_crf_to_dropbox(self, mouse_code):
+        pass
+    def copy_allen_to_dropbox(self, mouse_code):
+        pass
+        
+        
+        
+        
+    
+        
+        

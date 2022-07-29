@@ -776,6 +776,10 @@ class Aquisition:
         
         self.analysis_object=ResultsAnalysis(acquisition_object=self, nondatabase=nondatabase, new_full_data=new_full_data)
         
+    def load_results_analysis_cloud(self, nondatabase=None, new_full_data=False):
+        
+        self.analysis_object=ResultsAnalysis(acquisition_object=self, nondatabase=nondatabase, new_full_data=new_full_data)
+        
  
     def get_associated_tomato_fov_datasets(self):
 

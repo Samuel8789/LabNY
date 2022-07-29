@@ -58,8 +58,8 @@ class RunNYLab(Project):
             self.gui = Gui(self)
             self.gui.mainloop()
     
-    def do_datamanaging(self):
-        self.datamanaging=DataManaging(self)
+    def do_datamanaging(self, full=True):
+        self.datamanaging=DataManaging(self, full=full)
     
     def change_and_save_selected_paths_roots(self): 
                         
