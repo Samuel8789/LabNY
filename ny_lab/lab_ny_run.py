@@ -86,6 +86,9 @@ class RunNYLab(Project):
         
         self.data_paths_roots={name:select_values_gui(list(self.all_paths_for_this_system.keys()), name) for name  in self.data_paths_names}
         
+    def manage_different_computers(self):
+        # if not la computer then simplified dataManaging
+        pass
         
 
 if __name__ == "__main__":

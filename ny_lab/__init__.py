@@ -8,20 +8,21 @@ import glob
 from  .lab_ny_run import RunNYLab
 import logging
 import logging.config
+from sys import platform
+import os
+from project_manager.ProjectsCLass import Project
 
 
 
-log_dir='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Logging'
-
-log_files=glob.glob(log_dir+'\\app_errors_**.log')
+log_dir=os.path.join(Project.check_dropbox_path(),'Projects','LabNY' ,'Logging')
+log_files=glob.glob(log_dir+os.sep+'app_errors_**.log')
 if log_files:
     new_file_number=len(log_files)+1
 else:
     new_file_number=1
 
-filename='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Logging\app_'+str(new_file_number)+'.log'
-filename_errors='\\\\?\\'+r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Logging\app_errors_'+str(new_file_number)+'.log'
-
+filename=log_dir + os.sep+'app_'+str(new_file_number)+'.log'
+filename_errors=log_dir + os.sep+'app_errors_'+str(new_file_number)+'.log'
 
 
 
