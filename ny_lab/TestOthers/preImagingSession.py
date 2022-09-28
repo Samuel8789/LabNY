@@ -76,7 +76,7 @@ class PreImagingSession():
         self.main_dir=[self.widefield_dir_WS1, self.visstimsessions_dir_WS1, self.eyecam_dir_WS2, self.stimdaq_dir_WS2, self.prairireraw1, self.prairireraw2]
         self.sshfolder=r'G:\Projects\TemPrairireSSH'
         
-        self.prairireraw=[r'E:\Sam',r'F:\Samuel',r'G:\Sam']
+        self.prairireraw=[self.prairireraw1,self.prairireraw2,self.prairireraw3]
         print('prepare_empty_session'.upper())
 
         self.prepare_empty_session()
@@ -273,11 +273,14 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20220722'
+    sessiondate='20220922'
     mice=[
-    'SPOK',
-    'SPOM',
-    'SPOO',
+    'SPOL',
+    'SPON',
+    'SPOP',
+    'SPOQ',
+    'SPOS',
+    'SPOU',
 ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()

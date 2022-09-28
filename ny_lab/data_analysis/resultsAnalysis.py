@@ -144,12 +144,15 @@ class ResultsAnalysis():
                  full_data_path=None ,
                  nondatabase=None,
                  new_full_data=False,
-                 allen_BO_tuple=False
+                 acquisition_data_path=False,
+                 allen_BO_tuple=False,
+                 cloud=False,
                  ):      
         self.allen_BO_tuple=allen_BO_tuple
         self.acquisition_object=acquisition_object
         self.nondatabase=nondatabase
         self.new_full_data=new_full_data
+        self.data_analysis_path=acquisition_data_path
         self.acquisition_voltage_signals_object=acquisition_voltage_signals_object
         self.metadata_object=metadata_object
         self.preframes=16
@@ -204,7 +207,21 @@ class ResultsAnalysis():
             self.spont=self.allen.explore_spontaneous_activity( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
             self.movies=self.allen.explore_natural_movie_analysis( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
             
+        elif cloud:
+            self.create_full_data_container()
+            self.create_stim_table()
+
+      
+            #%  pyr int identification
+
+            self.check_pyr_int_identif_files()
+            self.load_pyr_int_identif()
+            self.get_pyr_int_indexing_dict()
             
+            
+            # subanalysis, this should be mode to sub anlayis object
+            self.check_all_jesus_results()
+        
         else:   
             
             if self.acquisition_voltage_signals_object:
@@ -216,38 +233,32 @@ class ResultsAnalysis():
 #%% path managing
     def set_up_some_paths(self):
         timestr = time.strftime("%Y%m%d-%H%M%S")
+        name_dict={'jesus_runs_path':'JesusRuns',
+                   'caiman_runs_path':'CaimanRuns',
+                   'nmf_runs_path':'NMFAnalysis',
+                   'allen_runs_path':'AllenAnalysis',
+                   'CRFs_runs_path':'CRFsResults',
+                   'own_tuning_runs_path':'MyOwnTuningAnalysis',
+                   'pca_runs_path':'PCA'}
 
         if self.acquisition_object:
             mouse_slow_path=self.acquisition_object.mouse_imaging_session_object.mouse_object.mouse_slow_subproject_path
-            
-            self.data_paths={ 'jesus_runs_path':os.path.join(mouse_slow_path,'data','JesusRuns'),
-             'caiman_runs_path':os.path.join(mouse_slow_path,'data','CaimanRuns'),
-             'nmf_runs_path':os.path.join(mouse_slow_path,'data','NMFAnalysis'),
-             'allen_runs_path':os.path.join(mouse_slow_path,'data','AllenAnalysis'),
-             'CRFs_runs_path':os.path.join(mouse_slow_path,'data','CRFsResults'),
-             'own_tuning_runs_path':os.path.join(mouse_slow_path,'data','MyOwnTuningAnalysis'),
-             'pca_runs_path':os.path.join(mouse_slow_path,'data','PCA'),
-                }
+            self.data_analysis_path=os.path.join(mouse_slow_path,'data',self.acquisition_object.aquisition_name)
+            self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
             
             for data_path in self.data_paths.values():
                 if not os.path.isdir(data_path):
-                    os.mkdir(data_path)
+                    os.makedirs(data_path)
 
-            self.data_analysis_path=os.path.join(mouse_slow_path,'data')
             self.full_data_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'full_data.pkl'])  
             self.pyr_int_identif_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'pyr_int_identification.pkl'])  
             
+        elif self.data_analysis_path:
+            self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
+            
         else:
             
-            self.data_paths={ 'jesus_runs_path':self.temporary_processing,
-             'caiman_runs_path':self.temporary_processing,
-             'nmf_runs_path':self.temporary_processing,
-             'allen_runs_path':self.temporary_processing,
-             'CRFs_runs_path':self.temporary_processing,
-             'own_tuning_runs_path':self.temporary_processing,
-             'pca_runs_path':self.temporary_processing,
-                }
-            
+            self.data_paths={key:os.path.join(self.temporary_processing,val) for key,val in name_dict.items()}
             self.full_data_path_name=None
             self.pyr_int_identif_path_name=None
             
@@ -793,7 +804,7 @@ class ResultsAnalysis():
 
             plt.show()
             
-    def plot_orientation(self, cell, trace_type, plane):
+    def plot_orientation(self, cell, trace_type, plane, plot=None):
         
         pyr=np.argwhere(self.pyr_int_ids_and_indexes[plane]['pyr'][1]).flatten()
         inter=np.argwhere(self.pyr_int_ids_and_indexes[plane]['int'][1]).flatten()
@@ -805,14 +816,7 @@ class ResultsAnalysis():
         mean_evoked_2s=[]
         mean_evoked_1s=[]
 
-        
-        fig = plt.figure(constrained_layout=True)
-        subfigs = fig.subfigures(2, 3, wspace=0.07, width_ratios=[1, 1,1])
-        fig.suptitle('Cell: '+str(cell)+' '+celltype )
-
-        axs=['','','','']
         for n, ori in enumerate(np.linspace(0,180-(180/4),4)):
-            axs[n]=subfigs[int(np.floor(n/2)),int(n%2)].subplots(3)
             # trace_type='denoised'
             C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
             cell_trace=C_mat[cell,:]
@@ -825,39 +829,65 @@ class ResultsAnalysis():
              for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])
 
             meantraces=np.mean(trial, axis=0)
-                
-            for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
-                axs[n][0].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
-            axs[n][0].set_title(ori)
-
-                
-                
-            axs[n][0].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
-            axs[n][0].axvspan(self.preframes,self.preframes+self.stim, facecolor='b', alpha=0.3)
+            
             mean_evoked_2s.append(np.mean(meantraces[self.preframes:self.preframes+self.stim]))
             mean_evoked_1s.append(np.mean(meantraces[self.preframes:int(np.floor((self.preframes+self.stim)/2))]))
+            
+        mean_evoked_2s=[]
+        mean_evoked_1s=[]
 
-
-            axs[n][0].plot(meantraces,'k')
-            axs[n][1].imshow(trial,cmap='binary', aspect='auto')
-            axs[n][2].plot(meantraces,'k')
+        if plot: 
+          
+            fig = plt.figure(constrained_layout=True)
+            subfigs = fig.subfigures(2, 3, wspace=0.07, width_ratios=[1, 1,1])
+            fig.suptitle('Cell: '+str(cell)+' '+celltype )
+          
+            axs=['','','','']
+            for n, ori in enumerate(np.linspace(0,180-(180/4),4)):
+                axs[n]=subfigs[int(np.floor(n/2)),int(n%2)].subplots(3)
+                C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
+                cell_trace=C_mat[cell,:]
+                fluorescence=self.full_data['imaging_data'][plane]['Traces']['denoised'][cell,:]
+                
+                trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
+                 if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
+                 else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] 
+                 for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])
+    
+                meantraces=np.mean(trial, axis=0)
+                
+                mean_evoked_2s.append(np.mean(meantraces[self.preframes:self.preframes+self.stim]))
+                mean_evoked_1s.append(np.mean(meantraces[self.preframes:int(np.floor((self.preframes+self.stim)/2))]))
+              
+    
+                    
+                for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
+                    axs[n][0].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
+                axs[n][0].set_title(ori)
+                    
+                axs[n][0].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
+                axs[n][0].axvspan(self.preframes,self.preframes+self.stim, facecolor='b', alpha=0.3)
+               
+                axs[n][0].plot(meantraces,'k')
+                axs[n][1].imshow(trial,cmap='binary', aspect='auto')
+                axs[n][2].plot(meantraces,'k')
 
 
                 
-                
-        ax1=subfigs[0,2].subplots(1)    
-        ax1.plot(fluorescence)
-        ax2=subfigs[1,2].subplots(1)    
-        ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
-        ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
-        ax2.legend()
-
-        ax2.set_title('Mean Evoked Activity')
-
-        ax2.set_ylim(0,2*np.max(mean_evoked_2s))
-        ax2.set_ylim(0,0.2)
-
-        plt.show()
+                    
+            ax1=subfigs[0,2].subplots(1)    
+            ax1.plot(fluorescence)
+            ax2=subfigs[1,2].subplots(1)    
+            ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
+            ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
+            ax2.legend()
+    
+            ax2.set_title('Mean Evoked Activity')
+    
+            ax2.set_ylim(0,2*np.max(mean_evoked_2s))
+            ax2.set_ylim(0,0.2)
+    
+            plt.show()
         
         return mean_evoked_2s, mean_evoked_1s
 

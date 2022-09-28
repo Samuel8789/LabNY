@@ -39,7 +39,7 @@ class AddSessionInfo(tk.Toplevel):
                     self.values[i].append(texts)  
                     
                 elif j>0:
-                    if i !=1:
+                    if i not in (1,2):
                         self.b[i].append(Text(self, height=5, width=150, wrap=WORD)) # b[i][j]
                         self.b[i][j].grid(row=i+1, column=j)                              
                         self.values[i].append(self.b[i][j].get("1.0",END) )
@@ -51,6 +51,12 @@ class AddSessionInfo(tk.Toplevel):
                         self.b[i][j].grid(row=i+1, column=j)   
                         self.b[i][j].current(0)     
                         self.values[i].append(self.b[i][j].get())   
+                    elif i==2:
+                        self.b[i].append(Text(self, height=5, width=150, wrap=WORD)) # b[i][j]
+                        self.b[i][j].grid(row=i+1, column=j)                              
+                        self.values[i].append(self.b[i][j].get("1.0",END) )
+                        self.b[i][j].insert("1.0",('00:00'))
+                            
 
         enter_button = Button(self, text="Enter", command=self.retrieve_input)
         enter_button.grid(row=1,column=26)

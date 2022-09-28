@@ -6,42 +6,58 @@ Created on Wed Sep 22 15:37:52 2021
 """
 import numpy as np
 import copy
+import matplotlib.pyplot as plt
+import scipy as sp
+from numpy import fft
 
-def shiftBiDi(BiDiPhase, image):
+
+def biDiPhaseOffsets(image, maxphase=5, sigma=0.35):       
+    [Ly, Lx]=image.shape  
+    image=sp.ndimage.gaussian_filter(image,sigma)
+
+
+    
+    eps0 = np.float32(1e-6)
+    d1 = np.fft.fft(image[1::2,:], axis=1)
+    d1 = d1/(abs(d1) + eps0)
+
+    d2 = np.conj(np.fft.fft(image[::2,:],axis=1))
+    d2 = d2/(abs(d2) + eps0)
+    
+    cc = np.real(np.fft.ifft(d1*d2, axis=1))
+    
+    cc = np.fft.fftshift(cc, axes=1);
+    cc_m = np.mean(cc,0)
+    
+    BiDiPhase = -(np.argmax(cc_m[-maxphase + Lx // 2 : maxphase+1 + Lx // 2]) - maxphase)
+
+    return BiDiPhase, maxphase, sigma
+
+def shiftBiDi(BiDiPhase, image, ixs=None):
     [Ly, Lx]=image.shape 
     shifted_image=copy.copy(image)
-    yrange = np.arange(1,Ly,2)
+
     if BiDiPhase>0:
-        shifted_image[yrange,BiDiPhase:Lx-1] = image[yrange, 0:(Lx-1-BiDiPhase)]
+        shifted_image[1::2, BiDiPhase:] = image[1::2, 0:-BiDiPhase]
+    elif BiDiPhase<0:
+        shifted_image[1::2, 0:BiDiPhase]  = image[1::2, -BiDiPhase:]
     else:
-        shifted_image[yrange,0:Lx-1+BiDiPhase]  = image[yrange, -BiDiPhase:Lx-1]
+        pass
+        
+        
+    # if bidiphase > 0:
+    #     shifted_image[ 1::2, BiDiPhase:] = image[ 1::2, :-BiDiPhase]
+    # else :
+    #     shifted_image[ 1::2, :BiDiPhase] = image[ 1::2, -BiDiPhase:]
+    # return frames    
+        
 
     return shifted_image
 
 
-def biDiPhaseOffsets(image):       
-         
-    [Ly, Lx]=image.shape  
-    
-    # lines scanned one direction
-    yr1=np.arange(1,int(np.floor(Ly/2)*2),2)
-    
-    #lines scanned in other direction
-    yr2=np.arange(0,int(np.floor(Ly/2)*2),2)
-    
-    eps0 = np.float32(1e-6)
-    d1 = np.fft.fft(image[yr1,:], axis=1)
-    d2 = np.conjugate(np.fft.fft(image[yr2,:],axis=1))
-    d1 = d1/(abs(d1) + eps0)
-    d2 = d2/(abs(d2) + eps0)
-    
-    cc = np.real_if_close(np.fft.ifft(d1*d2, axis=1))
-    
-    cc = np.fft.fftshift(cc, axes=1);
-    cc = np.mean(cc,0)
-    
-    ix=np.argmax(cc[int(np.floor(Lx/2)) + np.arange(-5,6)])
-    ix     = ix - (5);
-    BiDiPhase = -1 * ix;
 
-    return BiDiPhase
+
+
+
+
+

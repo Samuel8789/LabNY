@@ -97,17 +97,12 @@ class DataManaging():
             module_logger.info('Data managing done')
             print('Data managing done')
         else:
-            self.all_existing_sessions_database=[]
-            self.read_all_imaging_sessions_from_database()
-            self.all_existing_sessions_database_objects={}
-            self.build_all_paririe_session_from_database()
-            self.all_non_imaged_mice_objects={}
-            self.all_imaged_mice_objects={}
-            self.build_all_mice_objects_from_database()
-            self.all_experimetal_mice_objects={**self.all_imaged_mice_objects, **self.all_non_imaged_mice_objects}
+           self.read_dropbox_data_dir()
 
-            pass
+           pass
 
+        
+        
 #%% building mouse objects and prairire imaging sessions        
     def build_all_mice_objects_from_database(self):
     
@@ -364,10 +359,15 @@ class DataManaging():
         
     def read_all_imaging_sessions_not_in_database(self):     
         test=[session[2] for session in self.all_existing_sessions_database]
-        self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in  test]
+        self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in test]
         # this ignores jesus and hakim sessions any folder with name sin it
-        test2=[value for key, value in self.all_existing_sessions.items() if key.isdigit() and datetime.datetime.strptime(key,'%Y%m%d')>datetime.datetime.strptime( os.path.split(test[-1])[1],'%Y%m%d')]
+        thresholdforsession=datetime.datetime.strptime('20220630','%Y%m%d') #arbitrary dynamic
+
+        # thresholdforsession=datetime.datetime.strptime( os.path.split(test[-1])[1],'%Y%m%d')# latest session ind atabase
+        test2=[value for key, value in self.all_existing_sessions.items() if key.isdigit() and datetime.datetime.strptime(key,'%Y%m%d')>thresholdforsession]
         self.all_new_unprocessed_session={session_name:session for session_name, session in  self.all_existing_sessions.items() if (session in test2) and (session not in test)}
+        self.all_database_session={session_name:session for session_name, session in  self.all_existing_sessions.items() if session in test}
+
 
 
 #%% building sessions
@@ -836,15 +836,22 @@ class DataManaging():
         self.get_all_deep_caiman_objects()
         
 #%% cloud transfers        
+    def read_dropbox_data_dir(self):
+        pass
+        
     def copy_full_data_to_dropbox(self, mouse_code):
         pass
     
     def copy_data_dir_to_dropbox(self, mouse_code):
         mouse_object=self.all_imaged_mice_objects[mouse_code]
-        os.path.join(mouse_object.mouse_slow_subproject_path, 'data')
-        
-        
-        
+        aqc_list=glob.glob(os.path.join(mouse_object.mouse_slow_subproject_path, 'data'+'\\*'))
+        for acq in aqc_list:
+            dirpath=os.path.join(self.LabProjectObject.data_paths_project['ResultsContainers'],'\\'.join(acq.split('\\')[-6:]) )
+            if not os.path.isdir(dirpath):
+                os.makedirs(dirpath)
+            filestocopy=[i for i in glob.glob(acq+'\\*') if os.path.isfile(i)]
+            [shutil.copy(f,dirpath) for f in filestocopy]
+            
         
     def copy_jesus_runs_to_dropbox(self, mouse_code):
         pass

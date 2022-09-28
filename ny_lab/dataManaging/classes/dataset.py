@@ -87,6 +87,8 @@ class ImageSequenceDataset:
                                 self.do_initial_caiman_extraction()
                             self.do_initial_kalman()
                             self.do_summary_images(self.kalman_movie_path)
+                            self.do_summary_images(self.gauss_path)
+
                             
                         elif self.dataset_frame_number>1:   
                             self.do_summary_images(self.shifted_movie_path)
@@ -122,6 +124,8 @@ class ImageSequenceDataset:
                                 self.do_initial_kalman()
                                 self.do_summary_images(self.kalman_movie_path)
                                 
+                                self.do_summary_images(self.gauss_path)
+                                
                             elif self.dataset_frame_number>1:   
                                 self.do_summary_images(self.shifted_movie_path)
                                 module_logger.info('SHort file doing summary images directly')
@@ -142,7 +146,7 @@ class ImageSequenceDataset:
                             
                     # self.unload_dataset()        
                     module_logger.info('Finished processing dataset ' + self.selected_dataset_raw_path 
-                                       + '_' + self.selected_dataset_mmap_path)
+                                       + '_____' + self.selected_dataset_mmap_path)
     
                 except:
                     module_logger.exception('Something wrong with raw processing ' +   self.selected_dataset_raw_path)
@@ -260,7 +264,13 @@ class ImageSequenceDataset:
 
     
     def read_issues_file(self):
-        pass        
+        
+        
+        pass     
+    
+
+    
+    
     def do_bidishift(self, force=False):  
         module_logger.info('Bidishifting ' + self.selected_dataset_raw_path)
 
@@ -272,7 +282,7 @@ class ImageSequenceDataset:
         self.initial_caiman_custom=None
         self.initial_caiman=None
         try:
-            module_logger.info('Running Caiman ' + self.selected_dataset_raw_path)
+            module_logger.info('Running Initial Caiman ' + self.selected_dataset_raw_path)
             
             if self.bidishift_object.start_end_flag and self.shifted_movie_path and self.bidishift_object.shifted_movie_full_caiman_path==self.bidishift_object.shifted_movie_custom_files_path:
                 module_logger.info('Running Caiman custom length ' + self.selected_dataset_raw_path)
@@ -295,8 +305,10 @@ class ImageSequenceDataset:
         try:
             module_logger.info('Running Kalman Filter ' + self.selected_dataset_raw_path)
 
-            self.kalman_object=MotionCorrectedKalman(shifted_mmap_path=self.mc_onacid_path, kalman_only=True, dataset_object=self)                                           
+            self.kalman_object=MotionCorrectedKalman(shifted_mmap_path=self.mc_onacid_path, dataset_object=self)                                           
             self.kalman_movie_path =self.kalman_object.kalman_path
+            self.gauss_path =self.kalman_object.gauss_path
+
                                                
         except:
             module_logger.exception('Something wrong with kalman ' +   self.selected_dataset_raw_path)
@@ -312,6 +324,9 @@ class ImageSequenceDataset:
                 
             elif source_movie_path==self.shifted_movie_path:
                 module_logger.info('Getting non kalman summary images ' + self.selected_dataset_raw_path)
+                
+                
+                
             if   source_movie_path: 
                 self.summary_images_object=SummaryImages(image_sequence_path= source_movie_path, dataset_object=self)
             else:
@@ -451,6 +466,8 @@ class ImageSequenceDataset:
     def open_dataset_directory(self):
         os.startfile(self.selected_dataset_mmap_path)
 
+    def open_raw_video_on_imagej(self):
+        pass
 if __name__ == "__main__":
     
     # dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000\Ch2Green\plane1'

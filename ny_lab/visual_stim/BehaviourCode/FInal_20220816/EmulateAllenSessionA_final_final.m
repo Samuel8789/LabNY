@@ -1,8 +1,8 @@
 sca()
 clear 
 close all
-desktop_testing=1;
-stimdate='20220610';
+desktop_testing=0;
+stimdate='20220816';
 mouse='Test';
 fov='Test';
 opto='None';
@@ -36,7 +36,7 @@ ops.paradigm_trial_num =    [ 200,   1,     5,    1,    10,    1,   200,   1,   
 ops.paradigm_stim_time=     [   2,  30,   120,   30,    30,   30,     2, 300,   120,  30,    2];
 ops.paradigm_isi_time=      [   1,   0,     0,    0,     0,    0,     1,   0,     0,   0,    1];
 ops.paradigm_frame_number=  [   1,   1,  3600,    1,   900,    1,     1,   1,  3600,   1,    1];
-ops.paradigm_optotest=      [   1,   0,     0,    0,     0,    0,     1,   1,     0,   0,    1];
+ops.paradigm_optotest=      [   0,   0,     0,    0,     0,    0,     0,   0,     0,   0,    0];
 
 isi_color = [ops.isicolor ops.isicolor ops.isicolor];
 isi_color_texture=[255 255 255];
@@ -68,10 +68,7 @@ if desktop_testing==1
 end
 white = WhiteIndex(screenid);
 black = BlackIndex(screenid);
-% Do a simply calculation to calculate the luminance value for grey. This
-% will be half the luminace value for white
-grey = white / 2;
-% grey=135;
+
 
 [win, rect] = Screen('OpenWindow',screenid, isi_color); % rect is the coordinates of the screen
 ops.flipInterval = Screen('GetFlipInterval', win);
@@ -82,7 +79,6 @@ topPriorityLevel = MaxPriority(win);
 
 
 %% drifitng gratings
-
 totalgratings=size(driftinggratings,3)*size(driftinggratings,4);
 seepfreq=20;
 periodtimes=[10 10 10];
@@ -312,7 +308,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
     if grating
          for trl=1:ops.paradigm_trial_num(parad_num) 
             % define voltage depending on trial
-            grat_volt=movievolmin+(movievolmax-movievolmin)*(texindexes(trl)-1)/(ops.paradigm_trial_num(parad_num)-1)
+            grat_volt=movievolmin+(movievolmax-movievolmin)*(texindexes(trl))/totalstim;
              if texindexes(trl)==0
                 grat_volt=movievolmax+0.5;
              end

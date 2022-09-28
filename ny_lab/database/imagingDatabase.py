@@ -689,7 +689,7 @@ class ImagingDatabase():
         params=(get_values[1][1],)
         Microscope=int(self.databse_ref.arbitrary_query_to_df(query_microscopes, params).ID.iloc[0])
         if len(get_values[2][1])>2:
-            StartTime=format(datetime.datetime.strptime(get_values[2][1], "%H:%M\n"),"%H:%M")
+            StartTime=format(datetime.datetime.strptime(get_values[2][1], "%H:%M"),"%H:%M")
         else:
             StartTime=''
         Objectives=get_values[3][1]

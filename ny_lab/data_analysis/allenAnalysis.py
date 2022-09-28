@@ -305,6 +305,7 @@ class AllenAnalysis():
                     axis=0) / sqrt(len(subset_response))
                 response[ori_pt, tf_pt, :, 2] = subset_pval.apply(
                     ptest, axis=0)
+                
         return response
         
         
@@ -328,7 +329,7 @@ class AllenAnalysis():
         '''
         DriftingGratings._log.info('Calculating peak response properties')
  
-        peak = pd.DataFrame(index=range(self.drift_obj.numbercells),
+        peak = pd.DataFrame(index=range(self.numbercells),
                             columns=('ori_dg', 'tf_dg', 'reliability_dg',
                                      'osi_dg', 'dsi_dg', 'peak_dff_dg',
                                      'ptest_dg', 'p_run_dg',
@@ -336,9 +337,9 @@ class AllenAnalysis():
                                      'cv_os_dg', 'cv_ds_dg', 'tf_index_dg',
                                      'cell_specimen_id'))
         # cids = self.drift_obj.data_set.get_cell_specimen_ids()
-        cids=np.arange(self.drift_obj.numbercells)
+        cids=np.arange(self.numbercells)
         orivals_rad = np.deg2rad(self.drift_obj.orivals)
-        for nc in range(self.drift_obj.numbercells):
+        for nc in range(self.numbercells):
             cell_peak = np.where(self.response[:, 1:, nc, 0] == np.nanmax(
                 self.response[:, 1:, nc, 0]))
             prefori = cell_peak[0][0]
@@ -453,7 +454,7 @@ class AllenAnalysis():
                             % (str(csid), str(idx)))
     
     def open_star_plot(self, cell_specimen_id=None, include_labels=False,
-                       cell_index=None):
+                       cell_index=None, show=None):
         cell_index = self.row_from_cell_id(cell_specimen_id, cell_index)
 
         df = self.mean_sweep_response[str(cell_index)]
@@ -475,7 +476,8 @@ class AllenAnalysis():
         if include_labels:
             fp.show_r_labels()
             fp.show_angle_labels()
-        plt.show()
+        if show:
+            plt.show()
         
     def plot_orientation_selectivity(self,
                                      si_range=oplots.SI_RANGE,

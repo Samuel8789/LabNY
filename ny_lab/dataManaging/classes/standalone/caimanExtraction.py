@@ -74,6 +74,7 @@ class CaimanExtraction():
 
             if first_pass_mot_correct: 
                 self.dataset_caiman_parameters['epochs']=1
+                self.dataset_caiman_parameters['motion_correct']=True
                 self.save_mot_correct=True
                 self.dataset_caiman_parameters['use_cnn']=False
                 
@@ -108,7 +109,14 @@ class CaimanExtraction():
     def copy_fast_results_remove_all(self):
         
         caiman_file=glob.glob(self.temp_path+'\**.hdf5')[0]
+        motcorrectfile=glob.glob(self.temp_path+'\**MC_OnACID**.mmap')[0]
+        shiftsfile=glob.glob(self.temp_path+'\**shifts**.pkl')[0]
+
         shutil.copyfile(caiman_file,os.path.join(os.path.split(self.original_path)[0],os.path.split(caiman_file)[1]))
+        shutil.copyfile(motcorrectfile,os.path.join(os.path.split(self.original_path)[0],os.path.split(motcorrectfile)[1]))
+        shutil.copyfile(shiftsfile,os.path.join(os.path.split(self.original_path)[0],os.path.split(shiftsfile)[1]))
+
+
         
         filelist = glob.glob(os.path.join(self.temp_path, "*"))
         for f in filelist:
@@ -203,6 +211,8 @@ class CaimanExtraction():
         use_cnn = True  # use the CNN classifier
         min_cnn_thr = 0.90  # if cnn classifier predicts below this value, reject
         cnn_lowest = 0.3  # neurons with cnn probability lowe
+        fudge_factor=0.99 #defqault is 0.96
+
 
         self.dataset_caiman_parameters = {'fnames': self.bidishifted_movie_path,
                                            'fr': fr,
@@ -228,12 +238,14 @@ class CaimanExtraction():
                                            'epochs':epochs,
                                            'use_cnn': use_cnn,
                                            'min_cnn_thr': min_cnn_thr,
-                                           'cnn_lowest': cnn_lowest
+                                           'cnn_lowest': cnn_lowest,
+                                           'fudge_factor':fudge_factor
                                             }
         
-    def apply_caiman(self):       
+    def apply_caiman(self): 
+        # this is if there is already a ciamna file
         if self.caiman_path and self.mc_onacid_path:
-            
+        
                 if not self.force_run:
                     module_logger.info('Caiman not run, files already there ' + self.bidishifted_movie_path )
                     self.load_cnmf_object()
@@ -264,12 +276,13 @@ class CaimanExtraction():
                         # self.remove_unclipped_issue_shifted_movies()
                     except:
                             module_logger.exception('Something wrong with deep On Acid ' + self.bidishifted_movie_path )
-                    
+        #this is the initial extraction with motion correction            
         else:  
             try:
                 self.temp_file_to_fast_disk()
                 self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
                 self.copy_fast_results_remove_all()
+                self.check_motion_corrected_on_acid()
 
             except:
                     module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
@@ -320,6 +333,9 @@ class CaimanExtraction():
         
         self.caiman_full_paths=sorted(glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
         self.caiman_custom_paths=sorted(glob.glob(self.temporary_path+'\\**end_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
+        
+        self.caiman_sorted_files=sorted(glob.glob(self.temporary_path+'\\**sort.mat'), key=os.path.getmtime) 
+
    
         if  self.first_pass_mot_correct:
             indxx=0

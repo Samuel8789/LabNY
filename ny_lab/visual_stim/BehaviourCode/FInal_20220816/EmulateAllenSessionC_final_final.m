@@ -1,60 +1,58 @@
 sca()
-clear 
+clear
 close all
-desktop_testing=1;
+desktop_testing=0;
 stimdate='20220610';
 mouse='Test';
 fov='Test';
 opto='None';
-blue=true;
+blue=true; 
 is135=false;
 
 acquisition_name=[stimdate '_' mouse '_' fov '_' opto];
 stim_dir=fullfile(fileparts(pwd),'AllenStimuli', 'Smalles');
 
 if is135==true
-    ops.isicolor=131;
+    load(fullfile(stim_dir,'locally_sparse_noise_full_135.mat'))
+    ops.isicolor=135;
 else
+    load(fullfile(stim_dir,'locally_sparse_noise_full.mat'))
     ops.isicolor=ceil(255/2);
 end
 
-
-load(fullfile(stim_dir,'drifiting_gratings_full.mat'))
 load(fullfile(stim_dir,'natural_movie_one.mat'))
-load(fullfile(stim_dir,'natural_movie_three_full.mat'))
-driftinggratings=all_warped_drifting_gratings_full;
-clear all_warped_drifting_gratings_full 
+load(fullfile(stim_dir,'natural_movie_two.mat'))
+fullnoise=locally_sparse_noise_all_warped_frames_full;
+clear locally_sparse_noise_all_warped_frames_full 
 naturalmovie1big=natural_movie_one_all_warped_frames;
 clear natural_movie_one_all_warped_frames 
-naturalmovie3big=natural_movie_three_all_warped_frames_full;
-clear natural_movie_three_all_warped_frames_full 
+naturalmovie2big=natural_movie_two_all_warped_frames;
+clear natural_movie_two_all_warped_frames 
 
 %% parameters
 % ------ Paradigm sequence ------
-ops.paradigm_sequence = {'Drifting1', 'Intergrey','Movie3', 'Intergrey','Movie1','Intergrey','Drifting2' , 'Spont','Movie3','Intergrey','Drifting3'};  
-ops.paradigm_trial_num =    [ 200,   1,     5,    1,    10,    1,   200,   1,     5,   1,  200];   
-ops.paradigm_stim_time=     [   2,  30,   120,   30,    30,   30,     2, 300,   120,  30,    2];
-ops.paradigm_isi_time=      [   1,   0,     0,    0,     0,    0,     1,   0,     0,   0,    1];
-ops.paradigm_frame_number=  [   1,   1,  3600,    1,   900,    1,     1,   1,  3600,   1,    1];
-ops.paradigm_optotest=      [   1,   0,     0,    0,     0,    0,     1,   1,     0,   0,    1];
+ops.paradigm_sequence = {'Noise1','Spont','Movie1','Intergrey','Noise2','Intergrey','Movie2', 'Spont','Noise3'};  
+ops.paradigm_trial_num =    [2900,   1,    10,  1,  2900,   1,    10,   1,  3200];   
+ops.paradigm_stim_time=     [ 1/4, 300,    30, 30,   1/4,  30,    30, 300,   1/4];
+ops.paradigm_isi_time=      [   0,   0,     0,  0,     0,   0,     0,   0,     0];
+ops.paradigm_frame_number=  [   1,   1,   900,  1,     1,   1,   900,   1,     1];
+ops.paradigm_optotest=      [   0,   0,     0,  0,     0,   0,     0,   0,     0,];
 
 isi_color = [ops.isicolor ops.isicolor ops.isicolor];
-isi_color_texture=[255 255 255];
+isi_color_texture=[255 255 255]
 if blue==true
     isi_color = [0 0 ops.isicolor];
     isi_color_texture=[0 0 255];
 end
-repetitions=15;
+
 waitframes=1;
 random_jitter= randi([1 20]);
 stim_delay=200+random_jitter;
 iterations=1;
 
 %% set opto tirggers for which trial
-% chandelier one photon stimulation select 1 trial to do opto and also do
-% opto duirg the spont, not during movies
-%select angle to do opto, I need to count first count total repetitions
-% with one photon I have to trigger by myself at a given frequency
+%select angle to do opto
+
 optotrial=10;
 % slect movie frame to do opto
 optoframe=1;
@@ -81,52 +79,37 @@ resheight=resolution.height;
 topPriorityLevel = MaxPriority(win);
 
 
-%% drifitng gratings
+%% sampling the noise matrix
 
-totalgratings=size(driftinggratings,3)*size(driftinggratings,4);
-seepfreq=20;
-periodtimes=[10 10 10];
-periodreps=periodtimes*20;
-numbersweeps=ceil(periodreps/seepfreq);
-total_trials = totalgratings*repetitions;
-totalstim=totalgratings;
-tex = zeros(size(driftinggratings,3),size(driftinggratings,4),size(driftinggratings,5));
- for i=1:size(driftinggratings,3)
-     for j=1:size(driftinggratings,4)
-         for k=1:size(driftinggratings,5)    
-            tex(i,j,k)=Screen('MakeTexture', win,0.8*driftinggratings(:,:,i,j,k)); 
-         end
-     end
- end
-driftingtex=reshape(tex,[size(driftinggratings,3)*size(driftinggratings,4),size(driftinggratings,5)]);
-restoredtex=squeeze(reshape(driftingtex,[1,size(driftinggratings,3), size(driftinggratings,4), size(driftinggratings,5)]));
-all_grating_indexes=1:40;
-drifitng_grating_index_array=squeeze(reshape(all_grating_indexes,[1,size(driftinggratings,3), size(driftinggratings,4)]));
-trial_array=zeros(totalgratings,repetitions);
-for i=1:repetitions
-    trial_array(:,i)=randperm(totalgratings);
-end
-jitter=zeros(3,max(numbersweeps));
-for i=1:3
-    jitter(i,:)=randi(3,1,max(numbersweeps));
-end
-jitter(1:2,78:end)=NaN;
-jitter(find(jitter==1))=-1;
-jitter(find(jitter==2))=0;
-jitter(find(jitter==3))=1;
-sweepperiods=jitter+seepfreq;
-sweepindexes=cumsum(sweepperiods,2);
-sampled_grating_indexes=trial_array(randperm(total_trials, total_trials));
-sampled_grating_indexes_parts = reshape(sampled_grating_indexes, 3, []);
+ncol = 9000;
+splitrandperm=randperm(size(fullnoise,3));
+Ar=fullnoise(:,:,splitrandperm);
+clear fullnoise
+noise1=Ar(:,:,1:2900);
+noise2=Ar(:,:,2901:5800);
+noise3=Ar(:,:,5801:9000);
+clear Ar
+texnoise1=zeros(1,size(noise1,3));
+texnoise2=zeros(1,size(noise2,3));
+texnoise3=zeros(1,size(noise3,3));
 
-for i=1:3
-    sweepindexes(i,find(sweepindexes(i,1:numbersweeps(i))>periodreps(i)))=NaN;
-    sampled_grating_indexes_parts(i,sweepindexes(i,(~isnan(sweepindexes(i,:)))))=0;
+for i=1:size(noise1,3)
+    texnoise1(i)=Screen('MakeTexture', win, noise1(:,:,i)); 
 end
+for i=1:size(noise2,3)
+    texnoise2(i)=Screen('MakeTexture', win, noise2(:,:,i)); 
+end
+for i=1:size(noise3,3)
+    texnoise3(i)=Screen('MakeTexture', win, noise3(:,:,i)); 
+end
+% clear noise1 noise2 noise3 
+
+noiseindexes1=splitrandperm(1:2900)';
+noiseindexes2=splitrandperm(2901:5800)';
+noiseindexes3=splitrandperm(5801:9000)';
 
 
 %% loading the movies twice the size without waitframes
-%% loading the movies
 [~,~,frame_number_movie_1]=size(naturalmovie1big);
 texmov1=zeros(1,frame_number_movie_1);
 for i=1:frame_number_movie_1
@@ -134,14 +117,14 @@ for i=1:frame_number_movie_1
 end
 texmov1=reshape(repmat(texmov1,2,1),size(texmov1,1),2*size(texmov1,2));
 
-[~,~,frame_number_movie_3]=size(naturalmovie3big);
-texmov3=zeros(1,frame_number_movie_3);
-for i=1:frame_number_movie_3
-    texmov3(i)=Screen('MakeTexture', win, naturalmovie3big(:,:,i)); 
+[~,~,frame_number_movie_2]=size(naturalmovie2big);
+texmov2=zeros(1,frame_number_movie_2);
+for i=1:frame_number_movie_2
+    texmov2(i)=Screen('MakeTexture', win, naturalmovie2big(:,:,i)); 
 end
-texmov3=reshape(repmat(texmov3,2,1),size(texmov3,1),2*size(texmov3,2));
-clear naturalmovie1big naturalmovie2big
-ops.paradigm_frame_number=  [   1,   1,  frame_number_movie_3,    1,   frame_number_movie_1,    1,     1,   1,  frame_number_movie_3,   1,    1];
+texmov2=reshape(repmat(texmov2,2,1),size(texmov2,1),2*size(texmov2,2));
+% clear naturalmovie1big naturalmovie2big
+ops.paradigm_frame_number=  [   1,   1,   frame_number_movie_1,  1,     1,   1,   frame_number_movie_2,   1,     1];
 
 %% VoltageSignals
 if ~desktop_testing
@@ -198,27 +181,21 @@ for parad_num=1:numel(ops.paradigm_sequence)
                 full_info{1+parad_num,5}{trial+1,5}{frame+1,1}=frame;
             end           
         end
-   elseif contains(ops.paradigm_sequence{parad_num}, 'Drifting')
-        full_info{1+parad_num,5}=cell(ops.paradigm_trial_num(parad_num)+1,7);
-        full_info{1+parad_num,5}(1,:)={'Trial', 'TrialStart','StimStart' 'TrialEnd', 'TrialTime','DrifitingIndex', 'Phases'};
-            if contains(ops.paradigm_sequence{parad_num}, 'Drifting1')
-                gratingindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
-            elseif contains(ops.paradigm_sequence{parad_num}, 'Drifting2')
-                gratingindexes=sampled_grating_indexes_parts(2,(~isnan(sampled_grating_indexes_parts(2,:))));
-            elseif contains(ops.paradigm_sequence{parad_num}, 'Drifting3')
-                gratingindexes=sampled_grating_indexes_parts(3,(~isnan(sampled_grating_indexes_parts(3,:))));
+    elseif contains(ops.paradigm_sequence{parad_num}, 'Noise')
+        full_info{1+parad_num,5}=cell(ops.paradigm_trial_num(parad_num)+1,5);
+        full_info{1+parad_num,5}(1,:)={'Trial', 'TrialStart', 'TrialEnd', 'TrialTime','NoiseIndex'};
+            if contains(ops.paradigm_sequence{parad_num}, 'Noise1')
+                noiseindexes=noiseindexes1;
+            elseif contains(ops.paradigm_sequence{parad_num}, 'Noise2')
+                noiseindexes=noiseindexes2;
+            elseif contains(ops.paradigm_sequence{parad_num}, 'Noise3')
+                noiseindexes=noiseindexes3;
             end
-            for k = 1:length(gratingindexes);
-                full_info{1+parad_num,5}{k+1,6} = gratingindexes(k);
+            for k = 1:length(noiseindexes)
+                full_info{1+parad_num,5}{k+1,5} = noiseindexes(k);
             end    
             for trial=1:ops.paradigm_trial_num(parad_num)
                 full_info{1+parad_num,5}{trial+1,1}=trial;
-                phase_number=120;
-                full_info{1+parad_num,5}{trial+1,7}=cell(phase_number+1,4);
-                full_info{1+parad_num,5}{trial+1,7}(1,:)={'Phase', 'PahseStart', 'PhaseTime','PhaseValue'};
-                for phase=1:phase_number
-                    full_info{1+parad_num,5}{trial+1,7}{phase+1,1}=phase;
-                end     
             end
     else
         full_info{1+parad_num,5}=cell(ops.paradigm_trial_num(parad_num)+1,4);
@@ -263,133 +240,125 @@ for parad_num = 1:numel(ops.paradigm_sequence)
     session.outputSingleScan([maxvol 0]); 
     pause(0.05)
     session.outputSingleScan([maxvol 0]);    
-    session.outputSingleScan([maxvol 0]); 
-    grating=0;
+    session.outputSingleScan([maxvol 0]);     
+    noise=0;
     movi=0;
-    
+        
     optotest=0;
-
+    
  % check what paradigm
-    if strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting1')
-        texture=driftingtex   ;    
-        texindexes=sampled_grating_indexes_parts(1,(~isnan(sampled_grating_indexes_parts(1,:))));
-        grating=1;
+    if strcmpi(ops.paradigm_sequence{parad_num}, 'Noise1')
+        texture=texnoise1; 
+        noise=1;
         optotest=ops.paradigm_optotest(parad_num);
         
-    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting2')
-        texindexes=sampled_grating_indexes_parts(2,(~isnan(sampled_grating_indexes_parts(2,:))));
-        texture=driftingtex;
-        grating=1;
+    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Noise2')
+        texture=texnoise2;
+        noise=1;
         optotest=ops.paradigm_optotest(parad_num);
-
-    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Drifting3')
-        texindexes=sampled_grating_indexes_parts(3,(~isnan(sampled_grating_indexes_parts(3,:))));
-        texture=driftingtex;
-        grating=1;
+        
+    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Noise3')
+        texture=texnoise3;
+        noise=1;
         optotest=ops.paradigm_optotest(parad_num);
-
+        
     elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Movie1')
         texture=texmov1;
-        movi=1;  
+        movi=1;
         frame_number=frame_number_movie_1*2;
         optotest=ops.paradigm_optotest(parad_num);
-
-    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Movie3')
-        texture=texmov3;
+        
+    elseif strcmpi(ops.paradigm_sequence{parad_num}, 'Movie2')
+        texture=texmov2;
         movi=1;
-        frame_number=frame_number_movie_3*2;
+        frame_number=frame_number_movie_2*2;
         optotest=ops.paradigm_optotest(parad_num);
         
-    end    
+     end    
     
     session.outputSingleScan([0 0]);
     session.outputSingleScan([0 0]);
     pause(0.05)
     session.outputSingleScan([0 0]);
     session.outputSingleScan([0 0]);
-
-    %% GRATING
-    if grating
+    
+    %% NOISE
+    if noise
          for trl=1:ops.paradigm_trial_num(parad_num) 
-            % define voltage depending on trial
-            grat_volt=movievolmin+(movievolmax-movievolmin)*(texindexes(trl)-1)/(ops.paradigm_trial_num(parad_num)-1)
-             if texindexes(trl)==0
-                grat_volt=movievolmax+0.5;
-             end
+             
             % select wich grating will tirgger opto
             if optotest
                 if texindexes(trl)==optotrial
                     optotriger=5
-                else
+                    optotriger2=0;
+                elseif texindexes(trl+1)==optotrial
+                    optotriger2=5;
                     optotriger=0;
                 end
             else
                 optotriger=0;
-
+                optotriger2=0;
             end
-            %% ISI LOOP 1S
-            % start first ISI
-            Screen('FillRect', win, isi_color, rect);
-            now=GetSecs();
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% strat trial start isi
-            full_info{1+parad_num,5}{1+trl,2}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()]; % strat trial start isi
-            % send volateg after making screen blue
-            session.outputSingleScan([grat_volt 0]);
-            session.outputSingleScan([grat_volt 0]);
-            pause(0.05)
-            session.outputSingleScan([greyvol 0]);
-            session.outputSingleScan([greyvol 0]);
-            % prepare drawing the grating forwhen ISI FINISH
-            if texindexes(trl)~=0
-                %draw first frame of drifting grating
-                Screen('DrawTexture', win,texture(texindexes(trl),1), [],[],[],[],[], isi_color_texture);
-                ct=1;
+            % define voltage depending flip flop betwen trial, keep order in saved
+            if rem(trl, 2) == 0
+                trial_volt=greyvol+1;
             else
-                Screen('FillRect', win, isi_color);
-            end       
-
-            % count IS TIME
-            while (now-VBLTimestamp)<ops.paradigm_isi_time(parad_num)
-                      now=GetSecs();
-            end          
-            %% GRATING LOOP 2s
-            %flip first frame of grating
-            [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% stim start end isi
-            full_info{1+parad_num,5}{1+trl,3}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()]; % stim start end isi
-            % this is to tirgger opto if is the proper trial
-            session.outputSingleScan([greyvol optotriger]);
-            session.outputSingleScan([greyvol optotriger]);
-            pause(0.003)
-            session.outputSingleScan([greyvol 0]);
-            session.outputSingleScan([greyvol 0]);
-
-            % select grating vs blank sweep
-            if texindexes(trl)~=0
-                while (now-full_info{1+parad_num,5}{1+trl,3}(1))<ops.paradigm_stim_time(parad_num)           
+                trial_volt=greyvol-1;
+            end
+            % run first image and second image
+            if trl==1
+                now=GetSecs();
+                %draw and flip frist trial
+                Screen('DrawTexture', win, texture(1,trl), isi_color_texture);
+                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% show first image start
+                
+                session.outputSingleScan([trial_volt optotriger]);
+                session.outputSingleScan([trial_volt optotriger]);
+                pause(0.003)
+                session.outputSingleScan([trial_volt 0]);
+                session.outputSingleScan([trial_volt 0]);
+                full_info{1+parad_num,5}{1+trl,2}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];% show first image start
+                %prepare and draw nex texture
+                Screen('DrawTexture', win, texture(1,trl+1), isi_color_texture);
+                % wait 250ms with first image
+                while (now- VBLTimestamp)<ops.paradigm_stim_time(parad_num)
                         now=GetSecs();
-                        % draw next frame of grating
-                        Screen('DrawTexture', win,texture(texindexes(trl),rem(ct,60)+1), [],[],[],[],[], isi_color_texture);
-                        % flip frame of grating
-                        [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);
-                        %send a flip flop voltage for every frame
-                        if rem(ct, 2) == 0
-                            frame_volt=greyvol+1;
-                        else
-                            frame_volt=greyvol-1;
-                        end
-                        session.outputSingleScan([frame_volt 0]);
-                        session.outputSingleScan([frame_volt 0]);
-
-                        %save timing
-                        full_info{1+parad_num,5}{1+trl,7}{ct+2,2}=  [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
-                        ct=ct+1;
+                end     
+                %flip second image
+                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);% show second image start
+                session.outputSingleScan([trial_volt optotriger2]);
+                session.outputSingleScan([trial_volt optotriger2]);
+                pause(0.003)
+                session.outputSingleScan([trial_volt 0]);
+                session.outputSingleScan([trial_volt 0]);
+                full_info{1+parad_num,5}{1+trl+1,2}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
+                
+            elseif trl>1 && trl<ops.paradigm_trial_num(parad_num)
+                %prepare and draw nex texture
+                Screen('DrawTexture', win, texture(1,trl+1), isi_color_texture);
+                % wait 250ms with current trial
+                while (now-VBLTimestamp)<ops.paradigm_stim_time(parad_num)
+                    now=GetSecs();
                 end
+                % flip trl+1 image
+                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);
+                session.outputSingleScan([trial_volt optotriger2]);
+                session.outputSingleScan([trial_volt optotriger2]);
+                pause(0.003)
+                session.outputSingleScan([trial_volt 0]);
+                session.outputSingleScan([trial_volt 0]);
+                full_info{1+parad_num,5}{1+trl+1,2}=[VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
+                
             else
-                % blank sweep 2 second presentation
+                %prepare and draw final grey scren
+                Screen('FillRect', win, isi_color, rect);
+                % wait 250ms with last trial
                 while (now-VBLTimestamp)<ops.paradigm_stim_time(parad_num)
                     now=GetSecs();
                 end 
-            end
+                [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos]=Screen('Flip',win);
+                full_info{1+parad_num,5}{1+trl,3}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()]; 
+            end         
          end
     %% MOVIE     
     elseif movi
@@ -416,6 +385,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
             pause(0.003)
             session.outputSingleScan([trial_volt 0]);
             session.outputSingleScan([trial_volt 0]);
+            optotriger=0;
             full_info{1+parad_num,5}{1+trl,2}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];%strat first frame
             now=GetSecs();
             while (now-full_info{1+parad_num,5}{1+trl,2}(1))<ops.paradigm_stim_time(parad_num)%-ops.paradigm_stim_time(parad_num)/frame_number
@@ -425,8 +395,6 @@ for parad_num = 1:numel(ops.paradigm_sequence)
                     if  rem(ct,frame_number)+1==optoframe;
                         optotriger2=5
                     end
-                else
-                    optotriger2=0;
                 end
                 %draw and flip frame
                 Screen('DrawTexture', win,texture(1,rem(ct,frame_number)+1), [],[],[],[],[], isi_color_texture);
@@ -442,6 +410,7 @@ for parad_num = 1:numel(ops.paradigm_sequence)
                 pause(0.003)
                 session.outputSingleScan([frame_volt 0]);
                 session.outputSingleScan([frame_volt 0]);
+                optotriger2=0
                 full_info{1+parad_num,5}{1+trl,5}{1+ct+1,2}= [VBLTimestamp, StimulusOnsetTime, FlipTimestamp, Missed, Beampos, GetSecs()];
                 ct=ct+1;
             end                
@@ -569,7 +538,7 @@ clear temp_time;
 
 %% save info
 fprintf('Saving...\n');
-save([save_path,'\', file_name, '.mat'],'ops', 'full_info', 'isi_color','is135');
+save([save_path,'\', file_name, '.mat'],'ops', 'full_info', 'isi_color', 'is135');
 fprintf('Done\n');
 %% ploting noise timings
 % for j=[2,6,10]

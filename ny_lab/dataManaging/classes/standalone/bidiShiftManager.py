@@ -15,6 +15,8 @@ import pickle
 import glob
 import gc
 import shutil 
+import scipy.signal as sg
+import scipy.stats as st
 
 import logging 
 from ScanImageTiffReader import ScanImageTiffReader
@@ -53,6 +55,7 @@ class BidiShiftManager:
         self.bidiphases=[]
         self.expanded_dataset_name=expanded_dataset_name
         self.dataset_object=dataset_object
+        self.led_start_end_file=os.path.join(os.path.split(self.temporary_path)[0],'LED_Start_End.txt')
         
         
         
@@ -123,17 +126,23 @@ class BidiShiftManager:
                         
                     module_logger.info('loading raw image sequence')
                     # self.load_dataset_from_image_sequence()
-                    self.load_dataset_from_image_sequence()
                     
-                    if not self.start_end_flag:
-                       
+                    
+                    self.load_dataset_from_image_sequence()
+                   
+                    
+                    self.detect_LED_synchs()
+                    self.load_LED_tips()
+                    self.border_clip_image_sequence()
 
-                        self.frame_end= len(self.image_sequence)+1
+
+        
                     self.correct_bidi_movie() 
               
                         
                     module_logger.info('saving files')
                     self.save_shifts()
+                    module_logger.info('saving bidishifte corrected movie')
                     self.save_shifted_movie()
                     module_logger.info('rechecking output files')
                     self.check_shifted_movie_path()
@@ -144,12 +153,7 @@ class BidiShiftManager:
         elif self.raw_dataset_object:
             self.temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
             pass
-        
-        
-        
-        
-            
-            
+
         else:
             
             if self.shifted_movie_path:
@@ -162,10 +166,11 @@ class BidiShiftManager:
                 if self.bidiphase_file_path:
                     self.load_bidiphases_from_file()
                 self.load_dataset_from_image_sequence()
+                self.border_clip_image_sequence()
                
                 self.correct_bidi_movie()
             else:
-            
+
                 if self.caiman_movie:
                     self.image_sequence=self.caiman_movie
                     
@@ -174,6 +179,8 @@ class BidiShiftManager:
          
                 elif self.dataset_image_sequence_path:
                      self.load_dataset_from_image_sequence()   
+                     self.border_clip_image_sequence()
+                    
     
                 if self.bidiphase_file_path:
                     self.load_bidiphases_from_file()
@@ -196,7 +203,53 @@ class BidiShiftManager:
             self.frame_start= start_end[0]
             self.frame_end=start_end[1]-1  
             # self.frame_end=start_end[1]  
+            
+    def load_LED_tips(self):
+               
+        if os.path.isfile(self.led_start_end_file):
+            self.led_start_end_flag=True
+            with open(self.led_start_end_file) as f:
+                lines = f.readlines()
+            led_start_end=[int(x) for x in lines]
+            self.led_corrected_frame_start= led_start_end[0]
+            self.led_corrected_frame_end=led_start_end[1] 
+        
 
+    def detect_LED_synchs(self):
+            
+        m_mean = self.image_sequence.mean(axis=(1, 2))
+        scored=st.zscore(m_mean)
+        # plt.plot(m_mean)
+        dif=np.diff(scored)
+        median=sg.medfilt(dif, kernel_size=1)
+        rounded=np.round(median)
+        # finsg start transition
+        # transitions=np.where(abs(dif)>max(abs(dif))/2)[0]
+        # transitions_median=np.where(abs(median)>max(abs(median))/2)[0]
+        transitions_medina_rounded=np.where(abs(rounded)>max(abs(rounded))/2)[0]
+
+        star_led=transitions_medina_rounded[transitions_medina_rounded<int(len(m_mean)/2)]
+        end_led=transitions_medina_rounded[transitions_medina_rounded>int(len(m_mean)/2)]
+
+
+        if len(star_led)>0:
+            led_frame_start_end=star_led[-1]+1
+            pad1=5
+        else:
+            led_frame_start_end=0
+            pad1=0
+
+        if len(end_led)>0:
+            led_frame_end_start=end_led[0]+1
+            pad2=5
+        else:     
+            led_frame_end_start=len(m_mean)+1
+            pad2=0
+            
+        if not os.path.isfile(self.led_start_end_file):
+            with open(self.led_start_end_file, 'w') as f:
+                f.writelines((str( led_frame_start_end+pad1),'\n', str( led_frame_end_start-pad2)))
+        
 
     def check_bidiphases_in_directory(self):
         self.bidiphase_custom_file_paths=[]
@@ -301,19 +354,30 @@ class BidiShiftManager:
         module_logger.info('loading files')
         try:
             self.image_sequence=cm.load(image_sequence_paths)
-            module_logger.info('Caimn not propelry loaded witj a;l files, try first file ch1(contains all info)')
+            module_logger.info('Caimn fila sequence properly loaded')
 
         except:
             self.image_sequence=cm.load(image_sequence_paths[0])[:,0,:,:]
             module_logger.info('all files in single file')
-
             
-            
-            
+    def border_clip_image_sequence(self):
+        
+        if not self.start_end_flag:
+            self.frame_end= len(self.image_sequence)+1    
         if len(self.image_sequence)>1:
             self.image_sequence= self.image_sequence[self.frame_start:self.frame_end,:,:]
         else:
             pass
+
+          
+        if not self.led_start_end_flag:
+            self.led_corrected_frame_start=0
+            self.led_corrected_frame_end= len(self.image_sequence)+1  
+        if len(self.image_sequence)>1:
+            self.image_sequence= self.image_sequence[self.led_corrected_frame_start:self.led_corrected_frame_end,:,:]
+        else:
+            pass
+            
 
     def load_dataset_from_mmap(self): 
         self.image_sequence
@@ -328,63 +392,6 @@ class BidiShiftManager:
     
 
 #%% do the processing
-    def load_LED_tips(self):
-        
-        led_start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'LED_Start_End.txt')
-        if os.path.isfile(led_start_end_file):
-            self.led_start_end_flag=True
-            with open(led_start_end_file) as f:
-                lines = f.readlines()
-            led_start_end=[int(x) for x in lines]
-            self.led_frame_start= led_start_end[0]
-            self.led_frame_end=led_start_end[1] 
-        
-    # def get_LED_tips(self):
-        
-    #     led_start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'LED_Start_End.txt')
-    #     if not os.path.isfile(led_start_end_file):
-
-    #         mov=self.image_sequence
-    #         m_mean = mov.mean(axis=(1, 2))
-    #         x=np.arange(len(m_mean))
-    #         dif=np.diff(m_mean)
-    #         median=sg.medfilt(dif, kernel_size=3)
-    #         rounded=np.round(median)
-    #         transitions=np.where(abs(dif)>1000)[0]
-    #         transitions_median=np.where(abs(median)>20)[0]
-    #         transitions_medina_rounded=np.where(abs(rounded)>20)[0]
-    #         self.led_frame_start=transitions[3]+1
-    #         self.led_frame_end=transitions[4]+1
-    #         noled=mov[start:end,:,:]
-    #         noled_extended=mov[start-1:end+1,:,:]
-    #         noled_mean = noled.mean(axis=(1, 2))
-    #         noledx=np.arange(len(noled_mean))
-    #         noleddif=np.diff(noled_mean)
-    
-    
-    #         # mov.play()
-    #         # plt.imshow(mov[141,:,:])
-    #         # plt.figure()
-    #         # plt.plot(x,m_mean)
-    #         # plt.plot(x[1:],abs(dif))
-    #         # plt.plot(x[1:],abs(median))
-    #         # plt.plot(x[1:],abs(rounded))
-    #         # plt.figure()
-    #         # plt.imshow(noled[0,:,:])
-    #         # plt.figure()
-    #         # plt.imshow(noled[-1,:,:])
-    #         # plt.figure()
-    #         # plt.imshow(noled_extended[0,:,:])
-    #         # plt.figure()
-    #         # plt.imshow(noled_extended[-1,:,:])
-    #         # plt.figure()
-    #         # plt.plot(noledx,noled_mean)
-    #         # plt.plot(noledx[1:],abs(noleddif))
-            
-            
-    #         if not os.path.isfile(led_start_end_file):
-    #             with open(led_start_end_file, 'w') as f:
-    #                 f.writelines((str( self.led_frame_start),'\n', str( self.led_frame_end)))
 
  
 
@@ -410,7 +417,7 @@ class BidiShiftManager:
     def shift_images(self):
         shifted_images=np.zeros(self.image_sequence.shape).astype('float32')
         for i in range(self.image_sequence.shape[0]):
-            shifted_images[i,:,:]=shiftBiDi(self.bidiphases[i], self.image_sequence[i,:,:])
+            shifted_images[i,:,:]=shiftBiDi(self.bidiphases[i][0], self.image_sequence[i,:,:])
         return shifted_images
     
 
@@ -476,10 +483,14 @@ class BidiShiftManager:
                 
 if __name__ == "__main__":
     
-    dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000\Ch2Green\plane1'
+    # dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000\Ch2Green\plane1'
     # dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\SurfaceImage\Aq_1\220428_SPMT_FOV2_Surface_25x_920_52570_570620_without-000\Ch2Green\plane1'
     # dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\0CoordinateAcquisiton\Aq_1\220428_SPMT_0Coordinate_25x_940_52570_570620_wit-000\Ch2Green\plane1'
     temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
+    
+    
+    dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220701\Mice\SPLB\TestAcquisitions\Aq_1\220701_SPLB_Test_25x_920_51020_60745_with-000\Ch2Green\plane1'
+
 
     bidihits = BidiShiftManager(dataset_image_sequence_path=dataset_image_sequence_path, temporary_path=temporary_path )
 

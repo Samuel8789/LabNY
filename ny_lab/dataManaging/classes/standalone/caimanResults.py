@@ -63,9 +63,6 @@ class CaimanResults():
         
         self.MCMC_sigma=50#ms
         self.dfdt_sigma=50#ms
-
-
-        
         
         self.binarized_dfdt=np.empty((0, 0))
         self.C_matrix=np.empty((0, 0))
@@ -240,10 +237,11 @@ class CaimanResults():
         self.check_if_mat_file()
         self.options_path=r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_pre_processing\caiman_sorter-master\caiman_sorter_options.mat'
         self.options_mat=self.loadmat(self.options_path)
-    
-        self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.hdf5_file_path, fast_output=True)
+    #%%
+        self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.hdf5_file_path, fast_output=False)
+        #%%
         if  self.mat_results_path:
-            self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.mat_results_path, fast_output=True)            
+            self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.mat_results_path, fast_output=False)            
         spio.savemat(self.options_path, self.options_mat)
                 
         eng = matlab.engine.start_matlab()

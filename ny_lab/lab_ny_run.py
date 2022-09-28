@@ -37,11 +37,14 @@ class RunNYLab(Project):
             try:
 
                 self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots[name]], 'LabNY') for name in self.data_paths_names}
+                self.data_paths_project['ResultsContainers']= os.path.join(self.all_paths_for_this_system['Dropbox'], 'LabNY','ResultsContainers')    
+
     
             except KeyError:
                 self.change_and_save_selected_paths_roots()
-                self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}     
+                self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}  
                 
+
         else:
             self.data_paths_names=['ResultsContainers']
             self.data_paths_project={name: os.path.join(self.all_paths_for_this_system['Dropbox'], 'LabNY','ResultsContainers') for name in self.data_paths_names}     

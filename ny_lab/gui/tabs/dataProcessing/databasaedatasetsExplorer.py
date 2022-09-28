@@ -61,7 +61,7 @@ class MouseDatasetsPanel(tk.Toplevel):
               self.frames[self.frames_names[i]]=ttk.Frame(self, borderwidth = 4, relief='groove')
               
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=2)
+        self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=3)
         # self.grid_rowconfigure(2, weight=1)
 
@@ -82,13 +82,15 @@ class MouseDatasetsPanel(tk.Toplevel):
                             ]
         self.frame1.frames={}
         for i in range(len(self.frame1.frames_names)):
-              self.frame1.frames[self.frame1.frames_names[i]]=ttk.Frame(self.frame1, borderwidth = 4, relief='groove')
+              # self.frame1.frames[self.frame1.frames_names[i]]=ttk.Frame(self.frame1, borderwidth = 4, relief='groove')
+              self.frame1.frames[self.frame1.frames_names[i]]=ScrollbarFrame(self.frame1, borderwidth = 4, relief='groove')
+
               
         self.frame1.grid_columnconfigure(0, weight=2)
         self.frame1.grid_columnconfigure(1, weight=1)
-        self.frame1.grid_columnconfigure(2, weight=3)
+        self.frame1.grid_columnconfigure(2, weight=2)
         self.frame1.grid_rowconfigure(0, weight=1)
-        self.frame1.grid_rowconfigure(1, weight=1)
+        # self.frame1.grid_rowconfigure(1, weight=1)
 
         
         self.frame1.frames[self.frame1.frames_names[0]].grid(row=0, column=0, sticky="nswe")         
@@ -99,14 +101,15 @@ class MouseDatasetsPanel(tk.Toplevel):
         
 #%%'Imaging Session Info Frame SELECTIONS frame' 
 
-        self.frame1.frame1=self.frame1.frames[self.frame1.frames_names[0]]
+        self.frame1.frame1=self.frame1.frames[self.frame1.frames_names[0]].scrolled_frame
     
         self.frame1.frame1.litbox_names=['Mouse_selection', 
                       'acquisition_selection', 
                       'dataset_selection1',
                        'dataset_selection2',
                        'dataset_selection3',
-                       'dataset_selection4'
+                       'dataset_selection4',
+                       'mock'
                       ]
 
         self.frame1.frame1.listboxes={}
@@ -118,7 +121,7 @@ class MouseDatasetsPanel(tk.Toplevel):
             self.frame1.frame1.listboxes[litbox_name]=Listbox(self.frame1.frame1, listvariable=self.frame1.frame1.listbox_variables[litbox_name], width=10, height=10, exportselection=0)
             self.frame1.frame1.scrollbar [litbox_name]= Scrollbar(self.frame1.frame1) 
             self.frame1.frame1.listboxes[litbox_name].config(yscrollcommand =  self.frame1.frame1.scrollbar [litbox_name].set)
-            self.frame1.frame1.scrollbar [litbox_name].config(command = self.frame1.frame1.listboxes[litbox_name].yview)
+            self.frame1.frame1.scrollbar[litbox_name].config(command = self.frame1.frame1.listboxes[litbox_name].yview)
             
         self.get_mouse_imaged() 
         self.get_all_objects()
@@ -140,13 +143,15 @@ class MouseDatasetsPanel(tk.Toplevel):
             elif i==1:
                 litbox.grid(column=0, row=1)
             elif i==2:
-                litbox.grid(column=1, row=0)
+                litbox.grid(column=2, row=0)
             elif i==3:
-                litbox.grid(column=1, row=1) 
+                litbox.grid(column=2, row=1) 
             elif i==4:
-                litbox.grid(column=1, row=2)
+                litbox.grid(column=2, row=2)
             elif i==5:
-                litbox.grid(column=1, row=3)  
+                litbox.grid(column=2, row=3)
+            elif i==6:
+                litbox.grid(column=0, row=4) 
                 
                 
         for i, scrolbar in    enumerate(self.frame1.frame1.scrollbar.values()):
@@ -159,9 +164,11 @@ class MouseDatasetsPanel(tk.Toplevel):
             elif i==3:
                 scrolbar.grid(column=3, row=1) 
             elif i==4:
-                scrolbar.grid(column=5, row=0)
+                scrolbar.grid(column=3, row=2)
             elif i==5:
-                scrolbar.grid(column=5, row=1)  
+                scrolbar.grid(column=3, row=3)  
+            elif i==6:
+                scrolbar.grid(column=0, row=4) 
 
 
         # self.frame1.frame1.buttons={}
@@ -183,7 +190,7 @@ class MouseDatasetsPanel(tk.Toplevel):
 
 #%%'Imaging Session Info Frame METADATA frame' 
  
-        self.frame1.frame2=self.frame1.frames[self.frame1.frames_names[1]]
+        self.frame1.frame2=self.frame1.frames[self.frame1.frames_names[1]].scrolled_frame
      
   
         self.frame1.frame2.labels={}
@@ -230,7 +237,7 @@ class MouseDatasetsPanel(tk.Toplevel):
             self.frame1.frame2.labels_values[label].grid(column=1, row=i) 
 
 #%%'Imaging Session Info Frame WIDEFIELD frame' 
-        self.frame1.frame3=self.frame1.frames[self.frame1.frames_names[2]]
+        self.frame1.frame3=self.frame1.frames[self.frame1.frames_names[2]].scrolled_frame
         
         self.frame1.frame3.fig = Figure(figsize=(4, 4), dpi=100)
         self.frame1.frame3.ax=self.frame1.frame3.fig.add_axes([0.1,0.1,0.8,0.8])
@@ -535,14 +542,14 @@ class MouseDatasetsPanel(tk.Toplevel):
  
     def get_mouse_imaged(self):     
         
-        self.mice=list(self.datamanaging.all_imaged_mice_objects.keys())
+        self.mice=sorted(list(self.datamanaging.all_imaged_mice_objects.keys()))
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[0]].set(self.mice)
  
     def get_all_mouse_acquisitions(self):
 
         acquisitions=list(self.mice_objects[self.mouse_code]['Acquisitions'].keys())
         self.frame1.frame1.listbox_variables[self.frame1.frame1.litbox_names[1]].set(acquisitions)   
-        self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].config(width=0,height=0)
+        self.frame1.frame1.listboxes[self.frame1.frame1.litbox_names[1]].config(width=0,height=10)
         
     def get_acquisition_datasets(self):   
         selected_acq_datasets= list(self.mice_objects[self.mouse_code]['Acquisitions'][self.selected_acquisition]['Datasets'].keys())

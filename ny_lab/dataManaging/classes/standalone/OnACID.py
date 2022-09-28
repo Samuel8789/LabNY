@@ -50,6 +50,7 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     start_t=time.time()
     fnamestemp=parameter_dict['fnames']
     opts = cnmf.params.CNMFParams(params_dict=parameter_dict)
+    opts.set('temporal', {'fudge_factor':0.99})
 
     # %% fit online
     #stadard cnmf

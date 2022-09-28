@@ -101,10 +101,10 @@ class plan_window_parameters(tk.Toplevel):
                     self.b[i][j].current(2)
                 elif j==6:    
                     self.b[i].append(ttk.Combobox( self, values=self.good_covertype, width=20) ) # b[i][j]
-                    self.b[i][j].current(1)
+                    self.b[i][j].current(3)
                 elif j==7:    
                     self.b[i].append(ttk.Combobox( self, values=self.good_coversize, width=15) ) # b[i][j]
-                    self.b[i][j].current(2)
+                    self.b[i][j].current(5)
                 else:
                     self.b[i].append(Entry(self, text="", width=5)) # b[i][j]     
                 

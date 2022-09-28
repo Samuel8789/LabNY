@@ -97,6 +97,53 @@ class DataProcessingTab(tk.Frame):
         
 
         #%% procesing database sessions, add the mouse explore here also
+        
+        self.frame2= self.frames[self.frames_names[1]]  
+        self.frame2.title=ttk.Label(self.frame1, text=self.frames_names[0], width=40)
+        self.frame2.title.grid(column=0, row=0)       
+
+        
+        self.frame2.buttons={}
+        self.frame2.buttons_names=['Proces Permanent Folders',
+                                   'Open Mouse Session Viewer',
+                                   'Open dataset explorer'
+                                     ]
+        
+        self.frame2.buttons_commands=[self.clean_up_raw_imaging_folders_button,
+                                      self.open_image_session_viewer_button,
+                                      self.open_dataset_explorer_button
+                                       ]
+        
+        for i in range(len( self.frame2.buttons_names)):
+              self.frame2.buttons[ self.frame2.buttons_names[i]]= ttk.Button( self.frame2 , text= self.frame2.buttons_names[i], command= self.frame2.buttons_commands[i])
+
+
+        # self.frame2.entries={}
+        # self.frame2.entries_names=['Session Path']
+        # for i in range(len( self.frame2.entries_names)):
+        #     self.frame2.entries[ self.frame2.entries_names[i]]=ttk.Entry( self.frame2 , text='', width=45)
+
+        self.frame2.labels={}
+        self.frame2.labels_names=['Unprocessed Sessions']
+        for i in range(len( self.frame2.labels_names)):
+            self.frame2.labels[ self.frame2.labels_names[i]]=ttk.Label( self.frame2, text= self.frame2.labels_names[i], width=30)
+
+
+        self.frame2.labels[ self.frame2.labels_names[0]].grid(column=0, row=1)       
+        self.frame2.buttons[ self.frame2.buttons_names[0]].grid(column=0, row=3)
+        self.frame2.buttons[ self.frame2.buttons_names[1]].grid(column=0, row=4)
+        self.frame2.buttons[ self.frame2.buttons_names[2]].grid(column=0, row=5)
+
+    
+
+        self.database_session_to_process=tk.StringVar()
+        values=[]
+        self.prairie_database_session_combobox=ttk.Combobox( self.frame2, values=values, textvariable=self.database_session_to_process, width=60, postcommand = self.update_datamanaging_database)   
+        # self.prairie_database_session_combobox=ttk.Combobox( self.frame2, values=list(self.gui_ref.datamanaging.all_new_unprocessed_session.keys()), textvariable=self.database_session_to_process, width=60)   
+
+        self.prairie_database_session_combobox.grid(column=0, row=2)
+        
+        
 
 
 
@@ -104,7 +151,11 @@ class DataProcessingTab(tk.Frame):
     def reprocess_database_session(self):
         pass
 
-
+    def update_datamanaging_database(self):
+        if self.gui_ref.datamanaging:
+            self.prairie_database_session_combobox['values']=list(self.gui_ref.datamanaging.all_database_session.keys())
+        else:
+            self.prairie_database_session_combobox['values']=[]
 
     def update_datamanaging(self):
         if self.gui_ref.datamanaging:
