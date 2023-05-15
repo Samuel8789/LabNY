@@ -37,7 +37,7 @@ class DataManaging():
         self.Database_ref=self.LabProjectObject.database
         # self.update_all_imaging_data_paths()
         if full:
-            self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects']
+            self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects', 'Imaging']
             self.data_paths_data={name:os.path.join(self.LabProjectObject.data_paths_project[name], self.data_paths[i])  for i , name in enumerate(self.LabProjectObject.data_paths_names)}     
     
             
@@ -352,6 +352,9 @@ class DataManaging():
  #%% reading sessions                                      
     def read_all_imaging_sessions_from_directories(self):
         self.all_existing_sessions={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
+        self.all_existing_sessions2={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw2']+'\\**\\**', recursive=False)}
+        self.all_existing_sessions.update(self.all_existing_sessions2)
+ 
  
     def read_all_imaging_sessions_from_database(self): 
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
@@ -592,6 +595,7 @@ class DataManaging():
         
 
     def update_all_imaging_data_paths(self) :
+        print('Correcting database paths for projects')
         query_all_codes="""
                 SELECT a.Code,a.ID, a.SlowStoragePath, a.WorkingStoragePath
                 FROM ExperimentalAnimals_table a   
@@ -601,8 +605,10 @@ class DataManaging():
         all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
         
         for mouse in all_mouse_info:
-            # if mouse[0]=='SPIH':
-                # module_logger.info("updating mouse paths" + mouse[0])
+
+            if mouse[0]=='SPQZ':
+                print("updating mouse paths" + mouse[0])
+                print(mouse[0])
                 mouse_expid=mouse[1]
                 mouse_SlowStoragePath=mouse[2]
                 mouse_WorkingStoragePath=mouse[3]
@@ -824,15 +830,27 @@ class DataManaging():
                  if len(dat.most_updated_caiman.all_caiman_full_paths)>1:
                     self.all_deep_caiman_objects[name]=dat.most_updated_caiman
 
-    def do_deep_caiman_of_mice_datasets(self, mice_codes:list):
+    def do_deep_caiman_of_mice_datasets(self, mice_codes:list, fovonly=False, nonfov=False):
         for mouse_code in mice_codes:
-              mouse_object=self.all_experimetal_mice_objects[mouse_code]
-              mouse_object.get_all_mouse_FOVdata_datasets()       
-              mouse_object.all_mouse_acquisitions_datasets
-              greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key}   
-              tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if (dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 or dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1)}
-              for dataset in tododeepgreensatasets.values():
-                  dataset.do_deep_caiman()
+            mouse_object=self.all_experimetal_mice_objects[mouse_code]
+            mouse_object.get_all_mouse_FOVdata_datasets()       
+            mouse_object.all_mouse_acquisitions_datasets
+            greendataset={key:v for key,v in mouse_object.all_mouse_FOVdata_datasets.items() if 'Green' in key}   
+            greennonfovdatasets={key:v for key,v in mouse_object.all_mouse_acquisitions_datasets.items() if 'Green' in key}   
+            
+            
+            tododeepgreensatasets={key:dataset for key,dataset in greendataset.items() if (dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 or dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1)}
+            todononfovdeepgreensatasets={key:dataset for key,dataset in greennonfovdatasets.items() if (dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['ToDoDeepCaiman']==1 or dataset.associated_aquisiton.metadata_object.imaging_metadata_database[0]['Is10MinRec']==1)}
+            
+            if fovonly:
+                for dataset in tododeepgreensatasets.values():
+                    if dataset.metadata.imaging_metadata_database[0]['ToDoDeepCaiman']:
+                     dataset.do_deep_caiman()
+            elif nonfov:
+                for dataset in todononfovdeepgreensatasets.values():
+                    if dataset.metadata.imaging_metadata_database[0]['ToDoDeepCaiman']:
+                     dataset.do_deep_caiman()
+                         
         self.get_all_deep_caiman_objects()
         
 #%% cloud transfers        

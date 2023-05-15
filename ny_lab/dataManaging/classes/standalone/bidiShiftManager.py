@@ -20,7 +20,7 @@ import scipy.stats as st
 
 import logging 
 from ScanImageTiffReader import ScanImageTiffReader
-
+import matplotlib
 
 # from bidicorrect_image import shiftBiDi, biDiPhaseOffsets
 try:
@@ -55,7 +55,10 @@ class BidiShiftManager:
         self.bidiphases=[]
         self.expanded_dataset_name=expanded_dataset_name
         self.dataset_object=dataset_object
-        self.led_start_end_file=os.path.join(os.path.split(self.temporary_path)[0],'LED_Start_End.txt')
+        self.led_start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'LED_Start_End.txt')
+        self.led_corrected_frame_start=None
+        self.led_corrected_frame_end=None
+        self.led_start_end_flag=None
         
         
         
@@ -130,12 +133,12 @@ class BidiShiftManager:
                     
                     self.load_dataset_from_image_sequence()
                    
-                    
-                    self.detect_LED_synchs()
-                    self.load_LED_tips()
-                    self.border_clip_image_sequence()
-
-
+                    if self.dataset_object.associated_aquisiton.all_vis_stim_mat_files:
+                        self.load_LED_tips()
+                        self.manually_detect_led_synchs()
+                        self.load_LED_tips()
+                        self.border_clip_image_sequence()
+            
         
                     self.correct_bidi_movie() 
               
@@ -166,7 +169,7 @@ class BidiShiftManager:
                 if self.bidiphase_file_path:
                     self.load_bidiphases_from_file()
                 self.load_dataset_from_image_sequence()
-                self.border_clip_image_sequence()
+                # self.border_clip_image_sequence()
                
                 self.correct_bidi_movie()
             else:
@@ -190,6 +193,8 @@ class BidiShiftManager:
             self.save_shifts()
             # self.plot_bidiphases()
             self.save_shifted_movie()
+            self.unload_shifted_movie()
+            self.unload_bidishifts()
         
 #%% check what ther is in the directory        
     def read_custom_start_end(self):
@@ -216,6 +221,7 @@ class BidiShiftManager:
         
 
     def detect_LED_synchs(self):
+        
             
         m_mean = self.image_sequence.mean(axis=(1, 2))
         scored=st.zscore(m_mean)
@@ -249,6 +255,153 @@ class BidiShiftManager:
         if not os.path.isfile(self.led_start_end_file):
             with open(self.led_start_end_file, 'w') as f:
                 f.writelines((str( led_frame_start_end+pad1),'\n', str( led_frame_end_start-pad2)))
+                
+    def manually_detect_led_synchs(self):
+        
+        if (not self.led_corrected_frame_start)  and (not self.led_corrected_frame_end):
+
+            m_mean = self.image_sequence.mean(axis=(1, 2))
+            scored=st.zscore(m_mean)
+            dif=np.diff(scored)
+            median=sg.medfilt(dif, kernel_size=1)
+            rounded=np.round(median,decimals=2)
+    
+            
+            f,axs=plt.subplots(2)
+            axs[0].plot(m_mean,'k')
+            axs[1].plot(scored,'r')
+            axs[1].plot(median,'b')
+            axs[1].plot(abs(rounded),'k')
+            # mngr = plt.get_current_fig_manager()
+            # mngr.window.setGeometry(50,100,2000, 1000)
+            plt.show(block = False)
+            plt.pause(0.01)
+            
+    
+            
+            raw_fluorescence_threshold = int(input('Integer raw florescence threshold\n'))
+            scored_threshold = int(input('Integer scored threshold\n'))
+            # transition_up_threshold = int(input('Integer transitions threshold\n'))
+            plt.close(f)
+            
+            no_led_start = int(input('Type 1 if no LED start signal\n'))
+            no_led_end = int(input('Type 1 if no LED end signal\n'))
+            led_on_frames=np.where(m_mean>raw_fluorescence_threshold)[0]
+            movie_midpoint=int(np.floor(len(m_mean)/2))
+    
+    
+            if (not no_led_start) or (not no_led_end):
+                if not no_led_start:
+                    
+                    
+                    led_on_frames_start=led_on_frames[led_on_frames<movie_midpoint]
+                    led_on_frames_start_first=led_on_frames_start[0]
+                    led_on_frames_start_last=led_on_frames_start[-1]
+                    pad_frames=5
+                    
+                    prepad=np.arange(led_on_frames_start_first-pad_frames,led_on_frames_start_first)
+                    postpad=np.arange(led_on_frames_start_last+1,led_on_frames_start_last+pad_frames+1)
+                    
+                    
+                    extended_LED_frames = np.concatenate((led_on_frames_start,prepad,postpad))
+                    extended_LED_frames.sort(kind='mergesort')
+                    
+                    
+                    f,axs=plt.subplots(1)
+                    axs.plot(extended_LED_frames,m_mean[extended_LED_frames],'k')
+                    axs.plot(prepad,m_mean[prepad],'r')
+                    axs.plot(postpad,m_mean[postpad],'y')
+                    axs.plot(led_on_frames_start_first,m_mean[led_on_frames_start_first],'mo')
+                    axs.plot(led_on_frames_start_last,m_mean[led_on_frames_start_last],'mo')
+                    axs.set_xticks(extended_LED_frames)
+                    axs.tick_params(direction='in' ,length=2,width=2)
+
+                    axs.set_xticklabels(axs.get_xticks(), rotation = 90)
+                    # mngr = plt.get_current_fig_manager()
+                    # mngr.window.setGeometry(50,100,2000, 1000)
+                    plt.show(block = False)
+                    plt.pause(0.01)
+                    
+                    new_start_LED_start=int(input('Integer correct led start start\n'))
+                    new_start_LED_end=int(input('Integer correct led start end\n'))
+                    
+                    peri_led_pad=5
+                    plt.close(f)
+                    
+                    
+                    movie_start_frame=new_start_LED_end+peri_led_pad
+                    
+                if not no_led_end:
+                    led_on_frames_end=led_on_frames[led_on_frames>movie_midpoint]
+                    
+                    
+                    led_on_frames_end_first=led_on_frames_end[0]
+                    led_on_frames_end_last=led_on_frames_end[-1]
+                    pad_frames=5
+                    
+                    prepad=np.arange(led_on_frames_end_first-pad_frames,led_on_frames_end_first)
+                    postpad=np.arange(led_on_frames_end_last+1,led_on_frames_end_last+pad_frames+1)
+                    
+                    
+                    extended_LED_frames = np.concatenate((led_on_frames_end,prepad,postpad))
+                    extended_LED_frames.sort(kind='mergesort')
+                    
+                    
+                    f,axs=plt.subplots(1)
+                    axs.plot(extended_LED_frames,m_mean[extended_LED_frames],'k')
+                    axs.plot(prepad,m_mean[prepad],'r')
+                    axs.plot(postpad,m_mean[postpad],'y')
+                    axs.plot(led_on_frames_end_first,m_mean[led_on_frames_end_first],'mo')
+                    axs.plot(led_on_frames_end_last,m_mean[led_on_frames_end_last],'mo')
+                    axs.set_xticks(extended_LED_frames)
+                    axs.tick_params(direction='in' ,length=2,width=2)
+                    axs.set_xticklabels(axs.get_xticks(), rotation = 90)
+
+                    
+                    # mngr = plt.get_current_fig_manager()
+                    # mngr.window.setGeometry(50,100,2000, 1000)
+                    plt.show(block = False)
+                    plt.pause(0.01)
+                    
+                    
+                    
+                    new_finish_LED_start=int(input('Integer correct led end start\n'))
+                    new_finish_LED_end=int(input('Integer correct led end end\n'))
+                    plt.close(f)
+                    peri_led_pad=5
+                    
+                    movie_end_frame=new_finish_LED_start-peri_led_pad
+                    
+                   
+            
+            
+            if no_led_start:
+                movie_start_frame=0
+            if no_led_end:
+                movie_end_frame=len(m_mean)
+                
+            movie_range=np.arange(movie_start_frame,movie_end_frame)
+            f,axs=plt.subplots(1)
+            axs.plot(m_mean,'k')
+            axs.plot(movie_range,m_mean[movie_range],'r')
+            axs.set_xticklabels(axs.get_xticks(), rotation = 45)
+            # mngr = plt.get_current_fig_manager()
+            # mngr.window.setGeometry(50,100,2000, 1000)
+            plt.show(block = False)
+            plt.pause(0.01)
+            
+            
+            
+            if not os.path.isfile(self.led_start_end_file):
+                with open(self.led_start_end_file, 'w') as f:
+                    f.writelines((str( movie_start_frame),'\n', str(movie_end_frame)))
+            plt.close('all')
+            self.led_corrected_frame_start= movie_start_frame
+            self.led_corrected_frame_end=movie_end_frame
+            
+        else:
+            pass                    
+                
         
 
     def check_bidiphases_in_directory(self):
@@ -348,22 +501,43 @@ class BidiShiftManager:
               self.bidiphases = pickle.load(fp)
 
     def load_dataset_from_image_sequence(self):
-        image_sequence_files=os.listdir(self.dataset_image_sequence_path)
-        image_sequence_paths= [os.path.join(self.dataset_image_sequence_path, image) for image in image_sequence_files if os.path.getsize(os.path.join(self.dataset_image_sequence_path, image))!=0 ]
+
+        
+        image_sequence_paths=glob.glob(self.dataset_image_sequence_path+'\**.tif')
         
         module_logger.info('loading files')
         try:
-            self.image_sequence=cm.load(image_sequence_paths)
-            module_logger.info('Caimn fila sequence properly loaded')
-
-        except:
-            self.image_sequence=cm.load(image_sequence_paths[0])[:,0,:,:]
-            module_logger.info('all files in single file')
+            self.image_sequence=cm.load(image_sequence_paths[0])
+            module_logger.info('Caiman loaded for first metadta file, sometimes it is the only that works for red or when all file ar in same direcotyr')
             
+            if 'Ch1Red' in image_sequence_paths[0]:
+                self.image_sequence= self.image_sequence[:,0,:,:]
+            else:
+                
+    
+                if len(image_sequence_paths)!= len(self.image_sequence)  or self.image_sequence.shape[1]==2:      
+                    module_logger.info('No full sequence from first file')
+                    try:
+                        self.image_sequence=cm.load(image_sequence_paths)
+                        module_logger.info('Caiman load sequence properly loaded')
+    
+                  
+                    except:
+                        try:
+                            self.image_sequence=cm.load(image_sequence_paths[0])[:,0,:,:]
+                            module_logger.info('all files in single file')
+                        except:
+                            module_logger.exception('Check caiman loading, something wrong')
+        except:                    
+            module_logger.exception('No video loaded')
+
+
+
+     
     def border_clip_image_sequence(self):
         
         if not self.start_end_flag:
-            self.frame_end= len(self.image_sequence)+1    
+            self.frame_end= len(self.image_sequence)    
         if len(self.image_sequence)>1:
             self.image_sequence= self.image_sequence[self.frame_start:self.frame_end,:,:]
         else:
@@ -489,7 +663,7 @@ if __name__ == "__main__":
     temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
     
     
-    dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220701\Mice\SPLB\TestAcquisitions\Aq_1\220701_SPLB_Test_25x_920_51020_60745_with-000\Ch2Green\plane1'
+    dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2023\20230307\Mice\SPRA\FOV_2\Aq_2\230307_SPRA_FOV2_19CellOptoScreen_dial1_25x_920_51020_63075-001\Ch1Red\plane1'
 
 
     bidihits = BidiShiftManager(dataset_image_sequence_path=dataset_image_sequence_path, temporary_path=temporary_path )
@@ -497,7 +671,7 @@ if __name__ == "__main__":
     # dataset_full_file_mmap_path=os.path.join(temporary_path,'210930_SPKI_2mintestvideo_920_50024_narrow_without-000_shifted_movie_d1_256_d2_256_d3_1_order_F_frames_3391_.mmap')
     # bidihits = BidiShiftManager(dataset_full_file_mmap_path=dataset_full_file_mmap_path )
 
-
+    bidihits.image_sequence.zproject()
 
 
     

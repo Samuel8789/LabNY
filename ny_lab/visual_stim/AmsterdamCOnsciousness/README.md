@@ -1,0 +1,2 @@
+# dual-lick-training
+Repository for Matlab scripts used in the dual-lick training setup. In the current state of this project it is only intended for collaboration within the group of users that use the dual-lick detector setup, but you can use the scripts for inspiration and other purposes if you want. Contact Jean Pie, Matthijs oude Lohuis, Reinder Dorman or jeannette Lorteije if you need more information regarding the use of the scripts.

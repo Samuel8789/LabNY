@@ -87,20 +87,65 @@ for key in database_structure.keys():
 #%% standard quering
 params=()
 query_brains="""
-SELECT*
-FROM Windows_table
-WHERE ID=196
+SELECT ID
+FROM VirusCombinations_table
+WHERE Combination="U + V"
 """
 zz=MouseDat.arbitrary_query_to_df(query_brains)
 #%% query updating 219 220 222
 
 query_mice_cage_update="""
-                UPDATE Breedings_table
-                SET Female2=NULL
-                WHERE ID IN (204)
+                UPDATE VisualStimulations_table
+                SET VisualStimulationProtocolID=1
+                WHERE ID=45
             """        
 params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+query_mice_cage_update="""
+                UPDATE VirusCombinations_table
+                SET ID=46
+                WHERE Combination="U + B"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+
+query_mice_cage_update="""
+                UPDATE VirusCombinations_table
+                SET ID=47
+                WHERE Combination="U"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+
+query_mice_cage_update="""
+                UPDATE VirusCombinations_table
+                SET ID=48
+                WHERE Combination="U + I"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+
+query_mice_cage_update="""
+                UPDATE VirusCombinations_table
+                SET ID=49
+                WHERE Combination="U + G"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
+
+query_mice_cage_update="""
+                UPDATE VirusCombinations_table
+                SET ID=50
+                WHERE Combination="U + V + B + P"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+
 
 
 
@@ -115,11 +160,55 @@ params=(13, 371, datetime.datetime.today())
 
 MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
 
+
+
     
 #%% removals
 query_remove="""
-DELETE FROM MICE_table
-WHERE  ID BETWEEN 3576 AND 3585
+DELETE FROM ImagingSessions_table
+WHERE  ID BETWEEN 88 AND 88
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM ImagedMice_table
+WHERE  ID BETWEEN 270 AND 275
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM Acquisitions_table
+WHERE  ID BETWEEN 758 AND 777
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM WideField_table
+WHERE  ID BETWEEN 266 AND 271
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM VisualStimulations_table
+WHERE  ID BETWEEN 78 AND 79
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM FaceCamera_table
+WHERE  ID BETWEEN 129 AND 130
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+query_remove="""
+DELETE FROM Imaging_table
+WHERE  ID BETWEEN 754 AND 773
 
 """
 params=()

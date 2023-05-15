@@ -11,6 +11,7 @@ import glob
 import gc
 import sys
 import shutil
+import caiman as cm
 
 # from OnACID import run_on_acid
 # from metadata import Metadata
@@ -48,7 +49,7 @@ class CaimanExtraction():
         module_logger.info('Instantiating ' +__name__)
         self.temp_path=r'C:\Users\sp3660\Desktop\CaimanTemp'
         self.galoistempdir='/home/sp3660/Desktop/caiman_temp'
-        
+        self.cnm_object=None
         self.dataset_object=dataset_object
         self.deep=deep
         self.metadata_object=metadata_object
@@ -101,20 +102,29 @@ class CaimanExtraction():
             
             
     def temp_file_to_fast_disk(self):
-        self.original_path= self.dataset_caiman_parameters['fnames']
-        shutil.copyfile(self.dataset_caiman_parameters['fnames'],os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1]))
-        self.dataset_caiman_parameters['fnames']=os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1])
-        
+        if not self.movie_slice.any():
+            self.original_path= self.dataset_caiman_parameters['fnames']
+            shutil.copyfile(self.dataset_caiman_parameters['fnames'],os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1]))
+            self.dataset_caiman_parameters['fnames']=os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1])
+        else:
+            mov=cm.load(self.dataset_caiman_parameters['fnames'])
+            self.original_path= self.dataset_caiman_parameters['fnames']
+            mov=mov[self.movie_slice,:,:]
+            mov.save(os.path.join(self.temp_path,self.good_filename+'.mmap'))
+            self.dataset_caiman_parameters['fnames']=glob.glob(os.path.join(self.temp_path,self.good_filename)+'**.mmap')[0]
+            
         
     def copy_fast_results_remove_all(self):
         
-        caiman_file=glob.glob(self.temp_path+'\**.hdf5')[0]
-        motcorrectfile=glob.glob(self.temp_path+'\**MC_OnACID**.mmap')[0]
-        shiftsfile=glob.glob(self.temp_path+'\**shifts**.pkl')[0]
-
-        shutil.copyfile(caiman_file,os.path.join(os.path.split(self.original_path)[0],os.path.split(caiman_file)[1]))
-        shutil.copyfile(motcorrectfile,os.path.join(os.path.split(self.original_path)[0],os.path.split(motcorrectfile)[1]))
-        shutil.copyfile(shiftsfile,os.path.join(os.path.split(self.original_path)[0],os.path.split(shiftsfile)[1]))
+        caiman_file=glob.glob(self.temp_path+'\**.hdf5')
+        motcorrectfile=glob.glob(self.temp_path+'\**MC_OnACID**.mmap')
+        shiftsfile=glob.glob(self.temp_path+'\**shifts**.pkl')
+        if caiman_file:
+            shutil.copyfile(caiman_file[0],os.path.join(os.path.split(self.original_path)[0],os.path.split(caiman_file[0])[1]))
+        if motcorrectfile:
+            shutil.copyfile(motcorrectfile[0],os.path.join(os.path.split(self.original_path)[0],os.path.split(motcorrectfile[0])[1]))
+        if shiftsfile:
+            shutil.copyfile(shiftsfile[0],os.path.join(os.path.split(self.original_path)[0],os.path.split(shiftsfile[0])[1]))
 
 
         
@@ -147,7 +157,9 @@ class CaimanExtraction():
             self.metadata=  self.dataset_object.metadata
         try:    
             module_logger.info('checking metadata for caiman ' + self.bidishifted_movie_path )
-
+            self.objective='Defaul Fat25x'
+            self.halfsize=5  
+            self.volume_period =10
             if self.metadata.imaging_metadata:
                 datasetmeta=self.metadata.imaging_metadata
                          
@@ -168,6 +180,7 @@ class CaimanExtraction():
                 self.objective=self.metadata.translated_imaging_metadata['Objective']
                 self.volume_period=self.metadata.translated_imaging_metadata['FinalVolumePeriod']
                 
+                
             if self.objective=='MBL Olympus 20x':
                 self.halfsize=4
             elif '25' in self.objective:
@@ -182,17 +195,23 @@ class CaimanExtraction():
     def change_set_parameters(self,**kwargs):
         
         for param,value in kwargs.items():
-            self.dataset_caiman_parameters[param]=value
+            if param=='movie_slice':
+                self.movie_slice=value
+            else:
+                self.dataset_caiman_parameters[param]=value
+
        
                 
                 
     def set_caiman_parameters(self):
+        
+        self.movie_slice=np.empty(0)
   
         fr = 1/self.volume_period  # frame rate (Hz) 3pl + 4ms = 15.5455
-        decay_time = 0.5# 2 for s 0.5 for f # approximate length of transient event in seconds
+        decay_time = 0.2# 2 for s 0.5 for f # approximate length of transient event in seconds
         gSig = (self.halfsize,self.halfsize)  # expected half size of neurons
         p = 2  # order of AR indicator dynamics
-        min_SNR = 1.5   # minimum SNR for accepting new components
+        min_SNR = 1   # minimum SNR for accepting new components
         ds_factor = 1  # spatial downsampling factor (increases speed but may lose some fine structure)
         gnb = 2  # number of background components
         gSig = tuple(np.ceil(np.array(gSig) / ds_factor).astype('int')) # recompute gSig if downsampling is involved
@@ -203,8 +222,8 @@ class CaimanExtraction():
         rval_thr = 0.8  # soace correlation threshold for candidate components
         # set up some additional supporting parameters needed for the algorithm
         # (these are default values but can change depending on dataset properties)
-        init_batch = 100 # number of frames for initialization (presumably from the first file)
-        K = 2  # initial number of components
+        init_batch = 500 # number of frames for initialization (presumably from the first file)
+        K = 1  # initial number of components
         epochs = 3 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8
@@ -283,6 +302,7 @@ class CaimanExtraction():
                 self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
                 self.copy_fast_results_remove_all()
                 self.check_motion_corrected_on_acid()
+                self.check_caiman_files()
 
             except:
                     module_logger.exception('Something wrong with On Acid processing' + self.bidishifted_movie_path )
@@ -480,8 +500,8 @@ if __name__ == "__main__":
     # metadata_file_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000.xml')
     # dataset_full_file_mmap_path=os.path.join(temporary_path,'211007_SPIK_FOV2_AllenA_20x_920_50024_narrow_without-000_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_62499_.mmap')
     
-    filename=r'211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
-    temporary_path='\\\\?\\'+r'C:\Users\sp3660\Desktop\TemporaryProcessing\StandAloneDataset\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000\Plane3'
+    filename=r'220525_SPKU_FOV1_AllenB_940_25x_hakim_00001'
+    temporary_path='\\\\?\\'+r'G:\Projects\TempProcessing\220525_SPKU_FOV1_AllenB_940_25x_hakim_00001'
     metadata_file_path=os.path.join(temporary_path,filename+'.xml')
     dataset_full_file_mmap_path=os.path.join(temporary_path, filename+'_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_64416_.mmap')
     

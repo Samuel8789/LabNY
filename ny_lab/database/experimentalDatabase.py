@@ -501,6 +501,12 @@ class ExperimentalDatabase():
         
         return this_mouse_code, this_mouse_nextletter_code, mouse_ID
     
+    def update_opto_project(self):
+        
+        # to extract from other method
+        pass
+        
+    
     def move_cage_to_experimental_room(self, cage, raw_date_performed, commit=False):
         
         date_performed=datetime.datetime.strptime(raw_date_performed, '%Y%m%d').date()
@@ -551,14 +557,14 @@ class ExperimentalDatabase():
         query_mouse_info='SELECT ID, Lab_number, Line, Label, Room FROM MICE_table   WHERE ID IN (%s)' % ','.join('?' for i in params)  
         
         mouse_info = self.databse_ref.arbitrary_query_to_df(query_mouse_info, params).values.tolist()[0]
-   
+        #thisupdates project based on otpo injected
         if mouse_info[2] in [5,12,13]:
-             if any(x in res for x in ['B', 'C1V1', 'I']):
+             if any(x in res for x in ['B', 'C1V1', 'I','D','K','L','M','T']):
                   mouse_info.append(5)  
              else:
                   mouse_info.append(4)
         elif mouse_info[2] in [18,19,20,21,22,23]:
-            if any(x in res for x in ['B', 'C1V1', 'I']):
+            if any(x in res for x in ['B', 'C1V1', 'I','D','K','L','M','T']):
                   mouse_info.append(3)
             else:
                   mouse_info.append(2)

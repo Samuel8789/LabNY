@@ -367,7 +367,7 @@ class JesusEnsemblesResults():
         with open( self.analysis_path, 'rb') as file:
             self.results_from_file= pickle.load(file)
             
-        self.analysis=self.results_from_file[4] 
+        self.analysis=self.results_from_file[-1] 
         self.input_options=self.results_from_file[:-1] 
         
     def export_raster_to_mat(self):
@@ -701,11 +701,10 @@ class JesusEnsemblesResults():
         
         pixel_per_bar = 10
         dpi = 100
-        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(16,9), dpi=dpi)
+        fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
+        # fig = plt.figure(figsize=(16,9), dpi=dpi)
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(self.analysis['Raster'], cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.imshow(self.analysis['Raster'], cmap='binary', aspect='auto',vmax=0.01)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Raw Unsorted {"_".join(self.input_options)}')
@@ -717,8 +716,7 @@ class JesusEnsemblesResults():
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(16,9), dpi=dpi)
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(self.analysis['Filter']['RasterFiltered'], cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.imshow(self.analysis['Filter']['RasterFiltered'], cmap='binary', aspect='auto',vmax=0.01)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Filtered Unsorted {"_".join(self.input_options)}')
@@ -728,8 +726,7 @@ class JesusEnsemblesResults():
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(16,9), dpi=dpi)
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(self.analysis['Filter']['RasterFiltered'], cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.imshow(self.analysis['Filter']['RasterFiltered'], cmap='binary', aspect='auto',vmax=0.01)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Filtered Unsorted Vector Overlay {"_".join(self.input_options)}')
@@ -741,8 +738,7 @@ class JesusEnsemblesResults():
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig = plt.figure(figsize=(16,9), dpi=dpi)
         ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(self.analysis['Filter']['RasterVectors'].T, cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.imshow(self.analysis['Filter']['RasterVectors'].T, cmap='binary', aspect='auto',vmax=0.01)
         ax.set_xlabel('Multi Activity Vectors')
         fig.supylabel('Cell Number')
         fig.suptitle(f'RasterVectors {"_".join(self.input_options)}')
@@ -755,50 +751,45 @@ class JesusEnsemblesResults():
         plt.close('all')
 
         
-        pixel_per_bar = 10
-        dpi = 100
+
         
         neuron_id=self.analysis['Ensembles']['NeuronID']
         raster=self.analysis['Raster']
         vector_id=self.analysis['Ensembles']['VectorID'].astype('uint64')
-
-   
         neuronsorted=raster[neuron_id,:][::-1]
         vectorsorted=raster[:,vector_id]
         neurvectorsorted=neuronsorted[:,vector_id]
 
-            
+        pixel_per_bar = 10
+        dpi = 100
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(16,9), dpi=dpi)
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        ax.imshow(neurvectorsorted, cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        fig,ax=plt.subplots(figsize=(6+(200*pixel_per_bar/dpi), 10),dpi=dpi)
+        # ax.imshow(neurvectorsorted, cmap='binary', aspect='auto',
+        #     interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        ax.imshow(neurvectorsorted, cmap='binary', aspect='auto',vmax=0.05)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Neuron Vectors Sorted {"_".join(self.input_options)}')
-        
+        fig.set_tight_layout(True)
+
      
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(16,9), dpi=dpi)
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        # ax.set_axis_off()
-        ax.imshow(neuronsorted, cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        fig,ax=plt.subplots(figsize=(6+(200*pixel_per_bar/dpi), 10),dpi=dpi)
+        ax.imshow(neuronsorted, cmap='binary', aspect='auto',vmax=0.05)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Neuron Sorted {"_".join(self.input_options)}')
+        fig.set_tight_layout(True)
 
         
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(16,9), dpi=dpi)
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        # ax.set_axis_off()
-        ax.imshow(vectorsorted, cmap='binary', aspect='auto',
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        fig,ax=plt.subplots(figsize=(6+(200*pixel_per_bar/dpi), 10),dpi=dpi)
+        ax.imshow(vectorsorted, cmap='binary', aspect='auto',vmax=0.05)
         ax.set_xlabel('Frames')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Vectors Sorted {"_".join(self.input_options)}')
-        
+        fig.set_tight_layout(True)
+
         
         filename = os.path.join(os.path.split(self.analysis_path)[0],f'{"_".join(self.input_options)}_{self.timestr}_sorted_rasters.pdf')
         self.save_multi_image(filename)
@@ -816,32 +807,27 @@ class JesusEnsemblesResults():
         dpi = 100
         
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(10,10))
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        im=ax.imshow(network, cmap='viridis', aspect='auto', vmax=np.max(network),
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        fig,ax=plt.subplots(figsize=(16,9))
+        # im=ax.imshow(network, cmap='viridis', aspect='auto', vmax=np.max(network),
+        #     interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        im=ax.imshow(network, cmap='viridis', aspect='auto', vmax=np.max(network))
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
-        
         ax.set_xlabel('Cell Number')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Significant Network {"_".join(self.input_options)}')
+        fig.set_tight_layout(True)
+
         
-        # fig, ax=plt.subplots(1)
-        # ax.imshow(network, aspect='auto')
-        
-        # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
-        fig = plt.figure(figsize=(10,10))
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+
+        fig,ax=plt.subplots(figsize=(16,9))
         im=ax.imshow(adjacency,  cmap='viridis', aspect='auto',vmax=np.max(adjacency),
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
-
         ax.set_xlabel('Cell Number')
         fig.supylabel('Cell Number')
         fig.suptitle(f'Adjacency Network {"_".join(self.input_options)}')
-        
-        # fig, ax=plt.subplots(1)
-        # ax.imshow(network, aspect='auto')
+        fig.set_tight_layout(True)
+
         
         filename = os.path.join(os.path.split(self.analysis_path)[0],f'{"_".join(self.input_options)}_{self.timestr}_adjacencies.pdf')
         self.save_multi_image(filename)
@@ -851,37 +837,41 @@ class JesusEnsemblesResults():
         plt.close('all')
 
         similarity=self.analysis['Clustering']['Similarity']
-        fig = plt.figure(figsize=(16,9))
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
-        im=ax.imshow(similarity,cmap='viridis', aspect='auto',vmax=np.max(similarity),
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
-        
-        fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
-
-        ax.set_xlabel('Ensemble Vector')
-        fig.supylabel('Ensemble Vector')
-        fig.suptitle('Vector Similarity')
-        
-        
         N=self.analysis['Filter']['RasterVectors'].shape[0]
         res_ord = seriation(self.analysis['Clustering']['Tree'], N, N+N-2)
-        
         similarity=self.analysis['Clustering']['Similarity']
         t=similarity[res_ord,: ]
         t2=t[:, res_ord]
+
         
-        fig = plt.figure(figsize=(16,9))
-        ax = fig.add_axes([0.05, 0.2, 0.9, 0.7])  # span the whole figure
+        
+        
+        fig,ax=plt.subplots(figsize=(16,9))
+        im=ax.imshow(similarity,cmap='viridis', aspect='auto',vmax=np.max(similarity),
+            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
+        ax.set_xlabel('Ensemble Vector')
+        fig.supylabel('Ensemble Vector')
+        fig.suptitle('Vector Similarity')
+        fig.set_tight_layout(True)
+        
+
+        fig,ax=plt.subplots(figsize=(16,9))
         im=ax.imshow(t2,cmap='viridis', aspect='auto', vmax=np.max(similarity),
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
-
         ax.set_xlabel('Ensemble Vector')
         fig.supylabel('Ensemble Vector')
         fig.suptitle('Sorted Vector Similarity')
-     
+        fig.set_tight_layout(True)
+
+
+
         fig = plt.figure(figsize=(10, 6))
         dn = dendrogram(self.analysis['Clustering']['Tree'])
+        fig.set_tight_layout(True)
+
+        
         
         filename = os.path.join(os.path.split(self.analysis_path)[0],f'{"_".join(self.input_options)}_{self.timestr}_vector_clustering.pdf')
         self.save_multi_image(filename)

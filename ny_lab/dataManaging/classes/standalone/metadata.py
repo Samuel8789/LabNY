@@ -15,6 +15,8 @@ import shutil
 import matplotlib.pyplot as plt
 import logging 
 import json
+from ScanImageTiffReader import ScanImageTiffReader
+
 import copy
 from dateutil import parser
 module_logger = logging.getLogger(__name__)
@@ -65,6 +67,7 @@ class Metadata():
         self.params=[]
 
         self.check_metadata_in_folder()
+        self.check_if_scainmage_tif()
   
 
         if self.aquisition_object:
@@ -74,9 +77,12 @@ class Metadata():
             
             if from_database:
                 self.get_all_metadata_from_database()
-            else:
+            elif   self.read_metadata_path:
                 module_logger.info('readig metdata from json')
                 self.read_json_metadata()
+            else:
+                module_logger.info('readig raw metdata from json')
+
                 
         if self.imaging_metadata_file:     
             if os.path.isfile(self.imaging_metadata_file):
@@ -91,7 +97,7 @@ class Metadata():
             if os.path.isfile(self.photostim_file):        
                     self.process_mark_points_xml()            
                     
-        if not from_database:
+        if not from_database and self.imaging_metadata:
             self.translate_metadata()
         # else:
         #     self.add_metadata_manually()
@@ -106,11 +112,71 @@ class Metadata():
             if self.aquisition_object:
                 self.save_metadata_as_json()  
                 
+                
+            self.get_timestamps()
     
         # if self.video_params:    
         #     self.plotting()    
         module_logger.info('Finished  Metadata')
-        
+    
+    def check_if_scainmage_tif(self):
+        if self.imaging_metadata_file:
+            if 'tif' in self.imaging_metadata_file:
+                
+               meta=ScanImageTiffReader(self.imaging_metadata_file).metadata()
+    
+    
+               parameters=['SI.hBeams.powers',
+                           'SI.hDisplay.displayRollingAverageFactor',
+                           'SI.hRoiManager.linesPerFrame',
+                           'SI.hRoiManager.pixelsPerLine',
+                           'SI.hRoiManager.scanFramePeriod',
+                           'SI.hRoiManager.scanFrameRate',
+                           'SI.hRoiManager.linePeriod',
+                           'SI.hChannels.channelsActive',
+                           'SI.hFastZ.numVolumes',
+                           'SI.hStackManager.framesPerSlice']
+    
+               meta_extract={}
+               for parameter in parameters:
+                   paddedstring=meta[meta.find(parameter +' = ')+len(parameter+' = '):meta.find(parameter+' = ')+len(parameter+' = ')+20]
+                   if 'powers' in parameter:
+                       tempstring=paddedstring[:paddedstring.find('\n')]
+    
+                       meta_extract[parameter]=[float(i) for i in tempstring[1:-1].split(" ")]
+                   elif 'channelsActive' in parameter:
+                       tempstring=paddedstring[:paddedstring.find('\n')]
+                       meta_extract[parameter]=[int(i) for i in tempstring[1:-1].split(";")]
+    
+                           
+                   else:
+                       meta_extract[parameter]=float(paddedstring[:paddedstring.find('\n')])
+                       
+                       
+                       
+    
+    
+               frame_meta_parameters=['frameNumbers' ,
+                                      'acquisitionNumbers', 
+                                      'frameNumberAcquisition', 
+                                      'frameTimestamps_sec', 
+                                      'acqTriggerTimestamps_sec', 
+                                      'nextFileMarkerTimestamps_sec',
+                                       ]
+    
+               timestamps=[]
+               for i in range(0,int(meta_extract['SI.hStackManager.framesPerSlice'])+2,2):
+                   extracted_parameters={}
+                   desc=ScanImageTiffReader(self.imaging_metadata_file).description(i)
+                   for parameter in frame_meta_parameters:
+                       paddedstring=desc[desc.find(parameter +' = ')+len(parameter+' = '):desc.find(parameter+' = ')+len(parameter+' = ')+20]
+                       extracted_parameters[parameter]=float(paddedstring[:paddedstring.find('\n')])
+    
+               timestamps.append([extracted_parameters['frameNumbers'],extracted_parameters['frameTimestamps_sec']])
+    
+                   
+
+    
     def get_timestamps(self):
 
         if os.path.isfile(self.timestamps_path):
@@ -163,469 +229,474 @@ class Metadata():
 
 
     def process_metadata(self):
-
-        if not self.full_metadata:            
-            tree = ET.parse( self.imaging_metadata_file)       
-            root = tree.getroot()
-            self.full_metadata=recursively_read_metadata(root)  
-        if not self.full_metadata:
-            return []
-        else:
-            MicroscopeInfo=self.full_metadata['PVStateShard']
-            seqinfo=self.full_metadata['Sequence']
-
-            self.params={'ImagingTime':parser.parse(self.full_metadata['date']).time().strftime('%H:%M:%S'),
-                    'Date':self.full_metadata['date'],
-                    'AquisitionName':os.path.splitext(os.path.basename(self.imaging_metadata_file))[0]}
-              
-            for element in MicroscopeInfo['Childs'].values():
-                
-                if element['key']=='activeMode':
-                    self.params['ScanMode']= element['value']
-                    
-                if element['key']=='bitDepth':
-                    self.params['BitDepth']=int(element['value'])
-                    
-                if element['key']=='dwellTime':
-                    self.params['dwellTime']=float(element['value'])
-                    
-                if element['key']=='framePeriod':
-                    self.params['framePeriod']=float(element['value'] )
-                    
-                if element['key']=='laserPower':
-                    self.params['ImagingLaserPower']=float(element['IndexedValue']['value'])
-                    
-                if element['key']=='laserPower':
-                    self.params['UncagingLaserPower']=float(element['IndexedValue_1']['value'] )
-                    
-                if element['key']=='linesPerFrame':
-                    self.params['LinesPerFrame']=int(element['value'])
-                    
-                if element['key']=='micronsPerPixel':
-                    self.params['MicronsPerPixelX']=float(element['IndexedValue']['value'])
-                    
-                if element['key']=='micronsPerPixel':
-                    self.params['MicronsPerPixelY']=float(element['IndexedValue_1']['value'])
-                    
-                if element['key']=='objectiveLens':
-                    self.params['Objective']=element['value']
-                    
-                if element['key']=='objectiveLensMag':
-                    self.params['ObjectiveMag']=int(element['value'])
-                    
-                if element['key']=='objectiveLensNA':
-                    self.params['ObjectiveNA']=float(element['value'])
-                    
-                if element['key']=='opticalZoom':
-                    self.params['OpticalZoom']=float(element['value'] )
-                    
-                if element['key']=='pixelsPerLine':
-                    self.params['PixelsPerLine']=int(element['value'])
-                    
-                if element['key']=='pmtGain':
-                    self.params['PMTGainRed']=float(element['IndexedValue']['value'] )
-                    
-                if element['key']=='pmtGain':
-                    self.params['PMTGainGreen']=float(element['IndexedValue_1']['value'])
-                    
-                if element['key']=='positionCurrent':
-                    self.params['PositionX']=float(element['SubindexedValues']['Childs']['SubindexedValue']['value'])
-                    
-                if element['key']=='positionCurrent':
-                    self.params['PositionY']=float(element['SubindexedValues_1']['Childs']['SubindexedValue']['value'])
-                    
-                if element['key']=='positionCurrent':
-                    self.params['PositionZphysical']=float(element['SubindexedValues_2']['Childs']['SubindexedValue']['value'])
-                    
-                if element['key']=='positionCurrent':
-                    self.params['PositionZETL']=float(element['SubindexedValues_2']['Childs']['SubindexedValue_1']['value'])
-                    
-                if element['key']=='rastersPerFrame':
-                    self.params['RasterAveraging']=int(element['value'])
-                    
-                if element['key']=='resonantSamplesPerPixel':
-                    self.params['ResonantSampling']=int(element['value'] )
-                    
-                if element['key']=='scanLinePeriod':
-                    self.params['ScanLinePeriod']=float(element['value'])
-                    
-                if element['key']=='zDevice':
-                    self.params['ZDevice']=int(element['value'] )
-                    
-            self.video_params={'MultiplanePrompt':seqinfo['type'],                                  
-                          'ParameterSet':seqinfo['Childs']["Frame"]['parameterSet'],
-                          'RedChannelName':'No Channel',
-                          'GreenChannelName':'No Channel',           
-                          'FrameNumber':int(len( [x for x in seqinfo['Childs'] if 'Frame' in x])),
-                          'PlaneNumber':'Single',
-                          'PlanePositionsOBJ':self.params['PositionZphysical'],
-                          'PlanePositionsETL':self.params['PositionZETL'],           
-                          'Planepowers':self.params['ImagingLaserPower'], 
-                          'XPositions':self.params['PositionX'],
-                          'YPositions':self.params['PositionY'],
-                          'pmtGains_Red':self.params['PMTGainRed'],
-                          'pmtGains_Green':self.params['PMTGainGreen'],
-                         
-                          }
-
-            # MultiPlane=0
-            SingleChannel=0
- #%% here to create the full frame by frame volume by volume 
-            if len(list(self.full_metadata))>6 and (self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume"):
-                # FirstVolumeMetadat=root[2]
-                FirstVolumeMetadat=  self.full_metadata['Sequence']
-
-                del self.video_params['FrameNumber']
-        
-                # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
-                self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
-
-                # MultiPlane=1
-                self.all_volumes=[]            
-                volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
-                
-                
-                if self.video_params['MultiplanePrompt']=="AtlasVolume":
-                    self.video_params['StageGridYOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridYOverlap']
-                    self.video_params['StageGridXOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridXOverlap']
-                    self.video_params['StageGridOverlapPercentage']=volumes[list(volumes.keys())[0]]['xYStageGridOverlapPercentage']
-                    self.video_params['StageGridNumYPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumYPositions']
-                    self.video_params['StageGridNumXPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumXPositions']
-                
-                for i, volume in enumerate(volumes.values()):
-                    if i==len(volumes.values()):
-                        print('x')
-                    all_planes={}
-                    planes={ key:plane for key, plane in volume['Childs'].items() if 'Frame' in key}
-                    for i, plane in enumerate(planes.values()):
-                         iplane={}
-                         iplane['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
-                         iplane['absoluteTime']=float(plane['absoluteTime'])
-                         iplane['index']=int(plane['index'])
-                         iplane['relativeTime']=float(plane['relativeTime'])
-                         
-                         iplane['LastGoodFrame']=int(plane['ExtraParameters']['lastGoodFrame'])
-                         ExtraMetadata=plane['PVStateShard']
-                         iplane['ImagingSlider']=self.params['ImagingLaserPower']
-                         iplane['UncagingSlider']=self.params['UncagingLaserPower']
-                         iplane['XAxis']='Default_' + str(self.params['PositionX'])
-                         iplane['YAxis']='Default_' + str(self.params['PositionY'])
-                         iplane['ObjectiveZ']='Default_' +str(self.video_params['PlanePositionsOBJ'])
-                         iplane['ETLZ']='Default_' +str(self.video_params['PlanePositionsETL'])
-
-
-                            
-                        # plane['File']['channelName']
-                        # plane['File_1']['channelName']
-
-
-                         for element in ExtraMetadata['Childs'].values():
-                             
-                             if 'framePeriod' in element.values():
-                                 iplane['framePeriod']=float(element['value'])
-                                 
-                             if 'scanLinePeriod' in element.values():
-                                 iplane['scanLinePeriod']=float(element['value'])
-                                 
-                             if 'laserPower' in element.values():
-                                 for element2 in  element.values():
-                                     if isinstance(element2,dict):
-                                         if 'Imaging' in element2.values():
-                                            iplane['ImagingSlider']=float(element2['value'])
-                                         if 'Uncaging' in element2.values():
-                                            iplane['UncagingSlider']=float(element2['value'])
-                                                                   
-                             if 'positionCurrent' in element.values():
-                                 for element2 in  element.values():
-                                     if isinstance(element2,dict):
-                                         if 'XAxis' in element2.values():
-                                             iplane['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                         if 'YAxis' in element2.values():
-                                             iplane['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-    
-                                         if 'ZAxis' in element2.values():
-                                             iplane['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                             iplane['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
-                                         
-                             if 'pmtGain' in element.values():
-                                 for element2 in element.values():
-                                     if isinstance(element2, dict):
-                                         iplane['pmtGain_'+element2['description']]=float(element2['value'])
-        
-                         all_planes[i]=iplane
-                    # this is because sometime sthe first xy positions were workng     
-                    
-                    if i!=len(volumes.values()):
-                        if len(all_planes.keys())>1:
-                            all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
-                            all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
-                    self.all_volumes.append(all_planes)  
-
-                    # this is because i had metadata with 1 extra volume with 2 planes only
-                if len(self.all_volumes)>1:
-                    if len(self.all_volumes[-1])!=len(self.all_volumes[-2]):
-                        self.all_volumes.pop(-1)
-                        self.video_params['VolumeNumber']=self.video_params['VolumeNumber']-1
-
-            elif len(list(self.full_metadata))<=6 and self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" :
-                # FirstVolumeMetadat=root[2]
-                FirstVolumeMetadat=  self.full_metadata['Sequence']
-
-                del self.video_params['FrameNumber']
-                # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
-                self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
-
-                # MultiPlane=1
-                self.all_volumes=[]            
-                volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
-                
-                
-                if self.video_params['MultiplanePrompt']=="AtlasVolume":
-                    self.video_params['StageGridYOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridYOverlap']
-                    self.video_params['StageGridXOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridXOverlap']
-                    self.video_params['StageGridOverlapPercentage']=volumes[list(volumes.keys())[0]]['xYStageGridOverlapPercentage']
-                    self.video_params['StageGridNumYPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumYPositions']
-                    self.video_params['StageGridNumXPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumXPositions']
-                
-                for i, volume in enumerate(volumes.values()):
-                    all_planes={}
-                    planes={ key:plane for key, plane in volume['Childs'].items() if 'Frame' in key}
-                    for i, plane in enumerate(planes.values()):
-                         iplane={}
-                         iplane['absoluteTime']=float(plane['absoluteTime'])
-                         iplane['index']=int(plane['index'])
-                         iplane['relativeTime']=float(plane['relativeTime'])
-                         iplane['framePeriod']='Default_' + str(self.params['framePeriod'])
-
-                         iplane['LastGoodFrame']='Default_0'
-                         iplane['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
- 
-                         iplane['LastGoodFrame']=int(plane['ExtraParameters']['lastGoodFrame'])
-                         ExtraMetadata=plane['PVStateShard']
-                         iplane['ImagingSlider']=self.params['ImagingLaserPower']
-                         iplane['UncagingSlider']=self.params['UncagingLaserPower']
-                         iplane['XAxis']='Default_' + str(self.params['PositionX'])
-                         iplane['YAxis']='Default_' + str(self.params['PositionY'])
-                         iplane['ObjectiveZ']='Default_' +str(self.video_params['PlanePositionsOBJ'])
-                         iplane['ETLZ']='Default_' +str(self.video_params['PlanePositionsETL'])
-          
-          
-                            
-                        # plane['File']['channelName']
-                        # plane['File_1']['channelName']
-          
-          
-                         for element in ExtraMetadata['Childs'].values():
-                             
-                             if 'framePeriod' in element.values():
-                                 iplane['framePeriod']=float(element['value'])
-                                 
-                             if 'scanLinePeriod' in element.values():
-                                 iplane['scanLinePeriod']=float(element['value'])
-                                 
-                             if 'laserPower' in element.values():
-                                 for element2 in  element.values():
-                                     if isinstance(element2,dict):
-                                         if 'Imaging' in element2.values():
-                                            iplane['ImagingSlider']=float(element2['value'])
-                                         if 'Uncaging' in element2.values():
-                                            iplane['UncagingSlider']=float(element2['value'])
-                                                                   
-                             if 'positionCurrent' in element.values():
-                                 for element2 in  element.values():
-                                     if isinstance(element2,dict):
-                                         if 'XAxis' in element2.values():
-                                             iplane['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                         if 'YAxis' in element2.values():
-                                             iplane['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-          
-                                         if 'ZAxis' in element2.values():
-                                             iplane['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                             iplane['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
-                                         
-                             if 'pmtGain' in element.values():
-                                 for element2 in element.values():
-                                     if isinstance(element2, dict):
-                                         iplane['pmtGain_'+element2['description']]=float(element2['value'])
-          
-                         all_planes[i]=iplane
-                    # this is because sometime sthe first xy positions were workng     
-                    all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
-                    all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
-                    self.all_volumes.append(all_planes)  
-          
-
-            elif self.video_params['MultiplanePrompt']=='AtlasPreview' or self.video_params['MultiplanePrompt']=='AtlasOverview':
-                
-                seqinfo=self.full_metadata['Sequence']
-                self.all_frames=[]
-                self.video_params['StageGridYOverlap']=seqinfo['xYStageGridYOverlap']
-                self.video_params['StageGridXOverlap']=seqinfo['xYStageGridXOverlap']
-                self.video_params['StageGridOverlapPercentage']=seqinfo['xYStageGridOverlapPercentage']
-                self.video_params['StageGridNumYPositions']=seqinfo['xYStageGridNumYPositions']
-                self.video_params['StageGridNumXPositions']=seqinfo['xYStageGridNumXPositions']
-                
-                for key, frame in seqinfo['Childs'].items() :
-                    if 'Frame' in  key:
-                        iframe={}
-                        iframe['LastGoodFrame']='Default_0'
-                        iframe['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
-                        iframe['absoluteTime']=float(frame['absoluteTime'])
-                        iframe['index']=int(frame['index'])
-                        iframe['relativeTime']=float(frame['relativeTime'])
-                        if 'ExtraParameters' in frame:     
-                            iframe['LastGoodFrame']=int(frame['ExtraParameters']['lastGoodFrame'])
-                        ExtraMetadata=frame['PVStateShard']
-                        
-                        for element in ExtraMetadata['Childs'].values():
-                        
-                            if 'framePeriod' in element.values():
-                                iframe['framePeriod']=float(element['value'])
-                                
-                            if 'scanLinePeriod' in element.values():
-                                iframe['scanLinePeriod']=float(element['value'])
-                                
-                            if 'laserPower' in element.values():
-                                for element2 in  element.values():
-                                    if isinstance(element2,dict):
-                                        if 'Imaging' in element2.values():
-                                           iframe['ImagingSlider']=float(element2['value'])
-                                        if 'Uncaging' in element2.values():
-                                           iframe['UncagingSlider']=float(element2['value'])
-                                                                  
-                            if 'positionCurrent' in element.values():
-                                for element2 in  element.values():
-                                    if isinstance(element2,dict):
-                                        if 'XAxis' in element2.values():
-                                            iframe['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                        if 'YAxis' in element2.values():
-                                            iframe['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-    
-                                        if 'ZAxis' in element2.values():
-                                            iframe['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
-                                            iframe['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
-                                        
-                        self.all_frames.append(iframe)
-   
-                
+        try:
+            if not self.full_metadata:            
+                tree = ET.parse( self.imaging_metadata_file)       
+                root = tree.getroot()
+                self.full_metadata=recursively_read_metadata(root)  
+            if not self.full_metadata:
+                return []
             else:
+                MicroscopeInfo=self.full_metadata['PVStateShard']
                 seqinfo=self.full_metadata['Sequence']
-                self.all_frames=[]
-                for key, frame in seqinfo['Childs'].items() :
-                    if 'Frame' in  key:
-                        iframe={}
-                        iframe['framePeriod']='Default_' + str(self.params['framePeriod'])
-                        iframe['LastGoodFrame']='Default_0'
-                        iframe['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
-                        iframe['absoluteTime']=float(frame['absoluteTime'])
-                        iframe['index']=int(frame['index'])
-                        iframe['relativeTime']=float(frame['relativeTime'])
-                        if 'ExtraParameters' in frame:     
-                            iframe['LastGoodFrame']=int(frame['ExtraParameters']['lastGoodFrame'])
-                            
-                        if 'PVStateShard' in  frame:
+    
+                self.params={'ImagingTime':parser.parse(self.full_metadata['date']).time().strftime('%H:%M:%S'),
+                        'Date':self.full_metadata['date'],
+                        'AquisitionName':os.path.splitext(os.path.basename(self.imaging_metadata_file))[0]}
+                  
+                for element in MicroscopeInfo['Childs'].values():
+                    
+                    if element['key']=='activeMode':
+                        self.params['ScanMode']= element['value']
+                        
+                    if element['key']=='bitDepth':
+                        self.params['BitDepth']=int(element['value'])
+                        
+                    if element['key']=='dwellTime':
+                        self.params['dwellTime']=float(element['value'])
+                        
+                    if element['key']=='framePeriod':
+                        self.params['framePeriod']=float(element['value'] )
+                        
+                    if element['key']=='laserPower':
+                        self.params['ImagingLaserPower']=float(element['IndexedValue']['value'])
+                        
+                    if element['key']=='laserPower':
+                        self.params['UncagingLaserPower']=float(element['IndexedValue_1']['value'] )
+                        
+                    if element['key']=='linesPerFrame':
+                        self.params['LinesPerFrame']=int(element['value'])
+                        
+                    if element['key']=='micronsPerPixel':
+                        self.params['MicronsPerPixelX']=float(element['IndexedValue']['value'])
+                        
+                    if element['key']=='micronsPerPixel':
+                        self.params['MicronsPerPixelY']=float(element['IndexedValue_1']['value'])
+                        
+                    if element['key']=='objectiveLens':
+                        self.params['Objective']=element['value']
+                        
+                    if element['key']=='objectiveLensMag':
+                        self.params['ObjectiveMag']=int(element['value'])
+                        
+                    if element['key']=='objectiveLensNA':
+                        self.params['ObjectiveNA']=float(element['value'])
+                        
+                    if element['key']=='opticalZoom':
+                        self.params['OpticalZoom']=float(element['value'] )
+                        
+                    if element['key']=='pixelsPerLine':
+                        self.params['PixelsPerLine']=int(element['value'])
+                        
+                    if element['key']=='pmtGain':
+                        self.params['PMTGainRed']=float(element['IndexedValue']['value'] )
+                        
+                    if element['key']=='pmtGain':
+                        self.params['PMTGainGreen']=float(element['IndexedValue_1']['value'])
+                        
+                    if element['key']=='positionCurrent':
+                        self.params['PositionX']=float(element['SubindexedValues']['Childs']['SubindexedValue']['value'])
+                        
+                    if element['key']=='positionCurrent':
+                        self.params['PositionY']=float(element['SubindexedValues_1']['Childs']['SubindexedValue']['value'])
+                        
+                    if element['key']=='positionCurrent':
+                        self.params['PositionZphysical']=float(element['SubindexedValues_2']['Childs']['SubindexedValue']['value'])
+                        
+                    if element['key']=='positionCurrent':
+                        self.params['PositionZETL']=float(element['SubindexedValues_2']['Childs']['SubindexedValue_1']['value'])
+                        
+                    if element['key']=='rastersPerFrame':
+                        self.params['RasterAveraging']=int(element['value'])
+                        
+                    if element['key']=='resonantSamplesPerPixel':
+                        self.params['ResonantSampling']=int(element['value'] )
+                        
+                    if element['key']=='scanLinePeriod':
+                        self.params['ScanLinePeriod']=float(element['value'])
+                        
+                    if element['key']=='zDevice':
+                        self.params['ZDevice']=int(element['value'] )
+                        
+                self.video_params={'MultiplanePrompt':seqinfo['type'],                                  
+                              'ParameterSet':seqinfo['Childs']["Frame"]['parameterSet'],
+                              'RedChannelName':'No Channel',
+                              'GreenChannelName':'No Channel',           
+                              'FrameNumber':int(len( [x for x in seqinfo['Childs'] if 'Frame' in x])),
+                              'PlaneNumber':'Single',
+                              'PlanePositionsOBJ':self.params['PositionZphysical'],
+                              'PlanePositionsETL':self.params['PositionZETL'],           
+                              'Planepowers':self.params['ImagingLaserPower'], 
+                              'XPositions':self.params['PositionX'],
+                              'YPositions':self.params['PositionY'],
+                              'pmtGains_Red':self.params['PMTGainRed'],
+                              'pmtGains_Green':self.params['PMTGainGreen'],
+                             
+                              }
+    
+                # MultiPlane=0
+                SingleChannel=0
+     #%% here to create the full frame by frame volume by volume 
+                if len(list(self.full_metadata))>6 and (self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume"):
+                    # FirstVolumeMetadat=root[2]
+                    FirstVolumeMetadat=  self.full_metadata['Sequence']
+    
+                    del self.video_params['FrameNumber']
+            
+                    # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+                    self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
+    
+                    # MultiPlane=1
+                    self.all_volumes=[]            
+                    volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
+                    
+                    
+                    if self.video_params['MultiplanePrompt']=="AtlasVolume":
+                        self.video_params['StageGridYOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridYOverlap']
+                        self.video_params['StageGridXOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridXOverlap']
+                        self.video_params['StageGridOverlapPercentage']=volumes[list(volumes.keys())[0]]['xYStageGridOverlapPercentage']
+                        self.video_params['StageGridNumYPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumYPositions']
+                        self.video_params['StageGridNumXPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumXPositions']
+                    
+                    for i, volume in enumerate(volumes.values()):
+                        if i==len(volumes.values()):
+                            print('x')
+                        all_planes={}
+                        planes={ key:plane for key, plane in volume['Childs'].items() if 'Frame' in key}
+                        for i, plane in enumerate(planes.values()):
+                             iplane={}
+                             iplane['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
+                             iplane['absoluteTime']=float(plane['absoluteTime'])
+                             iplane['index']=int(plane['index'])
+                             iplane['relativeTime']=float(plane['relativeTime'])
+                             
+                             iplane['LastGoodFrame']=int(plane['ExtraParameters']['lastGoodFrame'])
+                             ExtraMetadata=plane['PVStateShard']
+                             iplane['ImagingSlider']=self.params['ImagingLaserPower']
+                             iplane['UncagingSlider']=self.params['UncagingLaserPower']
+                             iplane['XAxis']='Default_' + str(self.params['PositionX'])
+                             iplane['YAxis']='Default_' + str(self.params['PositionY'])
+                             iplane['ObjectiveZ']='Default_' +str(self.video_params['PlanePositionsOBJ'])
+                             iplane['ETLZ']='Default_' +str(self.video_params['PlanePositionsETL'])
+    
+    
+                                
+                            # plane['File']['channelName']
+                            # plane['File_1']['channelName']
+    
+    
+                             for element in ExtraMetadata['Childs'].values():
+                                 
+                                 if 'framePeriod' in element.values():
+                                     iplane['framePeriod']=float(element['value'])
+                                     
+                                 if 'scanLinePeriod' in element.values():
+                                     iplane['scanLinePeriod']=float(element['value'])
+                                     
+                                 if 'laserPower' in element.values():
+                                     for element2 in  element.values():
+                                         if isinstance(element2,dict):
+                                             if 'Imaging' in element2.values():
+                                                iplane['ImagingSlider']=float(element2['value'])
+                                             if 'Uncaging' in element2.values():
+                                                iplane['UncagingSlider']=float(element2['value'])
+                                                                       
+                                 if 'positionCurrent' in element.values():
+                                     for element2 in  element.values():
+                                         if isinstance(element2,dict):
+                                             if 'XAxis' in element2.values():
+                                                 iplane['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                             if 'YAxis' in element2.values():
+                                                 iplane['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+        
+                                             if 'ZAxis' in element2.values():
+                                                 iplane['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                                 iplane['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
+                                             
+                                 if 'pmtGain' in element.values():
+                                     for element2 in element.values():
+                                         if isinstance(element2, dict):
+                                             iplane['pmtGain_'+element2['description']]=float(element2['value'])
+            
+                             all_planes[i]=iplane
+                        # this is because sometime sthe first xy positions were workng     
+                        
+                        if i!=len(volumes.values()):
+                            if len(all_planes.keys())>1:
+                                all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
+                                all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
+                        self.all_volumes.append(all_planes)  
+    
+                        # this is because i had metadata with 1 extra volume with 2 planes only
+                    if len(self.all_volumes)>1:
+                        if len(self.all_volumes[-1])!=len(self.all_volumes[-2]):
+                            self.all_volumes.pop(-1)
+                            self.video_params['VolumeNumber']=self.video_params['VolumeNumber']-1
+    
+                elif len(list(self.full_metadata))<=6 and self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" :
+                    # FirstVolumeMetadat=root[2]
+                    FirstVolumeMetadat=  self.full_metadata['Sequence']
+    
+                    del self.video_params['FrameNumber']
+                    # self.video_params['VolumeNumber']=int(len(list(root.findall('Sequence'))))
+                    self.video_params['VolumeNumber']=int(len([key for key in self.full_metadata.keys() if 'Sequence' in key]))
+    
+                    # MultiPlane=1
+                    self.all_volumes=[]            
+                    volumes={key:volume for key, volume in self.full_metadata.items() if 'Sequence' in  key}
+                    
+                    
+                    if self.video_params['MultiplanePrompt']=="AtlasVolume":
+                        self.video_params['StageGridYOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridYOverlap']
+                        self.video_params['StageGridXOverlap']=volumes[list(volumes.keys())[0]]['xYStageGridXOverlap']
+                        self.video_params['StageGridOverlapPercentage']=volumes[list(volumes.keys())[0]]['xYStageGridOverlapPercentage']
+                        self.video_params['StageGridNumYPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumYPositions']
+                        self.video_params['StageGridNumXPositions']=volumes[list(volumes.keys())[0]]['xYStageGridNumXPositions']
+                    
+                    for i, volume in enumerate(volumes.values()):
+                        all_planes={}
+                        planes={ key:plane for key, plane in volume['Childs'].items() if 'Frame' in key}
+                        for i, plane in enumerate(planes.values()):
+                             iplane={}
+                             iplane['absoluteTime']=float(plane['absoluteTime'])
+                             iplane['index']=int(plane['index'])
+                             iplane['relativeTime']=float(plane['relativeTime'])
+                             iplane['framePeriod']='Default_' + str(self.params['framePeriod'])
+    
+                             iplane['LastGoodFrame']='Default_0'
+                             iplane['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
+     
+                             iplane['LastGoodFrame']=int(plane['ExtraParameters']['lastGoodFrame'])
+                             ExtraMetadata=plane['PVStateShard']
+                             iplane['ImagingSlider']=self.params['ImagingLaserPower']
+                             iplane['UncagingSlider']=self.params['UncagingLaserPower']
+                             iplane['XAxis']='Default_' + str(self.params['PositionX'])
+                             iplane['YAxis']='Default_' + str(self.params['PositionY'])
+                             iplane['ObjectiveZ']='Default_' +str(self.video_params['PlanePositionsOBJ'])
+                             iplane['ETLZ']='Default_' +str(self.video_params['PlanePositionsETL'])
+              
+              
+                                
+                            # plane['File']['channelName']
+                            # plane['File_1']['channelName']
+              
+              
+                             for element in ExtraMetadata['Childs'].values():
+                                 
+                                 if 'framePeriod' in element.values():
+                                     iplane['framePeriod']=float(element['value'])
+                                     
+                                 if 'scanLinePeriod' in element.values():
+                                     iplane['scanLinePeriod']=float(element['value'])
+                                     
+                                 if 'laserPower' in element.values():
+                                     for element2 in  element.values():
+                                         if isinstance(element2,dict):
+                                             if 'Imaging' in element2.values():
+                                                iplane['ImagingSlider']=float(element2['value'])
+                                             if 'Uncaging' in element2.values():
+                                                iplane['UncagingSlider']=float(element2['value'])
+                                                                       
+                                 if 'positionCurrent' in element.values():
+                                     for element2 in  element.values():
+                                         if isinstance(element2,dict):
+                                             if 'XAxis' in element2.values():
+                                                 iplane['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                             if 'YAxis' in element2.values():
+                                                 iplane['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+              
+                                             if 'ZAxis' in element2.values():
+                                                 iplane['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                                 iplane['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
+                                             
+                                 if 'pmtGain' in element.values():
+                                     for element2 in element.values():
+                                         if isinstance(element2, dict):
+                                             iplane['pmtGain_'+element2['description']]=float(element2['value'])
+              
+                             all_planes[i]=iplane
+                        # this is because sometime sthe first xy positions were workng     
+                        all_planes[list(all_planes.keys())[0]]['XAxis']=all_planes[list(all_planes.keys())[1]]['XAxis']
+                        all_planes[list(all_planes.keys())[0]]['YAxis']=all_planes[list(all_planes.keys())[1]]['YAxis']  
+                        self.all_volumes.append(all_planes)  
+              
+    
+                elif self.video_params['MultiplanePrompt']=='AtlasPreview' or self.video_params['MultiplanePrompt']=='AtlasOverview':
+                    
+                    seqinfo=self.full_metadata['Sequence']
+                    self.all_frames=[]
+                    self.video_params['StageGridYOverlap']=seqinfo['xYStageGridYOverlap']
+                    self.video_params['StageGridXOverlap']=seqinfo['xYStageGridXOverlap']
+                    self.video_params['StageGridOverlapPercentage']=seqinfo['xYStageGridOverlapPercentage']
+                    self.video_params['StageGridNumYPositions']=seqinfo['xYStageGridNumYPositions']
+                    self.video_params['StageGridNumXPositions']=seqinfo['xYStageGridNumXPositions']
+                    
+                    for key, frame in seqinfo['Childs'].items() :
+                        if 'Frame' in  key:
+                            iframe={}
+                            iframe['LastGoodFrame']='Default_0'
+                            iframe['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
+                            iframe['absoluteTime']=float(frame['absoluteTime'])
+                            iframe['index']=int(frame['index'])
+                            iframe['relativeTime']=float(frame['relativeTime'])
+                            if 'ExtraParameters' in frame:     
+                                iframe['LastGoodFrame']=int(frame['ExtraParameters']['lastGoodFrame'])
                             ExtraMetadata=frame['PVStateShard']
-                            iframe['framePeriod']=float(ExtraMetadata['Childs']['PVStateValue']['value'])
-                            if len(ExtraMetadata['Childs'])>1:
-                                if 'value' in ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]:
-                                    iframe['scanLinePeriod']=float(ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]['value'])                               
-                        self.all_frames.append(iframe)
-
- #%% doind video params 
- 
- 
-            if self.video_params['MultiplanePrompt']=="AtlasVolume":
-                  self.video_params['XPositions']=[position[list(position.keys())[0]]['XAxis']  for position in self.all_volumes]
-                  self.video_params['YPositions']=[position[list(position.keys())[0]]['YAxis']  for position in self.all_volumes]                 
-              
-            elif self.video_params['MultiplanePrompt']=="TSeries ZSeries Element":
-                  self.video_params['XPositions']=self.all_volumes[0][list(self.all_volumes[0].keys())[0]]['XAxis'] 
-                  self.video_params['YPositions']=self.all_volumes[0][list(self.all_volumes[0].keys())[0]]['YAxis']     
+                            
+                            for element in ExtraMetadata['Childs'].values():
+                            
+                                if 'framePeriod' in element.values():
+                                    iframe['framePeriod']=float(element['value'])
+                                    
+                                if 'scanLinePeriod' in element.values():
+                                    iframe['scanLinePeriod']=float(element['value'])
+                                    
+                                if 'laserPower' in element.values():
+                                    for element2 in  element.values():
+                                        if isinstance(element2,dict):
+                                            if 'Imaging' in element2.values():
+                                               iframe['ImagingSlider']=float(element2['value'])
+                                            if 'Uncaging' in element2.values():
+                                               iframe['UncagingSlider']=float(element2['value'])
+                                                                      
+                                if 'positionCurrent' in element.values():
+                                    for element2 in  element.values():
+                                        if isinstance(element2,dict):
+                                            if 'XAxis' in element2.values():
+                                                iframe['XAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                            if 'YAxis' in element2.values():
+                                                iframe['YAxis']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+        
+                                            if 'ZAxis' in element2.values():
+                                                iframe['ObjectiveZ']=float(element2['Childs'][list(element2['Childs'].keys())[0]]['value'])
+                                                iframe['ETLZ']=float(element2['Childs'][list(element2['Childs'].keys())[1]]['value'])
+                                            
+                            self.all_frames.append(iframe)
+       
+                    
+                else:
+                    seqinfo=self.full_metadata['Sequence']
+                    self.all_frames=[]
+                    for key, frame in seqinfo['Childs'].items() :
+                        if 'Frame' in  key:
+                            iframe={}
+                            iframe['framePeriod']='Default_' + str(self.params['framePeriod'])
+                            iframe['LastGoodFrame']='Default_0'
+                            iframe['scanLinePeriod']='Default_' + str(self.params['ScanLinePeriod'])
+                            iframe['absoluteTime']=float(frame['absoluteTime'])
+                            iframe['index']=int(frame['index'])
+                            iframe['relativeTime']=float(frame['relativeTime'])
+                            if 'ExtraParameters' in frame:     
+                                iframe['LastGoodFrame']=int(frame['ExtraParameters']['lastGoodFrame'])
+                                
+                            if 'PVStateShard' in  frame:
+                                ExtraMetadata=frame['PVStateShard']
+                                iframe['framePeriod']=float(ExtraMetadata['Childs']['PVStateValue']['value'])
+                                if len(ExtraMetadata['Childs'])>1:
+                                    if 'value' in ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]:
+                                        iframe['scanLinePeriod']=float(ExtraMetadata['Childs'][list(ExtraMetadata['Childs'].keys())[-1]]['value'])                               
+                            self.all_frames.append(iframe)
+    
+     #%% doind video params 
+     
+     
+                if self.video_params['MultiplanePrompt']=="AtlasVolume":
+                      self.video_params['XPositions']=[position[list(position.keys())[0]]['XAxis']  for position in self.all_volumes]
+                      self.video_params['YPositions']=[position[list(position.keys())[0]]['YAxis']  for position in self.all_volumes]                 
                   
-                  
-            elif self.video_params['MultiplanePrompt']=='AtlasPreview' or self.video_params['MultiplanePrompt']=='AtlasOverview'  :
-                self.video_params['XPositions']=[frame['XAxis']  for frame in self.all_frames]
-                self.video_params['YPositions']=[frame['YAxis']  for frame in self.all_frames]
-                
-
-
-            if self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume": 
-                     
-                self.video_params['FullAcquisitionTime']=self.all_volumes[-1][list(self.all_volumes[-1].keys())[-1]]['relativeTime']  
-                # self.video_params['PlaneNumber']=len(list(FirstVolumeMetadat.findall('Frame')))  
-                self.video_params['PlaneNumber']= len([key for key in FirstVolumeMetadat['Childs'].keys() if 'Frame' in key])
-
-
+                elif self.video_params['MultiplanePrompt']=="TSeries ZSeries Element":
+                      self.video_params['XPositions']=self.all_volumes[0][list(self.all_volumes[0].keys())[0]]['XAxis'] 
+                      self.video_params['YPositions']=self.all_volumes[0][list(self.all_volumes[0].keys())[0]]['YAxis']     
+                      
+                      
+                elif self.video_params['MultiplanePrompt']=='AtlasPreview' or self.video_params['MultiplanePrompt']=='AtlasOverview'  :
+                    self.video_params['XPositions']=[frame['XAxis']  for frame in self.all_frames]
+                    self.video_params['YPositions']=[frame['YAxis']  for frame in self.all_frames]
+                    
+    
+    
+                if self.video_params['MultiplanePrompt']=="TSeries ZSeries Element" or self.video_params['MultiplanePrompt']=="AtlasVolume": 
                          
-                self.video_params['PlanePositionsOBJ']=[self.all_volumes[0][key]['ObjectiveZ'] for key in self.all_volumes[0].keys()]
-                self.video_params['PlanePositionsETL']=[self.all_volumes[0][key]['ETLZ'] for key in self.all_volumes[0].keys()]
-                self.video_params['Planepowers']= [self.all_volumes[0][key]['ImagingSlider'] for key in self.all_volumes[0].keys()]
-                self.video_params['pmtGains_Red']= [self.all_volumes[0][key]['pmtGain_Red'] for key in self.all_volumes[0].keys() if 'pmtGain_Red' in self.all_volumes[0][key].keys() ]
-                self.video_params['pmtGains_Green']= [self.all_volumes[0][key]['pmtGain_Green'] for key in self.all_volumes[0].keys() if 'pmtGain_Green' in self.all_volumes[0][key].keys() ]
+                    self.video_params['FullAcquisitionTime']=self.all_volumes[-1][list(self.all_volumes[-1].keys())[-1]]['relativeTime']  
+                    # self.video_params['PlaneNumber']=len(list(FirstVolumeMetadat.findall('Frame')))  
+                    self.video_params['PlaneNumber']= len([key for key in FirstVolumeMetadat['Childs'].keys() if 'Frame' in key])
+    
+    
+                             
+                    self.video_params['PlanePositionsOBJ']=[self.all_volumes[0][key]['ObjectiveZ'] for key in self.all_volumes[0].keys()]
+                    self.video_params['PlanePositionsETL']=[self.all_volumes[0][key]['ETLZ'] for key in self.all_volumes[0].keys()]
+                    self.video_params['Planepowers']= [self.all_volumes[0][key]['ImagingSlider'] for key in self.all_volumes[0].keys()]
+                    self.video_params['pmtGains_Red']= [self.all_volumes[0][key]['pmtGain_Red'] for key in self.all_volumes[0].keys() if 'pmtGain_Red' in self.all_volumes[0][key].keys() ]
+                    self.video_params['pmtGains_Green']= [self.all_volumes[0][key]['pmtGain_Green'] for key in self.all_volumes[0].keys() if 'pmtGain_Green' in self.all_volumes[0][key].keys() ]
+                    
+                    if not   self.video_params['pmtGains_Red']:
+                        self.video_params['pmtGains_Red']=self.params['PMTGainRed']
+                    if not  self.video_params['pmtGains_Green']:
+                            self.video_params['pmtGains_Green']=self.params['PMTGainGreen']
+          
+                    self.video_params['relativeTimes']= [[position[key]['relativeTime'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
+                    self.video_params['absoluteTimes']= [[position[key]['absoluteTime'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
+                    self.video_params['scanLinePeriods']= [[position[key]['scanLinePeriod'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
+                    self.video_params['framePeriods']= [[position[key]['framePeriod'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
                 
-                if not   self.video_params['pmtGains_Red']:
-                    self.video_params['pmtGains_Red']=self.params['PMTGainRed']
-                if not  self.video_params['pmtGains_Green']:
-                        self.video_params['pmtGains_Green']=self.params['PMTGainGreen']
-      
-                self.video_params['relativeTimes']= [[position[key]['relativeTime'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
-                self.video_params['absoluteTimes']= [[position[key]['absoluteTime'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
-                self.video_params['scanLinePeriods']= [[position[key]['scanLinePeriod'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
-                self.video_params['framePeriods']= [[position[key]['framePeriod'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
-            
-                self.video_params['lastGoodFrames']= [[position[key]['LastGoodFrame'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
+                    self.video_params['lastGoodFrames']= [[position[key]['LastGoodFrame'] for key in self.all_volumes[0].keys()] for position in self.all_volumes]
+    
+                else:
+     
+                   self.video_params['FullAcquisitionTime']=self.all_frames[-1]['relativeTime']
+                   self.video_params['relativeTimes']= [position['relativeTime']  for position in self.all_frames]
+                   self.video_params['absoluteTimes']= [position['absoluteTime']  for position in self.all_frames]
+                   self.video_params['scanLinePeriods']= [position['scanLinePeriod']  for position in self.all_frames]
+                   self.video_params['framePeriods']= [position['framePeriod']  for position in self.all_frames]
+                   self.video_params['lastGoodFrames']= [position['LastGoodFrame']  for position in self.all_frames]
+                
+    
+                if seqinfo['Childs']['PVStateShard'] and self.video_params['MultiplanePrompt']=="AtlasVolume":
+                    SingleChannel=0 
+                    files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                    for chan in files.values():
+                        ChannelName=chan['filename']
+                        if 'Green' in chan.values() :              
+                            self.video_params['GreenChannelName']=ChannelName
+                        elif 'Red' in chan.values():
+                            self.video_params['RedChannelName']=ChannelName
+                    if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
+                        SingleChannel=1
+                
+                elif seqinfo['Childs']['PVStateShard'] and not self.video_params['MultiplanePrompt']=="AtlasVolume":             
+                    SingleChannel=0 
+                    files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                    for chan in files.values():
+                        ChannelName=chan['filename']
+                        if 'Green' in chan.values() :              
+                            self.video_params['GreenChannelName']=ChannelName
+                        elif 'Red' in chan.values():
+                            self.video_params['RedChannelName']=ChannelName
+                    if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
+                        SingleChannel=1
+       
+                else:
+                    SingleChannel=0 
+                    files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
+                    for chan in files.values():
+                        ChannelName=chan['filename']
+                        if 'Green' in chan.values() :              
+                            self.video_params['GreenChannelName']=ChannelName
+                        elif 'Red' in chan.values():
+                            self.video_params['RedChannelName']=ChannelName
+                    if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
+                        SingleChannel=1
+                        
+                        
+            if self.all_frames:        
+                self.imaging_metadata=[self.params, self.video_params, self.all_frames]
+            if self.all_volumes:        
+                self.imaging_metadata=[self.params, self.video_params, self.all_volumes]
+        except:
+            print(f'corrupted metadata{self.imaging_metadata_file}')
+            module_logger.exception(f'corrupted metadata{self.imaging_metadata_file}')
 
-            else:
- 
-               self.video_params['FullAcquisitionTime']=self.all_frames[-1]['relativeTime']
-               self.video_params['relativeTimes']= [position['relativeTime']  for position in self.all_frames]
-               self.video_params['absoluteTimes']= [position['absoluteTime']  for position in self.all_frames]
-               self.video_params['scanLinePeriods']= [position['scanLinePeriod']  for position in self.all_frames]
-               self.video_params['framePeriods']= [position['framePeriod']  for position in self.all_frames]
-               self.video_params['lastGoodFrames']= [position['LastGoodFrame']  for position in self.all_frames]
-            
-
-            if seqinfo['Childs']['PVStateShard'] and self.video_params['MultiplanePrompt']=="AtlasVolume":
-                SingleChannel=0 
-                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
-                for chan in files.values():
-                    ChannelName=chan['filename']
-                    if 'Green' in chan.values() :              
-                        self.video_params['GreenChannelName']=ChannelName
-                    elif 'Red' in chan.values():
-                        self.video_params['RedChannelName']=ChannelName
-                if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
-                    SingleChannel=1
-            
-            elif seqinfo['Childs']['PVStateShard'] and not self.video_params['MultiplanePrompt']=="AtlasVolume":             
-                SingleChannel=0 
-                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
-                for chan in files.values():
-                    ChannelName=chan['filename']
-                    if 'Green' in chan.values() :              
-                        self.video_params['GreenChannelName']=ChannelName
-                    elif 'Red' in chan.values():
-                        self.video_params['RedChannelName']=ChannelName
-                if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
-                    SingleChannel=1
-   
-            else:
-                SingleChannel=0 
-                files={key:val for key, val in seqinfo['Childs']['Frame'].items() if 'File' in key}
-                for chan in files.values():
-                    ChannelName=chan['filename']
-                    if 'Green' in chan.values() :              
-                        self.video_params['GreenChannelName']=ChannelName
-                    elif 'Red' in chan.values():
-                        self.video_params['RedChannelName']=ChannelName
-                if not all( self.video_params['RedChannelName'] and self.video_params['GreenChannelName']):
-                    SingleChannel=1
                     
-                    
-        if self.all_frames:        
-            self.imaging_metadata=[self.params, self.video_params, self.all_frames]
-        if self.all_volumes:        
-            self.imaging_metadata=[self.params, self.video_params, self.all_volumes]
   #%% Plotting
     def plotting(self):
         
@@ -881,7 +952,7 @@ class Metadata():
             self.translated_imaging_metadata.pop('IsSlowStorage')
             self.translated_imaging_metadata.pop('IsWorkingStorage')
             self.translated_imaging_metadata.pop('SlowStoragePath')
-            self.translated_imaging_metadata.pop('ToDoDeepCaiman')
+            # self.translated_imaging_metadata.pop('ToDoDeepCaiman')
             self.translated_imaging_metadata.pop('WorkingStoragePath')
             self.translated_imaging_metadata = dict( sorted(self.translated_imaging_metadata.items(), key=lambda x: x[0].lower()) )
 
@@ -944,7 +1015,7 @@ class Metadata():
                     'CorrectedObjectivePositions':np.nan,
                     'CorrectedETLPositions':np.nan,
                     'ImagingTime':np.nan,
-                    'IsVoltagERecording':np.nan,
+                    'IsVoltageRecording':np.nan,
                     'MicronsPerPixelX':np.nan,
                     'MicronsPerPixelY':np.nan,
                     'Xpositions':np.nan,
@@ -1059,15 +1130,12 @@ class Metadata():
 #%%    
 if __name__ == "__main__":
    
-    temporary_path1=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000'
+    temporary_path1=r'G:\Projects\TemPrairireSSH\20230328\Calibrations\SensoryStimulation\TestAcquisitions\230328_Test_Test_1z_3min_2x_opto_25x_920_51020_63075_with-000'
     meta =Metadata(acquisition_directory_raw=temporary_path1)
-    markpoints=meta.full_mark_points_metadata
     
     
-
-
     
-
+    tr=meta.translated_imaging_metadata
 
    
 

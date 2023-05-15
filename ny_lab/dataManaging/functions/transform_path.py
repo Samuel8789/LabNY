@@ -20,6 +20,15 @@ def transform_path(path, fast_output=False, slow_ouput=False):
         else:
             new_path=path
           
+    elif path[0]=='D':
+        fast_path2='\\\\?\\'+ r'C:\Users\sp3660\Documents\Projects\LabNY\Working_Mice_Data_1'+path[46:]
+        if fast_output and not slow_ouput:
+            if os.path.isfile(fast_path2) or os.path.isdir(fast_path2):
+                new_path=fast_path2
+        else:
+            new_path=path
+        
+        
     else:
         slow_path='\\\\?\\'+ r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data' +fast_path1[fast_path1.find('Working_Mice')+19:]
         if slow_ouput and not fast_output:

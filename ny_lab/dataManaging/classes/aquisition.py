@@ -13,6 +13,9 @@ import gc
 import sys
 import tifffile
 import time
+import itertools
+import scipy.io as spio
+from pathlib import Path
 
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .dataset import ImageSequenceDataset
@@ -28,9 +31,42 @@ import logging
 module_logger = logging.getLogger(__name__)
 from .standalone.metadata import Metadata
 
+def loadmat(filename):
+    '''
+    this function should be called instead of direct spio.loadmat
+    as it cures the problem of not properly recovering python dictionaries
+    from mat files. It calls the function check keys to cure all entries
+    which are still mat-objects
+    '''
+    data = spio.loadmat(filename, struct_as_record=False, squeeze_me=True)
+    return _check_keys(data)
+
+def _check_keys(dict):
+    '''
+    checks if entries in dictionary are mat-objects. If yes
+    todict is called to change them to nested dictionaries
+    '''
+    for key in dict:
+        if isinstance(dict[key], spio.matlab.mio5_params.mat_struct):
+            dict[key] = _todict(dict[key])
+    return dict        
+
+def _todict(matobj):
+    '''
+    A recursive function which constructs from matobjects nested dictionaries
+    '''
+    dict = {}
+    for strg in matobj._fieldnames:
+        elem = matobj.__dict__[strg]
+        if isinstance(elem, spio.matlab.mio5_params.mat_struct):
+            dict[strg] = _todict(elem)
+        else:
+            dict[strg] = elem
+    return dict
+
 
 class Aquisition:   
-    def __init__(self, aqu_name, raw_input_path=None, FOV_object=None, mouse_imaging_session_object=None, atlas_object=None, subaq_object=None, non_imaging=False,):
+    def __init__(self, aqu_name, raw_input_path=None, FOV_object=None, mouse_imaging_session_object=None, atlas_object=None, subaq_object=None, non_imaging=False,scanimage_raw_path=False):
         self.subaq_object=subaq_object
         self.mouse_imaging_session_object=mouse_imaging_session_object
         self.FOV_object=FOV_object
@@ -45,8 +81,10 @@ class Aquisition:
         self.all_datasets={}
         self.plane_number=0   
         self.full_database_dictionary={}
+        self.scanimage_raw_path=scanimage_raw_path
         # self.voltage_signals_dictionary={}
-        
+        self.all_raw_datasets={}
+        self.Prairireaqpath=None
         
 
               
@@ -127,6 +165,22 @@ class Aquisition:
  #%% nopn imaging no pariaire files, only face camera
         elif non_imaging:                
               module_logger.info('i have to give tit a name to do facecamera')
+              
+              
+              
+        if self.scanimage_raw_path:
+            
+            self.scanimage_raw_path=r'F:\Projects\LabNY\Imaging\2022\20220525Hakim\Mice\SPKU\FOV_1\Aq_1'
+            
+            self.scanimagepath=os.path.split(glob.glob(scanimage_raw_path +'\\**\\**.csv', recursive=True)[0])[0]      
+            self.aquisition_path=os.path.split(self.scanimagepath)[0]
+            self.aquisition_name= os.path.split(self.scanimagepath)[1]
+            
+            
+            
+            
+            
+            pass
 #%% methods   
 #%% dealing with directory structures and paths
 #%% slow   
@@ -360,21 +414,23 @@ class Aquisition:
                     
                     else:
                        aq_info=check_channels_and_planes(directory_green, correction)
+               
       
           else:
               aq_info = check_channels_and_planes(self.Prairireaqpath, correction)
-              if aq_info[0]:
-                  ChannelRedExists=1
-                  PlaneNumber=aq_info[9]     
-                  first_cycle=  int(aq_info[3][5:] ) 
-                  last_cycle=  int(aq_info[4][5:]   )
-
-              if aq_info[1]:
-                  ChannelGreenExists=1
-                  PlaneNumber=aq_info[10]
-                  first_cycle=  int(aq_info[3][5:])
-                  last_cycle=  int(aq_info[4] [5:]  )  
-                  
+              
+          if aq_info[0]:
+                ChannelRedExists=1
+                PlaneNumber=aq_info[9]     
+                first_cycle=  int(aq_info[3][5:] ) 
+                last_cycle=  int(aq_info[4][5:]   )
+    
+          if aq_info[1]:
+                ChannelGreenExists=1
+                PlaneNumber=aq_info[10]
+                first_cycle=  int(aq_info[6][5:])
+                last_cycle=  int(aq_info[7] [5:] )  
+                
           Multiplane=False
           if PlaneNumber>1:
               Multiplane=True     
@@ -546,12 +602,22 @@ class Aquisition:
 
 
     def get_all_database_info(self):
-        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]  
+        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]
+        
+        # print(self.aq_ID)
+
+        # if self.aq_ID==561:
+        #     print(self.aq_ID)
         if self.aq_ID:
             self.full_database_dictionary=self.mouse_imaging_session_object.mouse_object.Database_ref.ImagingDatabase_class.get_single_acquisition_database_info(self.aq_ID)
             self.acquisition_database_info= self.full_database_dictionary['Acq']
             self.imaging_database_info= self.full_database_dictionary['Imaging']
-            
+            self.database_acq_raw_path=Path(self.acquisition_database_info.loc[0, 'AcquisitonRawPath']).resolve()
+            if glob.glob(str(self.database_acq_raw_path)+'\**'):
+                self.database_acq_raw_path= Path(glob.glob(str(self.database_acq_raw_path)+'\**')[0])
+            else:
+                self.database_acq_raw_path=None
+               
         
     def load_reference_images(self):
         self.reference_image_dic={title:'' for title in self.reference_images_working_fullpaths}
@@ -585,6 +651,9 @@ class Aquisition:
     def load_metadata_raw(self):
         if self.Prairireaqpath:
             self.metadata_object=Metadata(acquisition_directory_raw=self.Prairireaqpath,temporary_path=self.slow_storage_all_paths['metadata'], aquisition_object=self)
+        elif self.database_acq_raw_path:
+            self.metadata_object=Metadata(acquisition_directory_raw=self.database_acq_raw_path,temporary_path=self.slow_storage_all_paths['metadata'], aquisition_object=self)
+
                
     def load_metadata_slow_working_directories(self):
         if self.slow_storage_all_paths['metadata']:
@@ -725,7 +794,13 @@ class Aquisition:
 
         
     def unload_camera(self):
-        self.face_camera.unload_camera_file()
+        if self.face_camera:
+            module_logger.info('unloading face camera')
+
+            self.face_camera.unload_camera_file()
+        else:
+            module_logger.info('No face camera')
+        
         
 #%% dealing with visstim  
 
@@ -750,8 +825,48 @@ class Aquisition:
         self.all_vis_stim_mat_files=glob.glob(self.slow_storage_all_paths['visual stim']+'\\**.mat', recursive=False)
         
     def load_vis_stim_info(self):
-        pass
-      
+        if self.all_vis_stim_mat_files and self.all_vis_stim_mat_files[0]:
+            self.mat = loadmat(self.all_vis_stim_mat_files[0])
+            if 'full_info' in self.mat.keys():
+            
+                outarray=self.mat['full_info']
+                ops=self.mat['ops']
+                durationseconds=np.array([outarray[1:,2][i][0] for i in range(outarray[1:,2].shape[0])])-outarray[1:,1]
+                durationminutes=durationseconds/60
+                outarray[1:,3]=durationseconds
+                stimparadigms=outarray[:,0].tolist()
+                if 'SessionA' in self.all_vis_stim_mat_files[0]:
+                    pass
+                elif 'SessionB' in self.all_vis_stim_mat_files[0]:
+                    staticparadigms=np.where(['Static' in paradigm for paradigm in stimparadigms])[0]
+                    imagesparadigms=np.where(['Images' in paradigm for paradigm in stimparadigms])[0]
+                    movieparadigms=np.where(['Movie' in paradigm for paradigm in stimparadigms])[0]
+            
+                    statictrialinfo=outarray[staticparadigms,:]
+                    imagestrialinfo=outarray[imagesparadigms,:]
+                    movietrialinfo=outarray[movieparadigms,:]
+            
+                    firststaticgratings=statictrialinfo[0][4][1:-1,4].astype(int)
+                    secondstaticgratings=statictrialinfo[1][4][1:-1,4].astype(int)
+                    thirdstaticgratings=statictrialinfo[2][4][1:-1,4].astype(int)
+            
+                    self.allstaticindexes=np.hstack([firststaticgratings,secondstaticgratings,thirdstaticgratings])
+           
+                    firstnaturalimages=imagestrialinfo[0][4][1:-1,4].astype(int)
+                    secondnaturalimages=imagestrialinfo[1][4][1:-1,4].astype(int)
+                    thirdnaturalimages=imagestrialinfo[2][4][1:-1,4].astype(int)
+            
+                    self.allnatiuralindexes=np.hstack([firstnaturalimages,secondnaturalimages,thirdnaturalimages])
+                elif 'SessionC' in self.all_vis_stim_mat_files[0]:
+                    pass
+            else:
+                
+                ops=self.mat['ops']
+                if 'SessionA' in self.all_vis_stim_mat_files[0]:
+                    pass
+                pass
+            
+          
 #%% loading unloading all
     def load_all(self, camera=True, kalman=True):
         self.load_vis_stim_info()
@@ -789,6 +904,22 @@ class Aquisition:
         
         
         # dataset_object.summary_images_object.projection_dic['std_projection_path']
+        
+        
+        
+    def get_all_raw_aq_tiffiles(raw_aq_dir):
+        unprocessed=glob.glob(raw_aq_dir+'\**.tif')
+        processed=[]
+        for ch in ['Ch1Red','Ch2Green']:
+            if os.path.isdir(os.path.join(raw_aq_dir,ch)):
+                for i in os.listdir( os.path.join(raw_aq_dir,ch)):
+                    processed.append(glob.glob(os.path.join(raw_aq_dir,ch,i,'**.tif')))
+            
+        processed.append(unprocessed)
+        
+        allfiles=list(itertools.chain.from_iterable(processed))
+        
+        return allfiles
         
     
 #%% raw paths

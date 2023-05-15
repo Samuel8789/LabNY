@@ -9,8 +9,31 @@ import os
 import xml.etree.ElementTree as ET
 import glob
 import shutil
-from distutils.dir_util import copy_tree
+import xml
+import gc
 
+from distutils.dir_util import copy_tree
+from pyometiff import OMETIFFReader
+import pathlib
+
+
+def move_all_files_from_source_to_dest(source,dest):
+    file_list = glob.glob(source+'\**')
+    for fname in file_list:
+        shutil.move(fname,os.path.join(dest,os.path.split(fname)[1]))
+
+
+def open_directory(foldername):
+    systems = {
+        'nt': os.startfile,
+        'posix': lambda foldername: os.system('xdg-open "%s"' % foldername),
+        'os2': lambda foldername: os.system('open "%s"' % foldername)
+         }
+    
+    systems.get(os.name, os.startfile)(foldername)
+    return foldername
+
+    
 def read_mouse_name_from_aquisition(aquisition_folder):
     aquisition_name=os.path.basename(aquisition_folder)
     mouse_name=aquisition_name[0:4]
@@ -61,25 +84,32 @@ def recursively_delete_back_directories(directory):
 def short_metadata_type_check(aq_path):
     # print('Fast checking metadata')
     imaging_metadata_file=os.path.join(aq_path,os.path.split(aq_path)[1]+'.xml')  
-    tree = ET.parse( imaging_metadata_file)       
-    root = tree.getroot()
-    seqinfo=root.find('Sequence')  
-    aquisition_type=seqinfo.attrib['type']
-    if aquisition_type=='TSeries ZSeries Element':
-        framenumber=len(root.findall('Sequence'))
-        planenumber=len(seqinfo.findall('Frame'))
-    elif aquisition_type=='AtlasVolume': 
-        framenumber=len(root.findall('Sequence'))
-        planenumber=len(seqinfo.findall('Frame'))     
-    elif aquisition_type!='TSeries ZSeries Element':  
-        planenumber=1
-        framenumber=len(seqinfo.findall('Frame'))   
-      
+    
+    
+    try: 
+        tree = ET.parse( imaging_metadata_file)   
+          
+        root = tree.getroot()
+        seqinfo=root.find('Sequence')  
+        aquisition_type=seqinfo.attrib['type']
+        if aquisition_type=='TSeries ZSeries Element':
+            framenumber=len(root.findall('Sequence'))
+            planenumber=len(seqinfo.findall('Frame'))
+        elif aquisition_type=='AtlasVolume': 
+            framenumber=len(root.findall('Sequence'))
+            planenumber=len(seqinfo.findall('Frame'))     
+        elif aquisition_type!='TSeries ZSeries Element':  
+            planenumber=1
+            framenumber=len(seqinfo.findall('Frame'))   
+            
+    except:
+        print(f'Corrupted imaging netadata{imaging_metadata_file}')
 
+        aquisition_type=''
+        framenumber=0
+        planenumber=0
 
-
-      
-    return aquisition_type, framenumber, planenumber
+    return aquisition_type, framenumber, planenumber, 
 
 def channel_and_plane_of_image(single_image_full_path, multiplane, aq_type):
     Ch=False
@@ -115,8 +145,8 @@ def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type,
                         ChannelPath = [i for i in ChannelPaths if Ch in i] 
                         
                         if Plane<=len(PlanePaths):
-                            new_directory=ChannelPath[0] + PlanePaths[Plane-1]
-                            os.rename(current_directory + os.sep + fname, new_directory + os.sep + fname)
+                            new_directory=ChannelPath[0] + PlanePaths[Plane-1]                            
+                            shutil.move(os.path.join(current_directory,fname),os.path.join(new_directory,fname))
     else:
         for i, fname in enumerate(file_list):
             file_path=os.path.join(current_directory,fname)
@@ -127,7 +157,7 @@ def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type,
                         ChannelPath = [i for i in ChannelPaths if Ch in i] 
                         if cycle==len(PlanePaths):
                             new_directory=ChannelPath[0] + PlanePaths[cycle-1]
-                            os.rename(current_directory + os.sep + fname, new_directory + os.sep + fname)
+                            shutil.move(os.path.join(current_directory,fname),os.path.join(new_directory,fname))
                         
                         
         pass
@@ -136,15 +166,21 @@ def move_files(current_directory, ChannelPaths, PlanePaths, Multiplane, aq_type,
 
 
 def check_channels_and_planes(image_sequence_directory_full_path, correction=False):
-    # print('Cheking file structure')       
-    sq_type=short_metadata_type_check(image_sequence_directory_full_path)
     
+    if image_sequence_directory_full_path==r'F:\Projects\LabNY\Imaging\2022\20221021\Mice\SPNN\FOV_1\Aq_1\221021_SPNN_FOV1_AllenA_25x_940_51020_60745_with-000':
+        print('Error')
+    
+    # print('Cheking file structure')    
+    sq_type=[]
+    sq_type=list(short_metadata_type_check(image_sequence_directory_full_path))
+    
+    cleaneduplist=glob.glob(image_sequence_directory_full_path+'\**Cycle**.tif')
+
     # if 'TSeries ZSeries Element' separate by plane
     # if 'Single'
     # if 'TSeries Timed Element' separate by channles
     # if 'ZSeries' separate by channels only
        
-    file_list = os.listdir(image_sequence_directory_full_path)
     ChannelRedExists=False
     ChannelGreenExists=False
     Multiplane=False
@@ -154,14 +190,79 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     ChannelGreenExists=any(glob.glob(image_sequence_directory_full_path+'\\**_Ch2_**', recursive=False))  
        
     possible_channels=2
+    if sq_type[0]!='':
+        pass
+    else:
+        alltiffs=glob.glob(image_sequence_directory_full_path+'\**.tif')
+
+        if cleaneduplist and os.path.getsize(cleaneduplist[0])>200000:
+            
+            
+    
+            img_fpath = pathlib.Path(alltiffs[0])
+    
+            
+        elif os.path.isdir(os.path.join(image_sequence_directory_full_path,'Ch1Red')):
+            
+            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch1Red','plane1')+'\**.tif')[0])
+            
+        else :
+            
+            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch2Green','plane1')+'\**.tif')[0])
+    
+    
+            
+            
+        reader = OMETIFFReader(fpath=img_fpath)
+
+        img_array, metadata, xml_metadata = reader.read()
+        del reader, img_array, xml_metadata
+        gc.collect()
+
+        
+
+        if metadata['SizeZ']>1:
+            sq_type[0]='ZSeries' 
+            sq_type[0]='TSeries ZSeries Element' 
+           
+        else:
+            
+            sq_type[0]='Single' 
+            sq_type[0]='TSeries Timed Element' 
+       
+        sq_type[2]=metadata['SizeZ']
+        if alltiffs:
+            if alltiffs[-1][-9]==4 or  alltiffs[-1][-10]:
+                alltiffs.pop(-1)
+            elif alltiffs[-1][-10]==4:
+                alltiffs.pop(-1)
+                alltiffs.pop(-1)
+            """
+            HERE TO IMPROE AND MAKE THIS GOOD FOR
+            """
+            sq_type[1]=len(alltiffs)// metadata['SizeZ']//metadata['SizeC']
+            sq_type[1]=int(alltiffs[-1][-24:-19])
+        else:
+            sq_type[1]=0
+            
+       
+    
+            
+        
+
+        
+        
     possible_frames=sq_type[1]
     possible_planes=sq_type[2]
+    if sq_type[0]=='TSeries ZSeries Element' or sq_type[0]=='ZSeries':
+        Multiplane=True
+   
+            
     
     moviestructure={}
 
 
-    if sq_type[0]=='TSeries ZSeries Element' or sq_type[0]=='ZSeries':
-        Multiplane=True
+   
         
     RedPlaneNumber=0
     FirstRedPlane=0
@@ -177,7 +278,13 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     GreenLastFrame=0
                 
 
-    cleaneduplist=[file_name for file_name in file_list if os.path.isfile(os.path.join(image_sequence_directory_full_path , file_name)) and ('Cycle' in file_name and '.tif' in file_name)]
+    
+    # here I have to add an option to detect the extra files when doing the multiplane
+    if cleaneduplist:
+        if len(cleaneduplist)<4 and cleaneduplist[0][cleaneduplist[0].find('.ome')-1]=='4':
+            cleaneduplist=[]
+
+        
     if cleaneduplist:
         for channel in range(1,possible_channels+1):
             chlist=[file_name for file_name in cleaneduplist if  '_Ch{}_'.format(str(channel)) in file_name]
@@ -221,7 +328,7 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
                     aq_truth=[]
                     if sq_type[0]!='TSeries ZSeries Element' and correction:
                         for j, frame in enumerate(chlist):
-                            for i in range(j+1,possible_planes+1):
+                            for i in range(j+1,possible_frames+1):
                                 if 'Ch{}_{}'.format(str(channel),str(i).zfill(6)) in frame:
                                     aq_truth.append('Ch{}_{}'.format(str(channel),str(i).zfill(6)))  
                                     break

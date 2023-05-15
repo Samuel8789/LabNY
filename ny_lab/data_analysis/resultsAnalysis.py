@@ -15,7 +15,8 @@ import glob
 import gc
 import sys
 from matplotlib.backends.backend_pdf import PdfPages
-
+import logging 
+module_logger = logging.getLogger(__name__)
 
 import tkinter as Tkinter
 import random
@@ -23,6 +24,7 @@ from tkinter import *
 import pandas as pd
 import tkinter as tk
 import numpy as np
+import scipy.io as sio
 
 
 from matplotlib import gridspec
@@ -163,11 +165,12 @@ class ResultsAnalysis():
         self.temporary_processing=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
         self.caiman_results=None
         self.pyr_int_ids_and_indexes=None
-        self.set_up_some_paths()
 
         
         
         if self.acquisition_object:
+            self.set_up_some_paths()
+
             self.metadata_object=self.acquisition_object.metadata_object
             self.acquisition_object.voltage_signal_object
             self.volt_object=self.acquisition_object.voltage_signal_object
@@ -197,17 +200,24 @@ class ResultsAnalysis():
             
 
             self.allen, self.data_set, self.spikes=self.allen_BO_tuple
-            
+            self.set_up_some_paths()
+
             self.cell_info, self.traces, self.neuropilinfo, self.locomotion_info, self.metadata, self.pupilinfo,self.masks, self.projection=self.allen.dataset_exploration(self.data_set)
             # test=allen.allen_manifest.get_cell_specimens(ids=cell_info[1][0])
             self.stim_info=self.allen.exploring_stimulus(self.data_set)
-        
+            self.check_pyr_int_identif_files()
+
+            self.create_full_data_container_allen()
             self.allen.plotting_traces_and_stim(self.data_set, self.traces[-1], self.locomotion_info[0])
-            self.drifting=self.allen.explore_drifting_analysis( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
-            self.spont=self.allen.explore_spontaneous_activity( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
-            self.movies=self.allen.explore_natural_movie_analysis( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
+            # self.drifting=self.allen.explore_drifting_analysis( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
+            # self.spont=self.allen.explore_spontaneous_activity( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
+            # self.movies=self.allen.explore_natural_movie_analysis( self.data_set, self.traces[-1], self.spikes, selected_cell_index=0, plot=False)
+            self.load_pyr_int_identif()
+            
             
         elif cloud:
+            self.set_up_some_paths()
+
             self.create_full_data_container()
             self.create_stim_table()
 
@@ -223,6 +233,8 @@ class ResultsAnalysis():
             self.check_all_jesus_results()
         
         else:   
+            self.set_up_some_paths()
+
             
             if self.acquisition_voltage_signals_object:
                 self.volt_object=self.acquisition_voltage_signals_object
@@ -242,16 +254,13 @@ class ResultsAnalysis():
                    'pca_runs_path':'PCA'}
 
         if self.acquisition_object:
+            self.aquisition_id=self.acquisition_object.aquisition_name
             mouse_slow_path=self.acquisition_object.mouse_imaging_session_object.mouse_object.mouse_slow_subproject_path
             self.data_analysis_path=os.path.join(mouse_slow_path,'data',self.acquisition_object.aquisition_name)
             self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
             
-            for data_path in self.data_paths.values():
-                if not os.path.isdir(data_path):
-                    os.makedirs(data_path)
-
-            self.full_data_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'full_data.pkl'])  
-            self.pyr_int_identif_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'pyr_int_identification.pkl'])  
+            self.full_data_path_name='_'.join([self.aquisition_id, timestr,'full_data.pkl'])  
+            self.pyr_int_identif_path_name='_'.join([self.aquisition_id, timestr,'pyr_int_identification.pkl'])  
             
         elif self.data_analysis_path:
             self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
@@ -262,6 +271,21 @@ class ResultsAnalysis():
             self.full_data_path_name=None
             self.pyr_int_identif_path_name=None
             
+        if self.allen_BO_tuple:
+            self.aquisition_id='_'.join((str(self.data_set.get_metadata()['experiment_container_id']), str(self.data_set.get_metadata()['ophys_experiment_id'])))
+
+            self.data_analysis_path=os.path.join(self.allen.main_directory,'Containers', str(self.data_set.get_metadata()['experiment_container_id']), str(self.data_set.get_metadata()['ophys_experiment_id']))
+            self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
+            
+            self.full_data_path_name='_'.join([  self.aquisition_id, timestr,'full_data.pkl'])  
+            self.pyr_int_identif_path_name='_'.join([  self.aquisition_id, timestr,'pyr_int_identification.pkl'])  
+            
+        for data_path in self.data_paths.values():
+            if not os.path.isdir(data_path):
+                os.makedirs(data_path)
+            
+            
+           
 #%% loading aquisition objects(calcium results and signals)
     def load_all_data_objects(self):
         self.load_all_acquisition_subobjects()
@@ -298,15 +322,133 @@ class ResultsAnalysis():
         self.signals_object.update_frame_rates_with_metadata(prairire_frame_rate, daq_frame_rate)
         
         
+    def load_visual_stim_protocol(self):
+        pass
+        
+    def save_activity_array_to_matlab(self,activity_arrays):
+        if isinstance(activity_arrays[-2][2],list):
+            selectedcells='selected_cell_range_'+'_'.join([str(i) for i in activity_arrays[-2][2][:2]])+'___'+ '_'.join([str(i) for i in activity_arrays[-2][2][-2:]])
+
+            
+            
+        else:
+            selectedcells=activity_arrays[-2][2]
+        name='_'.join([activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4], selectedcells,'binarization_threshold_'+str(activity_arrays[-2][-1])])
+        sio.savemat( os.path.join(self.data_analysis_path,self.aquisition_id+'_'+name+'.mat'),{name:activity_arrays[3]})
+        
+    
 #%% checking datasets
     def check_caiman_rasters(self):
     
         for dataset in self.caiman_extractions.values():
                dataset.CaimanResults_object.plot_final_rasters()
      
-#%% full data organization       
-    def create_full_data_container(self):
+#%% full data organization   
+
+    def binarization(self, threshold=0.1):
         
+        binarized=np.copy(self.full_data['imaging_data']['Plane1']['Traces']['deconvolved'])
+
+        binarized[binarized>threshold]=1
+        binarized[binarized<threshold]=0
+
+        self.full_data['imaging_data']['Plane1']['Traces']['binarized']=binarized
+        self.full_data['imaging_data']['Plane1']['Traces']['binarization_threshold']=threshold
+
+        
+        
+        
+    def create_full_data_container_allen(self):
+        self.check_full_data()
+        self.load_full_data()
+        
+        
+        module_logger.info('Creating full data container')
+        
+        if not self.full_data or self.new_full_data:
+            
+            self.full_data={'imaging_data':{'Frame_rate':'',
+                                            'Interplane_period':'',
+                                            'Frame_number':'',
+                                            'Plane1':{'CellIds':np.arange(self.traces[2].shape[0]),
+                                                      'CellNumber':self.traces[2].shape[0],
+                                                      'Timestamps':(self.traces[1],self.traces[0]),
+                                                      'Traces':{'raw_traces':self.traces[2],
+                                                                'demixed_traces':self.traces[3],
+                                                                'neuropil_traces':self.traces[4],
+                                                                'corrected_traces':self.traces[5],
+                                                                'dff_traces':self.traces[6],
+                                                                'deconvolved':self.spikes,
+                                                                'binarized':'',
+                                                                'binarization_threshold':''
+    
+                                                                }
+                                                      }
+                                            },
+                            'voltage_traces':{},
+                            'visstim_info':{'Paradigm_Indexes':{
+    
+                                                                },
+                                            'Drifting_Gratings':{'Resampled_sliced_speed':''
+                                                }
+                                
+                                            }
+                                    
+                            }
+        
+        
+            self.binarization()
+
+            inter=[]
+            pyr=[]
+    
+            if self.data_set.get_metadata()['cre_line'] in ['Pvalb-IRES-Cre', 'Sst-IRES-Cre','Vip-IRES-Cre']:
+                inter=self.full_data['imaging_data']['Plane1']['CellIds'].tolist()
+            else:
+                pyr=self.full_data['imaging_data']['Plane1']['CellIds'].tolist()
+               
+            self.pyr_int_identification={}
+            self.pyr_int_identification['Plane1']={'interneuron':{'matlab':[i+1 for i in inter],
+                                                          'python':inter,
+                                                          },
+                                           'pyramidals':{'matlab':[i+1 for i in pyr],
+                                                         'python':pyr,
+                                                         }
+                                           }
+                
+            self.pyr_int_ids_and_indexes={'Plane1':{'pyr':(pyr,np.ones(len(pyr), dtype=bool)),
+                                                    'int':(inter,np.ones(len(inter), dtype=bool))
+                                                        }
+                                          }
+                            
+            epochtable=self.data_set.get_stimulus_epoch_table()
+            
+            
+            drifdic=['first_drifting_set_first',
+                     'first_drifting_set_last',
+                     'second_drifting_set_first',
+                     'second_drifting_set_last',
+                     'third_drifting_set_first',
+                     'third_drifting_set_last'
+                     ]
+            
+            drifting_epochs=epochtable[epochtable['stimulus']=='drifting_gratings'].reset_index(drop=True)
+            locomotions=[]
+            for i in range(3):
+                self.full_data['visstim_info']['Paradigm_Indexes'][drifdic[2*i]]=drifting_epochs['start'][i]
+                self.full_data['visstim_info']['Paradigm_Indexes'][drifdic[2*i+1]]=drifting_epochs['end'][i]
+                locomotions.append(self.locomotion_info[0][drifting_epochs['start'][i]:drifting_epochs['end'][i]])
+                
+                
+            
+            self.full_data['visstim_info']['Drifting_Gratings']['Resampled_sliced_speed']=np.hstack(locomotions)
+            self.save_pyr_int_identif()
+            self.save_full_data()
+
+           
+    def create_full_data_container(self):
+        module_logger.info('Creating full data container')
+
         self.check_full_data()
         self.load_full_data()
 
@@ -335,6 +477,8 @@ class ResultsAnalysis():
                 self.save_full_data()
             
         self.milisecond_period=1000/self.full_data['imaging_data']['Frame_rate']
+        module_logger.info('Finished Creating full data container')
+
 
 #%% loading and saving full data dictionary
     def reload_other_full_data(self, index):
@@ -378,6 +522,8 @@ class ResultsAnalysis():
 #%% calcium data managing
     def extract_calcium_traces(self):
         self.pyr_int_identification={}
+        
+        # Define dictionary names
         for dataset_name in list(self.caiman_results.keys()):
             if 'Plane1' in dataset_name:
                 plane=     'Plane1'   
@@ -401,7 +547,7 @@ class ResultsAnalysis():
                           'denoised':selected_plane_caiman.C_matrix, 
                            # 'df/f_demixed':calculate_dff(selected_plane_caiman.raw), 
                            # 'df/f_denoised':calculate_dff(selected_plane_caiman.C_matrix), 
-                          'dfdt_raw':selected_plane_caiman.dfdt_unsmoothed, 
+                          'dfdt_raw':selected_plane_caiman.dfdt_accepted_matrix, 
                           'dfdt_smoothed':selected_plane_caiman.dfdt_thesholded_accepted_matrix, 
                           'dfdt_binary':selected_plane_caiman.binarized_dfdt,
                           'foopsi_raw':selected_plane_caiman.foopsi_matrix, 
@@ -426,7 +572,7 @@ class ResultsAnalysis():
                 self.full_data['imaging_data']['All_planes_timestamped']['Traces']= {key:np.empty((0, len(self.full_data['imaging_data']['Plane1']['Timestamps'][0]))) for key in plane_traces.keys()}
 
             for matrix_name, matrix in  self.full_data['imaging_data'][plane]['Traces'].items():
-                if matrix.any():
+                if matrix.any() and self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name].shape[0]!=0:
                     self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name]=np.concatenate((self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name],  matrix), axis=0)
         
         # cell_numbers={k:len(plane['CellIds']) for k,plane in self.full_data['imaging_data'].items() if 'Plane' in k }
@@ -456,9 +602,28 @@ class ResultsAnalysis():
 
         if self.signals_object.vis_stim_protocol and self.signals_object.transitions_dictionary:
             self.full_data['visstim_info']['Paradigm_Indexes']={key:(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
-            self.full_data['visstim_info']['Movie1']={'Indexes':'',
-                                                      'Binary_Maytrix':''
+            
+            frame_starts=np.zeros([10,900])  
+            frame_ends=np.zeros([10,900])                                          
+                                        
+            it = np.nditer(self.signals_object.movie_one_frame_index_full_recording[:,:,0], flags=['multi_index'])                              
+            for x in it:                
+                frame_starts[it.multi_index]=np.abs(np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -x/voltagerate).argmin()
+                  
+            it = np.nditer(self.signals_object.movie_one_frame_index_full_recording[:,:,1], flags=['multi_index'])                              
+            for y in it:                
+                frame_ends[it.multi_index]=np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -y/voltagerate).argmin()
+            
+            self.full_data['visstim_info']['Full']={ 'Resampled_sliced_speed':self.resample(self.signals_object.rectified_speed_array['Prairire']['Locomotion'], factor=self.milisecond_period, kind='linear').squeeze(),
+                                                    'Resampled_sliced_visstim':self.resample(self.signals_object.rounded_vis_stim['Prairire']['VisStim'], factor=self.milisecond_period, kind='linear').squeeze(),
+               }
+            self.full_data['visstim_info']['Movie1']={'Frame_Starts':frame_starts,
+                                                      'Frame_Ends':frame_ends,                                                    
+                                                      'Resampled_sliced_speed':self.resample(self.signals_object.natural_movie_one_set_speed, factor=self.milisecond_period, kind='linear').squeeze(),
+                                                      'Resampled_sliced_visstim':self.resample(self.signals_object.natural_movie_one_set, factor=self.milisecond_period, kind='linear').squeeze(),
                                                         }
+     
+            
             self.full_data['visstim_info']['Spontaneous']={}
             self.full_data['visstim_info']['Spontaneous']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont_last']] ,), columns =['start', 'end'])
     
@@ -510,20 +675,175 @@ class ResultsAnalysis():
                                                             }
                 
             elif self.signals_object.vis_stim_protocol =='AllenB':    
-                
-                self.full_data['visstim_info']['Static_Gratings']={'Indexes':'',
-                                                          'Binary_Maytrix':'',
-                                                          'Ref_matrix':''
-                                                            }
-                self.full_data['visstim_info']['Natural_Images']={'Indexes':'',
-                                                          'Binary_Maytrix':'',
-                                                          'Ref_matrix':''
-                                                            }
+                all_static_grating_onsets=np.sort(np.append(self.signals_object.static_grat_even_index_full_recording,self.signals_object.static_grat_odd_index_full_recording))
+                all_natural_images_onsets=np.sort(np.append(self.signals_object.natural_image_even_index_full_recording,self.signals_object.natural_image_odd_index_full_recording))
+            
+  
+                static_gratings_trial_structure=pd.DataFrame({'onsets':all_static_grating_onsets,
+                                                              'grating_id': self.acquisition_object.allstaticindexes[:all_static_grating_onsets.shape[0]]})
 
+
+                natural_images_trial_structure=pd.DataFrame({'onsets':all_natural_images_onsets,
+                                                              'image_id': self.acquisition_object.allnatiuralindexes[:all_natural_images_onsets.shape[0]]})
+
+                indexes={}
+                for grating_id in range(0,120+1):
+                    indexes[grating_id]=[]
+                    for trial in range(static_gratings_trial_structure[static_gratings_trial_structure['grating_id']==grating_id].shape[0]):  
+                        idx=static_gratings_trial_structure[static_gratings_trial_structure['grating_id']==grating_id].iloc[trial][0]
+                        indexes[grating_id].append(np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -idx/voltagerate).argmin() )
+
+
+
+
+
+                self.full_data['visstim_info']['Static_Gratings']={'Indexes':indexes,
+                                                           'Resampled_sliced_speed':self.resample(np.concatenate((self.signals_object.first_static_set_speed, 
+                                                                                                                  self.signals_object.second_static_set_speed, 
+                                                                                                                  self.signals_object.third_static_set_speed)), factor=self.milisecond_period, kind='linear').squeeze(),
+                                                           'Resampled_sliced_visstim':self.resample(np.concatenate((self.signals_object.first_static_set, 
+                                                                                                                    self.signals_object.second_static_set,
+                                                                                                                    self.signals_object.third_static_set)), factor=self.milisecond_period, kind='linear').squeeze()
+                                                            }
+                indexes={}
+                for image_id in range(0,118+1):
+                    indexes[image_id]=[]
+                    for trial in range(natural_images_trial_structure[natural_images_trial_structure['image_id']==image_id].shape[0]):  
+                        idx=natural_images_trial_structure[natural_images_trial_structure['image_id']==image_id].iloc[trial][0]
+                        indexes[image_id].append(np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -idx/voltagerate).argmin() )
+                
+                self.full_data['visstim_info']['Natural_Images']={'Indexes':indexes,
+                                                          'Resampled_sliced_speed':self.resample(np.concatenate((self.signals_object.first_images_set_speed, 
+                                                                                                                 self.signals_object.second_images_set_speed, 
+                                                                                                                 self.signals_object.third_images_set_speed)), factor=self.milisecond_period, kind='linear').squeeze(),
+                                                          'Resampled_sliced_visstim':self.resample(np.concatenate((self.signals_object.first_images_set, 
+                                                                                                                   self.signals_object.second_images_set,
+                                                                                                                   self.signals_object.third_images_set)), factor=self.milisecond_period, kind='linear').squeeze()
+                                                            }
+         
     def create_stim_table(self):
         
-        self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']=self.drifting_grating_stim_table()
+        if self.signals_object.vis_stim_protocol=='AllenA':
+            self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table']=self.drifting_grating_stim_table()
+        elif self.signals_object.vis_stim_protocol=='AllenB':
+            self.full_data['visstim_info']['Static_Gratings']['stimulus_table']=self.static_gratings_stim_table()
+            self.full_data['visstim_info']['Natural_Images']['stimulus_table']=self.natural_images_stim_table()
+        elif self.signals_object.vis_stim_protocol=='AllenC':
+            pass
+                   
+    
+    def movie_one_stim_table(self):   
+        
+        
+        frame1starts=self.full_data['visstim_info']['Movie1']['Frame_Starts'][:,0].astype('uint32')
+        frame1ends=self.full_data['visstim_info']['Movie1']['Frame_Ends'][:,1].astype('uint32')
+        
+        if (not self.nondatabase) and self.signals_object.vis_stim_protocol:
+            self.stim_time=2000  #ms
+            self.pre_time=350    #ms
+            self.post_time=350   #ms
+                   
+            
+            self.pre_frames=np.ceil(self.pre_time/self.milisecond_period).astype(int)
+            self.post_frames=np.ceil(self.post_time/self.milisecond_period).astype(int)
+            self.stim_frames=np.ceil(self.stim_time/self.milisecond_period).astype(int)
+            self.grating_number=len(self.full_data['visstim_info']['Natural_Images']['Indexes'])
+            corrected_indexes=self.full_data['visstim_info']['Movie1']['Frame_Starts'].astype('uint32')
+            
+            df=pd.DataFrame({'Frame_ID':np.zeros(self.full_data['visstim_info']['Movie1']['Frame_Starts'].size),
+                             'Trial_ID':np.zeros(self.full_data['visstim_info']['Movie1']['Frame_Starts'].size),
+                         'start':np.zeros(self.full_data['visstim_info']['Movie1']['Frame_Starts'].size),
+                         'end':np.zeros(self.full_data['visstim_info']['Movie1']['Frame_Starts'].size)} )
+            
+            
+            
+                         
+            for i in np.arange(self.full_data['visstim_info']['Movie1']['Frame_Starts'].shape[0]):
+                framenumber=np.arange(1,self.full_data['visstim_info']['Movie1']['Frame_Starts'][i,:].shape[0]+1)
+                framestarts=self.full_data['visstim_info']['Movie1']['Frame_Starts'][i,:].astype('uint32')
+                frameends=self.full_data['visstim_info']['Movie1']['Frame_Ends'][i,:].astype('uint32')
+                
+                df.iloc[900*i:900*(i+1)]=np.vstack((framenumber,np.zeros(self.full_data['visstim_info']['Movie1']['Frame_Starts'][i,:].shape[0]).astype('uint8')+i+1,framestarts,frameends)).T
+   
+            df = df.astype('int')
 
+          
+            
+            return df
+        
+        
+        
+        
+    def movie_two_stim_table(self):
+        pass
+    def movie_three_stim_table(self):
+        pass
+    
+    def static_gratings_stim_table(self):
+        if (not self.nondatabase) and self.signals_object.vis_stim_protocol:
+            self.stim_time=250    #ms
+            self.pre_time=350     #ms
+            self.post_time=350      #ms
+                   
+            
+            self.pre_frames=np.ceil(self.pre_time/self.milisecond_period).astype(int)
+            self.post_frames=np.ceil(self.post_time/self.milisecond_period).astype(int)
+            self.stim_frames=np.ceil(self.stim_time/self.milisecond_period).astype(int)
+            self.grating_number=len(self.full_data['visstim_info']['Static_Gratings']['Indexes'])
+            corrected_indexes=self.full_data['visstim_info']['Static_Gratings']['Indexes']
+            
+            
+            df=pd.DataFrame({'Grating_ID':np.zeros(len(corrected_indexes[0])),
+                         'start':corrected_indexes[0],
+                         'end':corrected_indexes[0]+self.stim_frames           
+                        })
+            for i in range(1,len(corrected_indexes)):
+                df2=pd.DataFrame({'Grating_ID':np.zeros(len(corrected_indexes[i]))+i,
+                             'start':corrected_indexes[i],
+                             'end':corrected_indexes[i]+self.stim_frames 
+                            })
+                
+                df=df.append(df2, ignore_index=True)            
+            
+            
+          
+            sorted_df=df.sort_values(by=['start'])
+            
+            return sorted_df.reset_index(drop=True)
+                      
+    def natural_images_stim_table(self):
+            
+       if (not self.nondatabase) and self.signals_object.vis_stim_protocol:
+           self.stim_time=2000    #ms
+           self.pre_time=350     #ms
+           self.post_time=350      #ms
+                  
+           
+           self.pre_frames=np.ceil(self.pre_time/self.milisecond_period).astype(int)
+           self.post_frames=np.ceil(self.post_time/self.milisecond_period).astype(int)
+           self.stim_frames=np.ceil(self.stim_time/self.milisecond_period).astype(int)
+           self.grating_number=len(self.full_data['visstim_info']['Natural_Images']['Indexes'])
+           corrected_indexes=self.full_data['visstim_info']['Natural_Images']['Indexes']
+           
+           
+           df=pd.DataFrame({'Image_ID':np.zeros(len(corrected_indexes[0])),
+                        'start':corrected_indexes[0],
+                        'end':corrected_indexes[0]+self.stim_frames           
+                       })
+           for i in range(1,len(corrected_indexes)):
+               df2=pd.DataFrame({'Image_ID':np.zeros(len(corrected_indexes[i]))+i,
+                            'start':corrected_indexes[i],
+                            'end':corrected_indexes[i]+self.stim_frames 
+                           })
+               
+               df=df.append(df2, ignore_index=True)            
+           
+           
+         
+           sorted_df=df.sort_values(by=['start'])
+           
+           return sorted_df.reset_index(drop=True)
+                
     def drifting_grating_stim_table(self):
         if (not self.nondatabase) and self.signals_object.vis_stim_protocol:
     
@@ -564,21 +884,76 @@ class ResultsAnalysis():
             return sorted_df.reset_index(drop=True)
             
 #%% plotting
+
+    #%% PLOTTING MOVIE 1
+    
+   
+        
+        
+        
+        
+        
+        
+
+    #%% PLOTTING GENERAL
+    def general_raster_plotting(self, title):
+        #method to define defaul options for a raster plot
+        
+        pixel_per_bar = 4
+        dpi = 100
+        fig, ax = plt.subplots(1,  figsize=(16,9), dpi=dpi, sharex=True) 
+        ax.set_xlabel('Time(s)')
+        fig.supylabel('Cell Number')
+        fig.suptitle(title)
+        fig.set_tight_layout(True)
+        
+        return fig, ax
+    
+    def plot_sliced_raster(self,trace_type,plane,selected_cells,paradigm='Full', locomotion=False):
+        activity_arrays= self.get_raster_with_selections(trace_type,plane,selected_cells, paradigm)
+        
+        
+        if not locomotion:
+            fig, ax=self.general_raster_plotting(paradigm)
+              
+            centers = [activity_arrays[3].shape[0]+1, 1]
+            dy, = -np.diff(centers)/(activity_arrays[3].shape[0]-1)
+            extent=[activity_arrays[4][0]-activity_arrays[4][0],
+                    activity_arrays[4][-1]-activity_arrays[4][0],
+                    centers[0]+dy/2,
+                    centers[1]-dy/2]
+            
+            ax.imshow(activity_arrays[3], cmap='binary', aspect='auto',
+                interpolation='nearest', norm=mpl.colors.Normalize(0, 1),extent=extent)
+        else:
+            
+            pixel_per_bar = 4
+            dpi = 100
+            fig, ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True) 
+            ax[1].set_xlabel('Time(s)')
+            fig.supylabel('Cell Number')
+            fig.suptitle(title)
+            fig.set_tight_layout(True)
+            
+            
+        
+        # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
+      
+        
+        # filename = os.path.join( os.path.split(self.data_paths['Movie1'])[0],f'allcells_Raster_scored_mcmc.pdf')
+        # self.save_multi_image(filename)
+        # plt.close('all')
+        
+        
     def plot_all_planes_by_cell_type(self):
         plt.close('all')
 
-        pixel_per_bar = 4
-        dpi = 100
-        
-        
-        n1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][1]
-        n2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][1]
-        n3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][1]
-        allplanepyramidalindex=np.concatenate((n1,n2,n3))
-        in1=self.pyr_int_ids_and_indexes['Plane1']['int'][1]
-        in2=self.pyr_int_ids_and_indexes['Plane2']['int'][1]
-        in3=self.pyr_int_ids_and_indexes['Plane3']['int'][1]
-        allplaneinterneuronindex=np.concatenate((in1,in2,in3))
+    
+        dpi=100
+        pyramidals=[   val['pyr'][1]    for plane,val in self.pyr_int_ids_and_indexes.items()  if 'rough' not in plane]
+        allplanepyramidalindex=np.hstack(pyramidals)
+        pyramidals=[   val['int'][1]    for plane,val in self.pyr_int_ids_and_indexes.items() if 'rough' not in plane]
+        allplaneinterneuronindex=np.hstack(pyramidals)
         
         
         #all scored mcmc binary
@@ -602,10 +977,10 @@ class ResultsAnalysis():
         
         
         fig, ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
-        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplanepyramidalindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
-        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplanepyramidalindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
         ax[1].set_xlabel('Time(s)')
@@ -617,13 +992,13 @@ class ResultsAnalysis():
         #pyramidal mcmcm
         
         fig,ax = plt.subplots(3,  figsize=(16,9), dpi=dpi, sharex=True)
-        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplanepyramidalindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         ax[0].title.set_text('Raw_MCMC')
-        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplanepyramidalindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[1].title.set_text('Smoothed_MCMC_{}'.format(self.MCMC_sigma))
-        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplanepyramidalindex,:], cmap='binary', aspect='auto',
+        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplanepyramidalindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[2].title.set_text('Binarized_smoothed_MCMC_{}_{}'.format(0, self.MCMC_sigma ))
         ax[-1].set_xlabel('Time(s)')
@@ -635,10 +1010,10 @@ class ResultsAnalysis():
        
          
         fig, ax = plt.subplots(2,  figsize=(16,9), dpi=dpi, sharex=True)
-        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_smoothed'][allplaneinterneuronindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[0].title.set_text('Smoothed_thresholded_dfdt_{}_{}'.format(self.dfdt_sigma, self.dfdt_std_threshold))
-        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+        ax[1].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['dfdt_binary'][allplaneinterneuronindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[1].title.set_text('Binarized_Smoothed_thresholded_dfdt_{}_{}_{}'.format(0, self.dfdt_sigma, self.dfdt_std_threshold))
         ax[1].set_xlabel('Time(s)')
@@ -650,38 +1025,22 @@ class ResultsAnalysis():
        
        #interneuron mcmcm
         fig,ax = plt.subplots(3,  figsize=(16,9), dpi=dpi, sharex=True)
-        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+        ax[0].imshow( self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_raw'][allplaneinterneuronindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         ax[0].title.set_text('Raw_MCMC')
-        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+        ax[1].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_smoothed'][allplaneinterneuronindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[1].title.set_text('Smoothed_MCMC_{}'.format(self.MCMC_sigma))
-        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplaneinterneuronindex,:], cmap='binary', aspect='auto',
+        ax[2].imshow(  self.full_data['imaging_data']['All_planes_rough']['Traces']['mcmc_binary'][allplaneinterneuronindex.squeeze(),:], cmap='binary', aspect='auto',
             interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
         # ax[2].title.set_text('Binarized_smoothed_MCMC_{}_{}'.format(0, self.MCMC_sigma ))
         ax[-1].set_xlabel('Time(s)')
         fig.supylabel('Cell Number')
         fig.suptitle('Raster_MCMC')
                
-        
-        
-        
-
-
-
-    def some_ploting(self):
-        dataset_name=list(self.caiman_results.keys())[0]
-        fig, ax=plt.subplots(3)
-    
-        ax[0].plot(self.resampled_stim_matrix)
-        ax[0].margins(x=0)
-        ax[1].imshow(self.separated_planes_combined_gratings_binarized_mcmc[dataset_name], aspect='auto')
-        ax[2].imshow(self.separated_planes_combined_gratings_binarized_dfdt[dataset_name], aspect='auto')
-
     def plot_full_signals_and_raster(self):
         
         pass
-
 
     def do_some_plotting(self, cell, trace_type, plane, matlabcell=None):
         
@@ -692,8 +1051,7 @@ class ResultsAnalysis():
         # trace_type='dfdt_smoothed'
         # trace_type='denoised'
         # trace_type='mcmc_smoothed'
-    
-        
+         
         # self.preframes=25
         # self.stim=50
         # self.postframes=25
@@ -701,18 +1059,10 @@ class ResultsAnalysis():
         #cell 3 13
         # matlabcell=45# bimodal
         # matlabcell=47 49# very sharp dip at begining of stim
-
-
         # if matlabcell:
         #     cell=np.argwhere(self.full_data['imaging_data'][plane]['CellIds']==matlabcell)[0][0]  
-        
-        
-        # matlabcell=self.full_data['imaging_data'][plane]['CellIds'][cell]
-        
-        
-        
-        
-            
+               
+        # matlabcell=self.full_data['imaging_data'][plane]['CellIds'][cell]  
         if self.pyr_int_ids_and_indexes:
             pyr=np.argwhere(self.pyr_int_ids_and_indexes[plane]['pyr'][1]).flatten()
             inter=np.argwhere(self.pyr_int_ids_and_indexes[plane]['int'][1]).flatten()
@@ -722,19 +1072,13 @@ class ResultsAnalysis():
                 celltype='Interneuron'
                 
         celltype='Interneuron'
-
-        # print(plane+'\nMatlab cell: '+str( matlabcell)+'\nPython cell :'+str(cell)+'\n' + celltype)
-        
+        # print(plane+'\nMatlab cell: '+str( matlabcell)+'\nPython cell :'+str(cell)+'\n' + celltype)        
         #  self.plot_blank_sweeps(cell,trace_type,plane)
         #  self.plot_directions(cell,trace_type,plane)
         # self.plot_orientation(cell,trace_type,plane)
         C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
-        
-
         pixel_per_bar = 4
-        dpi = 100
-        
-               
+        dpi = 100            
         # fig,ax = plt.subplots(1,  figsize=(16,9), dpi=dpi)
         # ax.imshow( C_mat, cmap='binary', aspect='auto',
         #     interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
@@ -742,66 +1086,29 @@ class ResultsAnalysis():
         # ax.set_xlabel('Time(s)')
         # fig.supylabel('Cell Number')
         # fig.suptitle('Raster dfdt')
-        # plt.show()
- 
+        # plt.show() 
         return cell
-
-
-    def plot_blank_sweeps(self, cell, trace_type, plane):
-       
-        C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
-        
-
-        
-        cell_trace=C_mat[cell,:]
-        fig,ax=plt.subplots(4)
-        ax[0].plot(cell_trace)
-   
-        test=np.vstack(
-            [cell_trace[self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].start.values.astype( 'uint16' )[sweep]-self.preframes:
-                        self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].end.values.astype( 'uint16' )[sweep]+self.postframes]
-             for sweep in range(len(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].start.values.astype( 'uint16' )))])
-        
-        
-        meantraces=np.mean(test, axis=0)
-        
-        for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==1].iterrows():
-            ax[1].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
-            
-        ax[1].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
-        ax[1].axvspan(self.preframes,self.preframes+self.stim, facecolor='b', alpha=0.3)
-        ax[1].plot(meantraces,'k')
-        ax[2].imshow(test,cmap='binary', aspect='auto')
+    #%% PLOTTING DRIFTING GRATINGS
         ax[3].plot(meantraces,'k')
-            
-
-            
+                       
     def plot_directions(self, cell, trace_type, plane):
         
         for ori in np.linspace(0,360-45,8):
-            fig,ax=plt.subplots(4)
-
-         
+            fig,ax=plt.subplots(4)         
             C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
             cell_trace=C_mat[cell,:]
-            ax[0].plot(cell_trace)
-     
-    
+            ax[0].plot(cell_trace)       
             trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
              if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
              else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori].iterrows() ])
-
-            meantraces=np.mean(trial, axis=0)
-                
+            meantraces=np.mean(trial, axis=0)               
             for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
                 ax[1].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
             ax[1].axvspan(0,self.preframes, facecolor='g', alpha=0.3)
             ax[1].axvspan(self.preframes,self.preframes+self.stim, facecolor='b', alpha=0.3)
-
             ax[1].plot(meantraces,'k')
             ax[2].imshow(trial,cmap='binary', aspect='auto')
             ax[3].plot(meantraces,'k')
-
             plt.show()
             
     def plot_orientation(self, cell, trace_type, plane, plot=None):
@@ -815,27 +1122,21 @@ class ResultsAnalysis():
         
         mean_evoked_2s=[]
         mean_evoked_1s=[]
-
         for n, ori in enumerate(np.linspace(0,180-(180/4),4)):
             # trace_type='denoised'
             C_mat=self.full_data['imaging_data'][plane]['Traces'][trace_type]
             cell_trace=C_mat[cell,:]
-            fluorescence=self.full_data['imaging_data'][plane]['Traces']['denoised'][cell,:]
-          
-    
+            fluorescence=self.full_data['imaging_data'][plane]['Traces']['denoised'][cell,:]              
             trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
              if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
              else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] 
              for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])
-
-            meantraces=np.mean(trial, axis=0)
-            
+            meantraces=np.mean(trial, axis=0)            
             mean_evoked_2s.append(np.mean(meantraces[self.preframes:self.preframes+self.stim]))
             mean_evoked_1s.append(np.mean(meantraces[self.preframes:int(np.floor((self.preframes+self.stim)/2))]))
             
         mean_evoked_2s=[]
         mean_evoked_1s=[]
-
         if plot: 
           
             fig = plt.figure(constrained_layout=True)
@@ -852,15 +1153,12 @@ class ResultsAnalysis():
                 trial=np.vstack([cell_trace[int(row.start-self.preframes):int(row.end+self.postframes)]
                  if row.end-row.start+self.preframes+self.postframes==self.preframes+self.stim+self.postframes
                  else  cell_trace[int(row.start-self.preframes):int(row.end+self.postframes+1)] 
-                 for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])
-    
+                 for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin([ori, ori+180])].iterrows() ])   
                 meantraces=np.mean(trial, axis=0)
                 
                 mean_evoked_2s.append(np.mean(meantraces[self.preframes:self.preframes+self.stim]))
                 mean_evoked_1s.append(np.mean(meantraces[self.preframes:int(np.floor((self.preframes+self.stim)/2))]))
-              
-    
-                    
+                   
                 for i, row in self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation==ori)&(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].blank_sweep==0)].iterrows():
                     axs[n][0].plot(cell_trace[int(row.start)-self.preframes:int(row.end)+self.postframes], 'k', alpha=0.1)
                 axs[n][0].set_title(ori)
@@ -871,31 +1169,27 @@ class ResultsAnalysis():
                 axs[n][0].plot(meantraces,'k')
                 axs[n][1].imshow(trial,cmap='binary', aspect='auto')
                 axs[n][2].plot(meantraces,'k')
-
-
-                
-                    
+        
             ax1=subfigs[0,2].subplots(1)    
             ax1.plot(fluorescence)
             ax2=subfigs[1,2].subplots(1)    
             ax2.plot([0,45,90,135],mean_evoked_2s, 'r', label='Full Stim')
             ax2.plot([0,45,90,135],mean_evoked_1s, 'b', label='First Half Stim')
-            ax2.legend()
-    
-            ax2.set_title('Mean Evoked Activity')
-    
+            ax2.legend()    
+            ax2.set_title('Mean Evoked Activity')   
             ax2.set_ylim(0,2*np.max(mean_evoked_2s))
-            ax2.set_ylim(0,0.2)
-    
+            ax2.set_ylim(0,0.2)    
             plt.show()
         
         return mean_evoked_2s, mean_evoked_1s
 
-
 #%% INDEXING AND IDENTITI
 
     def convert_full_planes_idx_to_single_plane_final_indx(self,full_raster_pyhton_cell_idx, plane):
+        
+        # THIS IS TO CONVERT THE INDEXES FROM THE RASTER TO ACTUAL INDEXED FROM THE CAIMAN SORTER. IT DOESN WORK WITH CAIMAN SORTER INDEXES so if n=10 cells these indexex  have to be less than N
         caiman_sorter_idx=self.full_data['imaging_data'][plane]['CellIds']
+
         try:
             if 'All' in plane:
                 total_cells=sum(len(plane) for plane in caiman_sorter_idx.values())
@@ -903,42 +1197,32 @@ class ResultsAnalysis():
                 plane_asignation=[(full_raster_pyhton_cell_idx>=i,full_raster_pyhton_cell_idx<i) for i in first_idx_plane]
                 plane_idx = len(plane_asignation) - next(i for i, val in enumerate(reversed(plane_asignation), 1) if val == (True, False)) 
                 indexed_plane_sorter_idx=caiman_sorter_idx[f'Plane{plane_idx+1}']
-
+                     
+                single_plane_selected_pyhton_cell_idx=full_raster_pyhton_cell_idx-first_idx_plane[plane_idx]
+                single_plane_sorter_pyhton_idx=indexed_plane_sorter_idx[single_plane_selected_pyhton_cell_idx]
+                matlab_sorter_cell_id=single_plane_sorter_pyhton_idx+1
             else:
+
                 total_cells=len(caiman_sorter_idx)
                 plane_idx= int(plane[-1])-1
                 indexed_plane_sorter_idx=caiman_sorter_idx
-                
-            single_plane_selected_pyhton_cell_idx=full_raster_pyhton_cell_idx-first_idx_plane[plane_idx]
-            single_plane_sorter_pyhton_idx=indexed_plane_sorter_idx[single_plane_selected_pyhton_cell_idx]
-            matlab_sorter_cell_id=single_plane_sorter_pyhton_idx+1
+                # %this is for allen plane 1 only HAVETO DO FRO PLANE ! ON MY DATA
+                single_plane_selected_pyhton_cell_idx=full_raster_pyhton_cell_idx
+                single_plane_sorter_pyhton_idx=full_raster_pyhton_cell_idx
+                matlab_sorter_cell_id=None
+
+           
         
-            return  f'Plane{plane_idx+1}', total_cells, full_raster_pyhton_cell_idx, single_plane_selected_pyhton_cell_idx, single_plane_sorter_pyhton_idx,matlab_sorter_cell_id
+            return  f'Plane{plane_idx+1}', total_cells, full_raster_pyhton_cell_idx, single_plane_selected_pyhton_cell_idx, single_plane_sorter_pyhton_idx, matlab_sorter_cell_id
                  
         except:
             print('CHeck your indexes and planes')
             return None,None,None,None,None,None
-        
-         
-    
-    def get_full_raster_indx_from_matlab_sorter_idx(self, matlab_sorter_idx, plane):
-        
-        single_plane_sorter_pyhton_idx=matlab_sorter_idx-1
-        try:
-            single_plane_selected_pyhton_cell_idx=np.argwhere(self.full_data['imaging_data']['All_planes_rough']['CellIds'][plane]==single_plane_sorter_pyhton_idx)[0][0]
-            first_idx_plane=np.concatenate((np.zeros((1)),np.cumsum([len(plane) for plane in self.full_data['imaging_data']['All_planes_rough']['CellIds'].values()])[:-1])).astype('uint16')
-            full_raster_pyhton_cell_idx=single_plane_selected_pyhton_cell_idx+first_idx_plane[ int(plane[-1])-1]
-            return  full_raster_pyhton_cell_idx
-        except:
-            
-            print('Cell Not Accepted')
-            return None
-            
-            
+                       
     def indetify_full_rater_idx_cell_identity(self, raster_pyhton_cell_idx, plane):
         
-        if raster_pyhton_cell_idx<len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]):
-
+        #first check that the index is lower tha the toal number of cell in the given plane, then check if the index is in pyramidal or interneruon list
+        if raster_pyhton_cell_idx<len(np.concatenate([self.pyr_int_ids_and_indexes[plane]['pyr'][0],self.pyr_int_ids_and_indexes[plane]['int'][0]])):
             if self.pyr_int_ids_and_indexes[plane]['pyr'][1][raster_pyhton_cell_idx]:
                 cell_identity='Tomato -'
             elif  self.pyr_int_ids_and_indexes[plane]['int'][1][raster_pyhton_cell_idx]:
@@ -958,8 +1242,7 @@ class ResultsAnalysis():
         
         return   duration_dict
     
- 
-
+    
     def get_trial_from_drifting_angle(self, direction_list, temporal_frequency_list):
         
         selected_stim_table=self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'][(self.full_data['visstim_info']['Drifting_Gratings']['stimulus_table'].orientation.isin(direction_list)) & 
@@ -980,12 +1263,13 @@ class ResultsAnalysis():
             
         return    trial_indexig_ranges   
         
-   
 
+
+           
     def get_paradigm_range(self, paradigm):    
 
         if paradigm=='Full':
-            paradimg_range=np.arange(0,self.full_data['imaging_data']['Frame_number']+1)
+            paradimg_range=np.arange(0,self.full_data['imaging_data']['Frame_number'])
             
             
         elif paradigm=='Drifting_Gratings':
@@ -998,28 +1282,57 @@ class ResultsAnalysis():
             self.full_data['visstim_info']['Paradigm_Indexes']['third_drifting_set_last'])) 
             
             paradimg_range=paradimg_range=np.r_[indexes]
-
             
         elif paradigm=='Spontaneous':
-            paradigm_start=self.vistsiminfo['Spontaneous']['stimulus_table'].iloc[[0]]['start'].values[0]
-            paradigm_end=self.vistsiminfo['Spontaneous']['stimulus_table'].iloc[[-1]]['end'].values[0]
+            paradigm_start=self.full_data['visstim_info']['Spontaneous']['stimulus_table'].iloc[[0]]['start'].values[0]
+            paradigm_end=self.full_data['visstim_info']['Spontaneous']['stimulus_table'].iloc[[-1]]['end'].values[0]
             paradimg_range=np.arange(paradigm_start,paradigm_end+1)
             
         elif paradigm=='Movie1':
             
-            paradimg_range=np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['short_movie_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['short_movie_set_last'])
+            paradimg_range=np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_one_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_one_set_last'])
             
         elif paradigm=='Movie3':
             
-            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['first_movie_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['first_movie_set_last']),                       
-             np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['second_movie_set_first'],
-            self.full_data['visstim_info']['Paradigm_Indexes']['second_movie_set_last']))
+            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_three_first_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_three_first_set_last']),                       
+             np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_three_second_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_three_second_set_last']))
             paradimg_range=paradimg_range=np.r_[indexes]
-
-
-
+            
+        elif paradigm=='Movie2':
+            
+            paradimg_range=np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_two_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['natural_movie_two_set_last'])
+            
+        elif paradigm=='Natural_Images':
+            
+            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['first_images_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['first_images_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['second_images_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['second_images_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['third_images_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['third_images_set_last'])) 
+            
+            paradimg_range=paradimg_range=np.r_[indexes]
+            
+            
+            
+        elif paradigm=='Static_Gratings':
+            
+            indexes=(np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['first_static_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['first_static_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['second_static_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['second_static_set_last']),
+            np.arange(self.full_data['visstim_info']['Paradigm_Indexes']['third_static_set_first'],
+            self.full_data['visstim_info']['Paradigm_Indexes']['third_static_set_last'])) 
+            
+            paradimg_range=paradimg_range=np.r_[indexes]
+        
+        elif paradigm=='Sparse_Noise':
+            
+            pass
         return paradimg_range
     
     
@@ -1029,24 +1342,16 @@ class ResultsAnalysis():
         if isinstance(selected_cells, list):
             
             cell_indexes=np.r_[selected_cells]
-
-            
         elif self.pyr_int_ids_and_indexes:
         
             if selected_cells=='Pyramidal':
-                cell_indexes= self.pyr_int_ids_and_indexes[plane]['pyr'][1]
-                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))[cell_indexes]
-
+                cell_indexes= np.where(self.pyr_int_ids_and_indexes[plane]['pyr'][1].flatten())[0]
             elif selected_cells=='Interneurons':
-                cell_indexes= self.pyr_int_ids_and_indexes[plane]['int'][1]
-                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))[cell_indexes]
-
+                cell_indexes= np.where(self.pyr_int_ids_and_indexes[plane]['int'][1].flatten())[0]
             elif selected_cells=='All':
-                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))
-
+                cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1].flatten())+len(self.pyr_int_ids_and_indexes[plane]['int'][1].flatten()))
         else:
             cell_indexes=np.arange(len(self.pyr_int_ids_and_indexes[plane]['pyr'][1]))
-
             
         all_index_info=[ self.convert_full_planes_idx_to_single_plane_final_indx(full_raster_pyhton_cell_idx,plane)  for full_raster_pyhton_cell_idx in cell_indexes]
             
@@ -1054,7 +1359,7 @@ class ResultsAnalysis():
                 
         return cell_indexes, all_index_info
     
-    def get_raster_with_selections(self,trace_type,plane,selected_cells, paradigm=None, drifting_options=None):
+    def get_raster_with_selections(self, trace_type, plane,selected_cells, paradigm='Full', drifting_options=False):
         selected_plane_activity_traces=None
         selected_cells_traces=None
         selected_plane_trials_traces=None
@@ -1063,14 +1368,23 @@ class ResultsAnalysis():
         cell_range, all_index_info= self.create_cell_selection_ranges(selected_cells, plane) 
         
         selected_plane_activity_traces=self.full_data['imaging_data'][plane]['Traces'][trace_type]
-        selected_cells_traces=selected_plane_activity_traces[cell_range,:]
-        
+        if selected_plane_activity_traces.any():
+            selected_cells_traces=selected_plane_activity_traces[cell_range,:]
+        else:    
+            selected_cells_traces=np.zeros(self.full_data['imaging_data'][plane]['Traces']['demixed'].shape)
+            
+        selected_plane_and_cell_timestamps=self.full_data['imaging_data'][plane]['Timestamps'][1]
+        bin_threshold=0
+        if trace_type=='binarized':
+            bin_threshold=self.full_data['imaging_data']['Plane1']['Traces']['binarization_threshold']
+            
+            
+            
         if drifting_options:
             direction_list=drifting_options[0]
             temporal_frequency_list=drifting_options[1]
             seleceted_dur_frames=drifting_options[2]
             seleceted_dur_isi=drifting_options[3]
-        
             selected_stim_table=self.get_trial_from_drifting_angle(direction_list, temporal_frequency_list)
             duration_dict=self.define_pre_post_frames(seleceted_dur_frames,seleceted_dur_isi)
             trial_indexig_ranges=self.extract_trial_indexing_array(selected_stim_table, duration_dict)
@@ -1079,18 +1393,27 @@ class ResultsAnalysis():
             
             for trial_range in trial_indexig_ranges:
                 selected_plane_trials_traces.append(selected_cells_traces[:,trial_range])
-
-
-        
+                
         if paradigm:
             paradimg_range=self.get_paradigm_range(paradigm)
          
             selected_cells_paradigm_traces=selected_cells_traces[:,paradimg_range]
+            selected_cells_paradigm_timestamps=selected_plane_and_cell_timestamps[paradimg_range]
+            selected_cells_paradigm_framestamps=paradimg_range
             
             
-        options_array=[trace_type,plane,selected_cells,all_index_info, paradigm, drifting_options]
+            
+        options_array=[trace_type,plane,selected_cells,all_index_info, paradigm, drifting_options,bin_threshold ]
         
-        return selected_plane_activity_traces, selected_cells_traces, selected_cells_paradigm_traces, selected_plane_trials_traces,options_array    
+        return selected_plane_activity_traces, \
+                selected_cells_traces, \
+                selected_plane_and_cell_timestamps, \
+                selected_cells_paradigm_traces, \
+                selected_cells_paradigm_timestamps, \
+                selected_cells_paradigm_framestamps, \
+                selected_plane_trials_traces, \
+                options_array ,\
+                self.full_data['visstim_info'][paradigm]['Resampled_sliced_speed']
         
    
     def check_pyr_int_identif_files(self) :
@@ -1103,11 +1426,11 @@ class ResultsAnalysis():
         else:
             plane='Plane1'
             self.pyr_int_identification={}
-            self.pyr_int_identification[plane]={'interneuron':{'matlab':'',
-                                                          'python':'',
+            self.pyr_int_identification[plane]={'interneuron':{'matlab':np.full(1,False),
+                                                          'python':np.full(1,False),
                                                           },
-                                           'pyramidals':{'matlab':'',
-                                                         'python':'',
+                                           'pyramidals':{'matlab':np.full(1,False),
+                                                         'python':np.full(1,False),
                                                          }
                                            }
             if not  self.pyr_int_identification[plane]['interneuron']['python']:
@@ -1116,7 +1439,7 @@ class ResultsAnalysis():
             
     def save_pyr_int_identif(self):
         datapath=os.path.join(self.data_analysis_path, self.pyr_int_identif_path_name)
-        if not os.path.isfile(datapath):
+        if not self.pyr_int_identif_list:
             with open(datapath, 'wb') as f:
                 # Pickle the 'data' dictionary using the highest protocol available.
                 pickle.dump(self.pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
@@ -1126,34 +1449,28 @@ class ResultsAnalysis():
         if not self.nondatabase and  self.pyr_int_identification:
             self.pyr_int_ids_and_indexes={}
             for plane in self.pyr_int_identification.keys():
-                self.pyr_int_ids_and_indexes[plane]={'pyr':(self.pyr_int_identification[plane]['pyramidals']['python'], 
+                self.pyr_int_ids_and_indexes[plane]={'pyr':(np.array(self.pyr_int_identification[plane]['pyramidals']['python']), 
                                         np.in1d(self.full_data['imaging_data'][plane]['CellIds'], self.pyr_int_identification[plane]['pyramidals']['python'])),
                                   'int':(np.array(self.pyr_int_identification[plane]['interneuron']['python']),
                                         np.in1d(self.full_data['imaging_data'][plane]['CellIds'], self.pyr_int_identification[plane]['interneuron']['python']))}
                 
+             
                 
-            n1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][1]
-            n2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][1]
-            n3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][1]
-            nn1=self.pyr_int_ids_and_indexes['Plane1']['pyr'][0]
-            nn2=self.pyr_int_ids_and_indexes['Plane2']['pyr'][0]
-            nn3=self.pyr_int_ids_and_indexes['Plane3']['pyr'][0]
-            
-            in1=self.pyr_int_ids_and_indexes['Plane1']['int'][1]
-            in2=self.pyr_int_ids_and_indexes['Plane2']['int'][1]
-            in3=self.pyr_int_ids_and_indexes['Plane3']['int'][1]
-            inn1=self.pyr_int_ids_and_indexes['Plane1']['int'][0]
-            inn2=self.pyr_int_ids_and_indexes['Plane2']['int'][0]
-            inn3=self.pyr_int_ids_and_indexes['Plane3']['int'][0]
-            
-            
-            self.pyr_int_ids_and_indexes['All_planes_rough']  = {'pyr':(np.concatenate((nn1,nn2,nn3)), 
-                                    np.concatenate((n1,n2,n3))),
-                              'int':(np.concatenate((inn1,inn2,inn3)), 
-                                                      np.concatenate((in1,in2,in3)))}
+            pyramidal_indexes=[[],[]] 
+            for plane in self.pyr_int_ids_and_indexes.keys() :
+                pyramidal_indexes[0].append(self.pyr_int_ids_and_indexes[plane]['pyr'][0])
+                pyramidal_indexes[1].append(self.pyr_int_ids_and_indexes[plane]['pyr'][1])
+            interneruosn_indexes=[[],[] ]  
+            for plane in self.pyr_int_ids_and_indexes.keys() :
+                interneruosn_indexes[0].append(self.pyr_int_ids_and_indexes[plane]['int'][0])
+                interneruosn_indexes[1].append(self.pyr_int_ids_and_indexes[plane]['int'][1])
+                
+            self.pyr_int_ids_and_indexes['All_planes_rough']  = {'pyr':(np.hstack(pyramidal_indexes[0]).flatten(), 
+                                    np.hstack(pyramidal_indexes[1]).flatten()),
+                              'int':(np.hstack(interneruosn_indexes[0]).flatten(), 
+                                                      np.hstack(interneruosn_indexes[1]).flatten())}
                 
                   
-       
       
             
             
@@ -1165,24 +1482,19 @@ class ResultsAnalysis():
             #                  'int':(np.array(self.pyr_int_identification['Plane1']['interneuron']['python']),
             #                         np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['interneuron']['python']))}
 
-
     def convert_excel_identitty_file(self):
         timestr = time.strftime("%Y%m%d-%H%M%S")
         aqname=''
         datapath=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data'
         identfile='SPKGcellidentiity.xlsx'
         fullfilepath=os.path.join(datapath, identfile)
-
         pyr_int_identif_path_name='_'.join(['211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000', timestr,'pyr_int_identification.pkl'])  
-
-
         planes=['Plane1', 'Plane2', 'Plane3']
         pyr_int_identification={}
         df1 = pd.read_excel(fullfilepath, sheet_name="Plane1", engine="openpyxl")
         df2 = pd.read_excel(fullfilepath, sheet_name="Plane2", engine="openpyxl")
         df3 = pd.read_excel(fullfilepath, sheet_name="Plane3", engine="openpyxl")
         dfs=[df1,df2,df3]
-
         pyramidal_count={}
         interneuron_count={}
         for i,plane in enumerate(planes):
@@ -1193,22 +1505,13 @@ class ResultsAnalysis():
                                                           'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist())-1
                                                           }
                                             }
-
-
-
             pyramidal_count[plane]=pyr_int_identification[plane]['pyramidals']['python'].shape[0]
             interneuron_count[plane]=pyr_int_identification[plane]['interneuron']['python'].shape[0]
-
-
-
-
-
         datapath=os.path.join(datapath, pyr_int_identif_path_name)
         if not os.path.isfile(datapath):
             with open(datapath, 'wb') as f:
                 # Pickle the 'data' dictionary using the highest protocol available.
                 pickle.dump(pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
-
 
     # def identify_in_pyr(self):
             
@@ -1460,8 +1763,6 @@ class ResultsAnalysis():
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_mean_trial_PCA.pdf')
         self.save_multi_image(filename)
         plt.close('all')
-
-        
         return  Xr_sc, pca, Xp
                                                       
     def get_concatentaed_trial_averaged_PCA(self):
@@ -1476,8 +1777,6 @@ class ResultsAnalysis():
         pca = PCA(n_components=n_components)
         Xa_p = pca.fit_transform(Xa.T).T
         plt.plot(pca.explained_variance_ratio_)
-
-
         comp_to_plot=3
         fig, axes = plt.subplots(1, comp_to_plot, figsize=[20, 2.8], sharey='row')
         for comp in range(comp_to_plot):
@@ -1522,20 +1821,16 @@ class ResultsAnalysis():
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_trial_averaged_PCA.pdf')
         self.save_multi_image(filename)
         plt.close('all')
-
-        
         return Xa, pca, Xa_p
              
     def get_trial_concatenated_PCA(self): 
         n_components = 15
-   
         Xl = np.hstack(self.trials)
         Xl = self.z_score(Xl)
         pca = PCA(n_components=15)
         Xl_p = pca.fit_transform(Xl.T).T
         gt = {comp : {t_type : [] for t_type in self.trial_types} for comp in range(n_components)}
         plt.plot(pca.explained_variance_ratio_)
-   
         for comp in range(n_components):
             for i, t_type in enumerate(self.trial_type):
                 if not np.isnan(t_type):
@@ -1549,7 +1844,6 @@ class ResultsAnalysis():
                                      
         f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=False, sharex=True)
         f.suptitle('trial concatenated PCA' )
-
         for comp in range(3):
             ax = axes[comp]
             alldfs=[]
@@ -1574,13 +1868,11 @@ class ResultsAnalysis():
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_single_trial_PCA.pdf')
         self.save_multi_image(filename)
         plt.close('all')
-
         return Xl, pca, Xl_p
 
 
     def get_hybrid_PCA(self):    
         n_components = 15
-
         # fit PCA on trial averages
         trial_averages = []
         for ind in self.t_type_ind:
@@ -1592,9 +1884,6 @@ class ResultsAnalysis():
         pca = PCA(n_components=15) 
         pca.fit(Xav_sc.T) # only call the fit method
         plt.plot(pca.explained_variance_ratio_)
-        
-
-        
         self.projected_trials = []
         for trial in self.trials:
             # scale every trial using the same scaling applied to the averages 
@@ -1602,7 +1891,7 @@ class ResultsAnalysis():
             # project every trial using the pca fit on averages
             proj_trial = pca.transform(trial.T).T
             self.projected_trials.append(proj_trial)
-   
+            
         gt = {comp: {t_type: [] for t_type in self.trial_types}
               for comp in range(n_components)}
         
@@ -1614,7 +1903,6 @@ class ResultsAnalysis():
                         
         f, axes = plt.subplots(1, 3, figsize=[10, 2.8], sharey=True, sharex=True)
         f.suptitle('Hybrid PCA' )
-
         for comp in range(3):
             alldfs=[]
             ax = axes[comp]
@@ -1659,8 +1947,6 @@ class ResultsAnalysis():
         component_x = 0
         component_y = 1
         component_z = 2
-
-        
         # create a boolean mask so we can plot activity during stimulus as 
         # solid line, and pre and post stimulus as a dashed line
         stim_mask = ~np.logical_and(np.arange(self.trial_size) >= self.frames_pre_stim,
@@ -1726,9 +2012,6 @@ class ResultsAnalysis():
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_trial_averaged_PCA_3d.pdf')
         self.save_multi_image(filename)
         plt.close('all')
-
-
-        
         return  Xa, pca, Xa_p
  
     def animation_2d_scatter(self):    
@@ -1793,8 +2076,7 @@ class ResultsAnalysis():
         
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_mean_response_animation_PCA.mp4')
         anim.save(filename, writer = 'ffmpeg', fps = 10)
-
-                    
+                   
     def animate_3d_trial_averaged(self,Xa_p):
         sigma = 3 # smoothing amount
         component_x = 0
@@ -1805,10 +2087,8 @@ class ResultsAnalysis():
         for t in range(self.trial_size):
             # projected data for all trials at time t 
             Xp = np.hstack([tr[:, None, t] for tr in self.projected_trials]).T
-            pca_frame.append(Xp)
-            
+            pca_frame.append(Xp)           
         subspace = (1, 2) # pick 
-
         # apply some smoothing to the trajectories
         for c in range(Xa_p.shape[0]):
             Xa_p[c, :] =  gaussian_filter1d(Xa_p[c, :], sigma=sigma)
@@ -1867,6 +2147,7 @@ class ResultsAnalysis():
         anim.save(filename, writer = 'ffmpeg', fps = 10)
         
     def animate_3d_single_trial(self):
+       
         pca_frame = []
         for t in range(self.trial_size):
             # projected data for all trials at time t 
@@ -1876,10 +2157,8 @@ class ResultsAnalysis():
         component_x = 0
         component_y = 1
         component_z = 2
-   
-        # set up a dictionary to color each line
+         # set up a dictionary to color each line
         col = {float(self.trial_types[i]) : self.pal[i] for i in range(len(self.trial_types))}
-        
         
         fig = plt.figure(figsize=[9, 9]); plt.close()
         ax = fig.add_subplot(1, 1, 1, projection='3d')
@@ -1930,15 +2209,16 @@ class ResultsAnalysis():
         anim = animation.FuncAnimation(fig, animate, frames=len(pca_frame), interval=30,blit=True)
         filename = os.path.join( self.data_paths[ 'pca_runs_path'],f'{"_".join(self.params)}_{self.timestr}_single_trial_animation_PCA.mp4')
         anim.save(filename, writer = 'ffmpeg', fps = 10)
-        
-                    
-        
-    
-            
-            
+  
 #%% allen
     def load_allen_analysis(self):
         self.allen_analysis=AllenAnalysis(self)
+        
+        
+    def analyze_movie_one(self):
+        pass
+        
+        
 #%% CRFs
     def load_CRFs_analysis(self):
         self.crf_analysis=CRFsResults(self)
@@ -1949,7 +2229,7 @@ class ResultsAnalysis():
     
     def build_binary_grating_array(self):
         pass
-        
+        s
         
         
     
@@ -1960,21 +2240,27 @@ class ResultsAnalysis():
 #%% jesus    
     def run_jesus_analysis(self, activity_arrays):   
         # self.load_jesus_results()
+        if isinstance(activity_arrays[-2][2],list):
+            selectedcells='selected_cell_range_'+'_'.join([str(i) for i in activity_arrays[-2][2][:2]])+'___'+ '_'.join([str(i) for i in activity_arrays[-2][2][-2:]])
 
-        final_raster=activity_arrays[2]
-        plt.imshow(final_raster, aspect='auto')
-        plt.title('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
+        else:
+            selectedcells=activity_arrays[-2][2]
+            
+            
+        final_raster=activity_arrays[3]
+        plt.imshow(final_raster, cmap='binary', aspect='auto', vmax=0.01)
+        plt.title('_'.join([activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4], selectedcells]))
         plt.show()
         self.jesus_binary_spikes=final_raster
-        pprint('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
+        pprint('_'.join([activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4], selectedcells]))
         self.jesus_analysis=JesusEnsemblesResults(self)
-        pprint('_'.join([activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4], activity_arrays[4][2]]))
+        pprint('_'.join([activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4], selectedcells]))
 
         # self.jesus_runs[ self.run_number+'_'+self.acquisition_object.aquisition_name+'_'+binary_raster_to_proces+'_'+plane+'_'+segment]=[binary_raster_to_proces, plane, segment, self.jesus_binary_spikes, self.jesus_analysis.analysis]
                 
-        self.jesus_run=[activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4],activity_arrays[4][2], self.jesus_analysis.analysis]
+        self.jesus_run=[activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4], selectedcells, 'threshold_'+str(activity_arrays[-2][-1]), self.jesus_analysis.analysis]
         timestr = time.strftime("%Y%m%d-%H%M%S")
-        self.jesus_runs_path_name='_'.join([self.acquisition_object.aquisition_name, timestr, activity_arrays[4][0], activity_arrays[4][1], activity_arrays[4][4],activity_arrays[4][2],'jesus_results.pkl'])  
+        self.jesus_runs_path_name='_'.join([self.aquisition_id, timestr, activity_arrays[-2][0], activity_arrays[-2][1], activity_arrays[-2][4],selectedcells,'binarization_threshold_'+str(activity_arrays[-2][-1]),'jesus_results.pkl'])  
 
 
         self.save_jesus_runs()
@@ -1992,8 +2278,52 @@ class ResultsAnalysis():
             pickle.dump(self.jesus_run, f, pickle.HIGHEST_PROTOCOL)
         
     def check_all_jesus_results(self) :
+        
         self.jesus_results_list=glob.glob( self.data_paths[ 'jesus_runs_path']+'\\**.pkl', recursive=False)
-            
+        def intersection(lst1, lst2):
+            return list(set(lst1) & set(lst2))
+
+        
+        pprint(self.jesus_results_list)
+    
+
+        #results by cell type
+        pyr_results=[i for i in  self.jesus_results_list if (('Pyr' in i) and ('.pkl' in i))]
+        int_results=[i for i in  self.jesus_results_list if (('_Interneurons_' in i) and ('.pkl' in i))]
+        all_cells_results=[i for i in  self.jesus_results_list if (('_All_jes' in i) and ('.pkl' in i))]
+        rangeof_cells_results=[i for i in  self.jesus_results_list if (('selected_cell_range' in i) and ('.pkl' in i))]
+
+        #results by paradigm
+        full_movie_results=[i for i in  self.jesus_results_list if (('_Full' in i) and ('.pkl' in i))]
+        drift_grat_results=[i for i in  self.jesus_results_list if (('Drifting' in i) and ('.pkl' in i))]
+        movie1_results=[i for i in  self.jesus_results_list if (('Movie1' in i) and ('.pkl' in i))]
+        movie2_results=[i for i in  self.jesus_results_list if (('Movie3' in i) and ('.pkl' in i))]
+        spont_results=[i for i in  self.jesus_results_list if (('Spont' in i) and ('.pkl' in i))]
+
+
+        #results by trace type
+        mcmcresults=[i for i in  self.jesus_results_list if (('mcmc_scored' in i) and ('.pkl' in i))]
+        dfdtresults=[i for i in  self.jesus_results_list if (('dfdt' in i) and ('.pkl' in i))]
+        scoredmcmcresults=[i for i in  self.jesus_results_list if (('mcmc_scored' in i) and ('.pkl' in i))]
+        binarizedresults=[i for i in  self.jesus_results_list if (('binarized' in i) and ('.pkl' in i))]
+
+
+
+         # gratings
+         
+        self.sorted_jesus_results={
+            'selected_cells':rangeof_cells_results,
+            'pyr_grat':intersection(pyr_results, drift_grat_results),
+            'int_grat':intersection(int_results, drift_grat_results),
+            'all_cells_grat':intersection(all_cells_results, drift_grat_results),
+            'selected_cells_grat':intersection(rangeof_cells_results, drift_grat_results)
+            }
+        
+        self.sorted_jesus_results['all_cells_grat_mcmcscored']=intersection(self.sorted_jesus_results['all_cells_grat'], scoredmcmcresults),
+        self.sorted_jesus_results['all_cells_grat_binarized']=intersection(self.sorted_jesus_results['all_cells_grat'], binarizedresults),
+        self.sorted_jesus_results['pyr_grat_mcmcscored']=intersection(self.sorted_jesus_results['pyr_grat'], scoredmcmcresults),
+        self.sorted_jesus_results['int_grat_mcmcscored']=intersection(self.sorted_jesus_results['int_grat'], scoredmcmcresults),
+       
      
     def unload_all_runs(self):
         

@@ -23,7 +23,8 @@ from .databasaedatasetsExplorer import MouseDatasetsPanel
 class DataProcessingTab(tk.Frame):
     def __init__(self, gui_object, gui_tab_control):
         super().__init__(gui_tab_control)
-        self.gui_ref=gui_object        
+        self.gui_ref=gui_object    
+        self.cleanedup_session_objects={}
         #%%TAB 5 'Data Processing',                        
    
         
@@ -51,17 +52,22 @@ class DataProcessingTab(tk.Frame):
         
         self.frame1.buttons={}
         self.frame1.buttons_names=['Copy ImagingSSH',
-                                   'Proces Permanent Folders',
+                                   'Clean up Permanent Folders',
                                    'Open Mouse Session Viewer',
                                    'Add Session To Database',
-                                   'Open dataset explorer'
+                                   'Open dataset explorer',
+                                   'Preprocess raw session',
+                                   'Process datasets'
+                                   
                                      ]
         
         self.frame1.buttons_commands=[self.open_ssh_notepad_and_cmd, 
                                       self.clean_up_raw_imaging_folders_button,
                                       self.open_image_session_viewer_button,
                                       self.add_new_imaging_session_button,
-                                      self.open_dataset_explorer_button
+                                      self.open_dataset_explorer_button,
+                                      self.preprocess_raw_session,
+                                      self.process_session_datasets
                                            ]
         
         for i in range(len( self.frame1.buttons_names)):
@@ -82,9 +88,13 @@ class DataProcessingTab(tk.Frame):
         self.frame1.labels[self.frame1.labels_names[0]].grid(column=0, row=1)       
         self.frame1.buttons[self.frame1.buttons_names[0]].grid(column=0, row=3)
         self.frame1.buttons[self.frame1.buttons_names[1]].grid(column=0, row=4)
-        self.frame1.buttons[self.frame1.buttons_names[2]].grid(column=0, row=5)
-        self.frame1.buttons[self.frame1.buttons_names[3]].grid(column=0, row=6)
-        self.frame1.buttons[self.frame1.buttons_names[4]].grid(column=0, row=7)
+        self.frame1.buttons[self.frame1.buttons_names[2]].grid(column=0, row=7)
+        self.frame1.buttons[self.frame1.buttons_names[3]].grid(column=0, row=8)
+        self.frame1.buttons[self.frame1.buttons_names[4]].grid(column=0, row=9)
+        self.frame1.buttons[self.frame1.buttons_names[5]].grid(column=0, row=5)
+        self.frame1.buttons[self.frame1.buttons_names[6]].grid(column=0, row=6)
+
+
 
     
 
@@ -106,12 +116,16 @@ class DataProcessingTab(tk.Frame):
         self.frame2.buttons={}
         self.frame2.buttons_names=['Proces Permanent Folders',
                                    'Open Mouse Session Viewer',
-                                   'Open dataset explorer'
+                                   'Open dataset explorer',
+                                   'Preprocess raw session',
+                                   'Process datasets'
                                      ]
         
         self.frame2.buttons_commands=[self.clean_up_raw_imaging_folders_button,
                                       self.open_image_session_viewer_button,
-                                      self.open_dataset_explorer_button
+                                      self.open_dataset_explorer_button,
+                                      self.preprocess_raw_session,
+                                      self.process_session_datasets
                                        ]
         
         for i in range(len( self.frame2.buttons_names)):
@@ -124,7 +138,7 @@ class DataProcessingTab(tk.Frame):
         #     self.frame2.entries[ self.frame2.entries_names[i]]=ttk.Entry( self.frame2 , text='', width=45)
 
         self.frame2.labels={}
-        self.frame2.labels_names=['Unprocessed Sessions']
+        self.frame2.labels_names=['Database Sessions']
         for i in range(len( self.frame2.labels_names)):
             self.frame2.labels[ self.frame2.labels_names[i]]=ttk.Label( self.frame2, text= self.frame2.labels_names[i], width=30)
 
@@ -133,6 +147,9 @@ class DataProcessingTab(tk.Frame):
         self.frame2.buttons[ self.frame2.buttons_names[0]].grid(column=0, row=3)
         self.frame2.buttons[ self.frame2.buttons_names[1]].grid(column=0, row=4)
         self.frame2.buttons[ self.frame2.buttons_names[2]].grid(column=0, row=5)
+        self.frame2.buttons[ self.frame2.buttons_names[3]].grid(column=0, row=6)
+        self.frame2.buttons[ self.frame2.buttons_names[4]].grid(column=0, row=7)
+
 
     
 
@@ -148,8 +165,7 @@ class DataProcessingTab(tk.Frame):
 
 
 #%% buttons
-    def reprocess_database_session(self):
-        pass
+
 
     def update_datamanaging_database(self):
         if self.gui_ref.datamanaging:
@@ -181,8 +197,54 @@ class DataProcessingTab(tk.Frame):
         prairie_session.process_all_imaged_mice()
         # button_update_database(self.gui_ref)
         print('Finsihed Processing Raw Permanent Folders')
+        if os.path.isdir(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice')):
+            os.startfile(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice'))
+        self.cleanedup_session_objects[session_name]=prairie_session
+        
+    def preprocess_raw_session(self):
+        session_name=self.session_to_process.get()
+        
+        if not self.cleanedup_session_objects or  session_name not in self.cleanedup_session_objects.keys():
+            self.clean_up_raw_imaging_folders_button()
+        else:
+            pass
+        prairie_session= self.cleanedup_session_objects[session_name]
+ 
+        for mouse_code in prairie_session.session_imaged_mice_codes:
+            if mouse_code!='SPHQ':
+             prairie_session.datamanagingobject.all_experimetal_mice_objects[mouse_code].raw_imaging_sessions_objects[session_name].raw_session_preprocessing()
+             
+         
+             
+        
+    def process_session_datasets(self):
+        session_name=self.session_to_process.get()
+        prairie_session= self.gui_ref.lab.datamanaging.all_existing_sessions_not_database_objects[session_name]
+        #%%
+        self.preprocess_raw_session()
+#%%
+        # raw_imaging_sessions_objects
+        for mouse_code in prairie_session.session_imaged_mice_codes:
+            if mouse_code!='SPHQ':
+                mouse_object=prairie_session.datamanagingobject.all_experimetal_mice_objects[mouse_code]
+                session_object=mouse_object.raw_imaging_sessions_objects[session_name]
+                mouse_object.get_all_mouse_raw_acquisitions_datasets(mouse_object.raw_imaging_sessions_objects)
+                for dataset in mouse_object.all_raw_mouse_acquisitions_datasets.values():
+                    dataset.process_raw_dataset()
+        
+        
+        
+        
+        print('Finished Processing (bidishift, le clip and summary images )datasets')
+        
+    def preprocess_database_session(self):
+        session_name=self.session_to_process.get()
+        prairie_session=self.gui_ref.lab.datamanaging.all_existing_sessions_not_database_objects[session_name]
+        
+        
+        pass
 
-        os.startfile(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice'))
+
 
     def open_image_session_viewer_button(self):
         session_name=os.path.split( self.session_to_process.get())[1]

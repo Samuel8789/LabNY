@@ -16,7 +16,7 @@ for sharing the data used in this demo.
 """
 import logging 
 module_logger = logging.getLogger(__name__)
-
+from datetime import datetime
 import numpy as np
 import os
 try:
@@ -46,6 +46,7 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     
     if save_mot_correct:
         mot_corretc=True
+        print('Doing motion correction')
 #%%
     start_t=time.time()
     fnamestemp=parameter_dict['fnames']
@@ -64,6 +65,10 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
         cnm = cnmf.online_cnmf.OnACID(params=opts)
         module_logger.info('start processing')
         preprocetime=time.time()
+        now = datetime.now()
+
+        current_time = now.strftime("%H:%M:%S")
+        module_logger.info("Current Time ="+ current_time)
         module_logger.info(preprocetime-start_t)
         cnm.fit_online()
         module_logger.info('Finsihed processing')

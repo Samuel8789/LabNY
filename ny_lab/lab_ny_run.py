@@ -30,7 +30,7 @@ class RunNYLab(Project):
         #load all mice info       
         self.all_mouse_info=self.database.allEXPERIMENTAL
         if Project.computer=='DESKTOP-OKLQSQS':
-            self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others']    
+            self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others', 'Raw2']    
                 
             self.data_paths_roots={}
             self.load_datbaseSaved_paths_roots()

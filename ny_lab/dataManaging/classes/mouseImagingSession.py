@@ -49,10 +49,12 @@ class MouseImagingSession():
                                               self.imaging_session_name)
         self.yet_to_add=yet_to_add
         
+        self.all_raw_nonimaging_Aquisitions={}
+        self.all_raw_0coordinate_Aquisitions={}
+        self.all_raw_FOVs={}
+
         
-       
-        
-        
+        self.all_raw_Test_Aquisitions={}
         self.all_Test_Aquisitions={}
         if not os.path.isdir(self.mouse_session_path):
             os.mkdir(self.mouse_session_path)
@@ -88,26 +90,12 @@ class MouseImagingSession():
 
 
             # this organizez folders in permanent directiory
-            self.raw_session_preprocessing()
-            print('Finished Folder Organization')
+            self.raw_session_folder_org()
+            print('Finished Folder Organization'+  raw_imaging_session_path +  self.mouse_code)
            
             #then create acquisitoin objects and copy to slow , this is slow because of metadta read
-            
-            try:
-                module_logger.info('adding raw fovs')
-                self.load_raw_FOVs()
-                module_logger.info('adding raw testaq')
-                self.load_raw_Test_Aquisitions()
-                module_logger.info('adding raw widefield')
-                self.load_raw_widefield_image()
-                module_logger.info('adding raw nonimaging')
-                self.load_raw_nonimaging_Aquisitions()
-                module_logger.info('adding raw 0coordinates')
-                self.load_raw_0coordinate_Aquisitions()
-                # self.load_raw_atlas()
-            except:
-                module_logger.exception('Something wrong with loading acquisitions ' +   self.mouse_raw_imaging_session_path)
-            print('Finished Session Preprocessing')
+            # self.raw_session_preprocessing()
+
 
 
         elif self.imaging_session_ID:
@@ -155,9 +143,28 @@ class MouseImagingSession():
 
 
    
+    def raw_session_preprocessing(self):  
         
+        if os.path.isdir( self.mouse_raw_imaging_session_path):
+            try:
+                module_logger.info('adding raw fovs')
+                self.load_raw_FOVs()
+                module_logger.info('adding raw testaq')
+                self.load_raw_Test_Aquisitions()
+                module_logger.info('adding raw widefield')
+                self.load_raw_widefield_image()
+                module_logger.info('adding raw nonimaging')
+                self.load_raw_nonimaging_Aquisitions()
+                module_logger.info('adding raw 0coordinates')
+                self.load_raw_0coordinate_Aquisitions()
+                # self.load_raw_atlas()
+            except:
+                module_logger.exception('Something wrong with loading acquisitions ' +   self.mouse_raw_imaging_session_path)
+            print('Finished Session Preprocessing')
+        else:
+            module_logger.info('no imaging done')
         
-    def raw_session_preprocessing(self):
+    def raw_session_folder_org(self):
         try:
             self.organize_acquisition_folders()  
         except:
@@ -212,6 +219,8 @@ class MouseImagingSession():
             for aq in allaq:
                 module_logger.info('processing acquisitions'+ aq_folder)
                 self.process_aquisition_folder(aq)
+                module_logger.info('removing empty final'+ aq_folder)
+
             recursively_eliminate_empty_folders(aq_folder) 
             
             
@@ -338,6 +347,8 @@ class MouseImagingSession():
                          
         
     def addFaceCamsVisStim(self, aq): 
+        module_logger.info('moving camera and mat files'+ aq)
+
         
         if not  self.UnprocessedFaceCamerasnames:
             self.UnprocessedFaceCamerasnames=['None']
@@ -404,7 +415,6 @@ class MouseImagingSession():
 #%% raw loading functions 
 
     def load_raw_nonimaging_Aquisitions(self):   
-        self.all_raw_nonimaging_Aquisitions={}
         if os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions')):           
             for i, aqu in enumerate(os.listdir(os.path.join(self.mouse_raw_imaging_session_path, 'NonImagingAcquisitions'))):
                  if (os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)) and glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)+'\\**\\**.env', recursive=False)):
@@ -453,7 +463,8 @@ class MouseImagingSession():
             self.load_existing_widefield_image()  
             
             
-    def load_raw_0coordinate_Aquisitions(self):   
+    def load_raw_0coordinate_Aquisitions(self): 
+         
          if os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton')):
          
              self.all_raw_0coordinate_Aquisitions={str(aqu):Coordinate0Aquisition(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton', aqu)+'\\**',recursive=False)[0],
@@ -482,6 +493,7 @@ class MouseImagingSession():
                         if os.path.isdir(os.path.join( self.mouse_session_path ,'nonimaging acquisitions', aqu))} 
 
     def load_existing_FOVs(self):
+          self.all_FOVs={}
     
           self.all_FOVs={str(directory):FOV(str(directory), mouse_imaging_session_object=self) 
                          
@@ -490,7 +502,8 @@ class MouseImagingSession():
         
    
         
-    def load_existing_Test_Aquisitions(self):   
+    def load_existing_Test_Aquisitions(self): 
+        self.all_Test_Aquisitions={}
         self.all_Test_Aquisitions={str(aqu):TestAquisition(os.path.join( self.mouse_session_path ,'test aquisitions', aqu),self) 
                          
                        for i, aqu in enumerate(os.listdir(os.path.join(self.mouse_session_path, 'test aquisitions')))
@@ -508,7 +521,7 @@ class MouseImagingSession():
    
         
     def load_existing_0coordinate_Aquisitions(self): 
-        
+        self.all_0coordinate_Aquisitions={}
         self.all_0coordinate_Aquisitions={str(aqu):Coordinate0Aquisition(os.path.join( self.mouse_session_path ,'0Coordinate acquisition', aqu), self) 
                          
                         for i, aqu in enumerate(os.listdir(os.path.join(self.mouse_session_path, '0Coordinate acquisition')))

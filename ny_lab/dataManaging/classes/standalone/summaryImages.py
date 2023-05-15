@@ -31,6 +31,7 @@ class SummaryImages:
     
     def __init__(self, image_sequence_path=None, dataset_object=None):
         self.projection_dic={}
+        self.projection_paths_dic={}
         self.image_sequence_path=image_sequence_path
         self.dataset_object=dataset_object
         
@@ -38,7 +39,7 @@ class SummaryImages:
             self.eliminate_caiman_extra_from_mmap()   
             self.read_projections()
             self.check_dir_for_projections()
-            if not self.projections:
+            if not self.current_projections:
                 self.do_projections()
                 self.save_projections()
                 self.unload_summary_images()
@@ -129,29 +130,49 @@ class SummaryImages:
     
             
     def check_dir_for_projections(self):
+        self.shifted_projections=[]
+        self.mc_projections=[]
         
-        self.projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**Movie**projection.tiff')
-        self.custom_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**custom**projection.tiff')
-        if self.custom_projections:
-            self.projections=self.custom_projections
-            
+        self.mc_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**Movie**OnACID**projection.tiff')
+        self.shifted_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**Movie**[^OnACID]**projection.tiff')
 
+        self.custom_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**custom**projection.tiff')
+        self.all_projections= self.mc_projections+self.shifted_projections
+        if self.custom_projections:
+            self.all_projections=self.custom_projections
+            
+            
+            
+        self.current_projections=[v for k,v in self.projection_paths_dic.items() if v in self.all_projections]
+        
 
         projection_names={'average_projection','max_projection','std_projection'}
-  
-        self.projection_paths_dic={}
-        for element in projection_names:
-            for element2 in  self.projections:
-                if element in element2:
-                    self.projection_paths_dic[element+'_path']=element2
-                    
-                    
+        
+        if self.current_projections:
+            for element in projection_names:
+                for element2 in  self.current_projections:
+                    if element in element2:
+                        self.projection_paths_dic[element+'_path']=element2
+        elif   self.mc_projections :
+            for element in projection_names:
+                for element2 in  self.mc_projections:
+                    if element in element2:
+                        self.projection_paths_dic[element+'_path']=element2
+        elif   self.shifted_projections :
+            for element in projection_names:
+                for element2 in  self.shifted_projections:
+                    if element in element2:
+                        self.projection_paths_dic[element+'_path']=element2
+
+
+            
+                        
         self.projection_dic={'average_projection_path':'',
                              'max_projection_path':'',
                              'std_projection_path':'',
                              # 'local_correlations_path':'',
                              }   
-
+        
   
             
     def copy_results_to_new_directory(self, new_directory):   

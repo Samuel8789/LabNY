@@ -32,7 +32,7 @@ except:
 
 class VoltageSignals():
     
-    def __init__(self, acquisition_object=None, voltage_excel_path=False, temporary_path=False, just_copy=False, slow_voltage_raw_csv_path=None, acquisition_directory_raw=False, extra_daq_path=None ):
+    def __init__(self, acquisition_object=None, voltage_excel_path=False, temporary_path=False, just_copy=False, slow_voltage_raw_csv_path=None, acquisition_directory_raw=False, extra_daq_path=None, scanimage_voltage_csv_path=None ):
         module_logger.info('Processing Voltage Signals')
 
         # create empty dictionarys
@@ -52,6 +52,7 @@ class VoltageSignals():
         self.voltage_signals_dictionary=copy.copy(self.voltage_signals_dictionary_daq)
         del  self.voltage_signals_dictionary['Time']
         self.voltage_signals_ftr_path_dictionary={}
+        self.scanimage_voltage_csv_path=scanimage_voltage_csv_path
         
 
         self.slow_voltage_raw_csv_path=slow_voltage_raw_csv_path
@@ -98,6 +99,18 @@ class VoltageSignals():
 
                 self.voltage_recording_raw_file_slow_full_file_path=self.voltage_excel_path
                 self.load_full_csv()
+            if  self.scanimage_voltage_csv_path:
+                self.acq_temp_name=os.path.split(os.path.split(self.scanimage_voltage_csv_path)[0])[1]
+                self.temporary_folder=os.path.join(r'C:\Users\sp3660\Desktop\TemporaryProcessing',self.acq_temp_name)
+                if not os.path.isdir( self.temporary_folder):
+                    os.mkdir(self.temporary_folder)
+                self.voltage_recording_raw_file_slow_full_file_path=self.scanimage_voltage_csv_path
+
+
+
+
+                self.load_scainimages_csv()
+                
 
 
                 
@@ -105,6 +118,24 @@ class VoltageSignals():
                 
             
 #%% methods
+
+    def load_scainimages_csv(self):
+        voltage_signals = pd.read_csv(self.scanimage_voltage_csv_path,names=['VisStim','Locomotion','Nothing'], sep="\t")
+        fig, axes = plt.subplots(nrows=3, ncols=1)
+        voltage_signals.iloc[:,0].plot(ax=axes[0])
+        voltage_signals.iloc[:,1].plot(ax=axes[1])
+        voltage_signals.iloc[:,2].plot(ax=axes[2])
+
+        
+        for signal in voltage_signals.columns.tolist():
+            if 'Locomotion' in signal or  ' Locomotion' in signal:
+                self.voltage_signals_dictionary['Locomotion']=voltage_signals[signal].to_frame()
+            if 'VisStim' in signal or ' VisStim' in signal:
+                self.voltage_signals_dictionary['VisStim']=voltage_signals[signal].to_frame()
+          
+        self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(voltage_signals.shape[0]), columns=['Time'])
+        
+
     def add_time_to_voltage_signals_dic(self):
         
         if self.voltage_signals_dictionary and not set(self.voltage_signals_dictionary).issuperset(['Time']):
@@ -170,7 +201,7 @@ class VoltageSignals():
                 self.no_voltage_signals=False
                 if os.path.getsize(path)>0:
                         self.is_file_dictionary[name]=1
-                        module_logger.info('signal is there' + path)                   
+                        module_logger.info('signal is there /n' + path)                   
                 else:       
                         self.is_file_dictionary[name]='Bad File'
                         module_logger.info('something wrong with file' + path)
@@ -306,7 +337,7 @@ class VoltageSignals():
             self.old_daq_keys=['Time', 'VisStim', 'Photodiode', 'Locomotion', 'LED/Frames', 'Optopockels',]
             if volt_array.shape[1]==5:
                 self.daq_keys=self.old_daq_keys
-            elif volt_array.shape[1]==6:
+            elif volt_array.shape[1]>=6:
                 self.daq_keys=self.new_daq_keys
             
 
@@ -394,7 +425,6 @@ class VoltageSignals():
                 
     def load_slow_storage_voltage_signals_daq(self):   
     
-        self.voltage_signals_dictionary_daq={}
         for name, path in self.voltage_signals_ftr_path_daq_dictionary.items():
             if os.path.isfile(path) :
                 if os.path.getsize(path)>0:  

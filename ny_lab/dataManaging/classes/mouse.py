@@ -29,7 +29,8 @@ class Mouse:
     def __init__(self, Mouse_Name, LabNY_object, data_managing_object=False, mouse_info=None, cloud=False):
         # module_logger.info('Instantiating ' +__name__)
 
-        
+        self.raw_imaging_sessions_objects={}
+
         self.mouse_name=Mouse_Name
         module_logger.info('Loading Mouse ' +self.mouse_name)
 
@@ -81,9 +82,8 @@ class Mouse:
     def add_prairie_session(self, raw_imaging_session_path, session_name):
         module_logger.info('Processing '+ self.mouse_name)
         # module_logger.info('Adding prairie sessions')
-        self.raw_imaging_sessions_objects={}
         self.raw_imaging_sessions_objects[session_name]=MouseImagingSession(session_name, raw_imaging_session_path=raw_imaging_session_path, mouse_object=self, yet_to_add=True)
-        self.unload_full_imaging_session(session_name)
+        # self.unload_full_imaging_session(session_name)
         # self.load_all_imaging_sessions()
        
         
@@ -116,6 +116,7 @@ class Mouse:
                        self.all_mouse_acquisitions[name1+'_'+name2]=aquisition  
                        
            for name2, FOV in imaging_session.all_FOVs.items():
+               
                for name3, aquisition in FOV.all_aquisitions.items():
                        self.all_mouse_acquisitions[name1+'_'+name2+'_'+name3]=aquisition
         
@@ -144,31 +145,90 @@ class Mouse:
            for name2, aquisition in imaging_session.all_nonimaging_Aquisitions.items():
                for name3, dataset in aquisition.all_datasets.items():
                        self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset
+                       
            for name2, aquisition in imaging_session.all_Test_Aquisitions.items():
                for name3, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset           
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset    
+                       
            for name2, aquisition in imaging_session.all_0coordinate_Aquisitions.items():
                for name3, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset       
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset   
+                       
            for name2, FOV in imaging_session.all_FOVs.items():
+               
+               for name3, aquisition in FOV.all_aquisitions.items():
+                   for name4, dataset in aquisition.all_datasets.items():
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset 
+               
                for name3, aquisition in FOV.all_existing_1050tomato.items():
                    for name4, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset               
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
                for name3, aquisition in FOV.all_existing_10503planetomato.items():
                    for name4, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset               
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
                for name3, aquisition in FOV.all_existing_1050HighResStackTomato.items():
                    for name4, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset               
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
                for name3, aquisition in FOV.all_existing_HighResStackGreen.items():
                    for name4, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset               
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
                for name3, aquisition in FOV.all_existing_OtherAcq.items():
                    for name4, dataset in aquisition.all_datasets.items():
-                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset               
+                       self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset 
+                       
                for name3, aquisition in FOV.all_existing_SurfaceImage.items():
                    for name4, dataset in aquisition.all_datasets.items():
                        self.all_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
+                       
+    def get_all_mouse_raw_acquisitions_datasets(self, session_list):  
+       self.all_raw_mouse_acquisitions_datasets={}
+       for name1, imaging_session in session_list.items():
+                  
+           for name2, aquisition in imaging_session.all_raw_nonimaging_Aquisitions.items():
+               for name3, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset
+                       
+           for name2, aquisition in imaging_session.all_raw_Test_Aquisitions.items():
+               for name3, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset  
+                       
+           for name2, aquisition in imaging_session.all_raw_0coordinate_Aquisitions.items():
+               for name3, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3]=dataset  
+                       
+           for name2, FOV in imaging_session.all_raw_FOVs.items():
+               
+               for name3, aquisition in FOV.all_raw_aquisitions.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset 
+               
+               for name3, aquisition in FOV.all_existing_1050tomato.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset   
+                       
+               for name3, aquisition in FOV.all_existing_10503planetomato.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset 
+                       
+               for name3, aquisition in FOV.all_existing_1050HighResStackTomato.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
+               for name3, aquisition in FOV.all_existing_HighResStackGreen.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
+               for name3, aquisition in FOV.all_existing_OtherAcq.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset  
+                       
+               for name3, aquisition in FOV.all_existing_SurfaceImage.items():
+                   for name4, dataset in aquisition.all_raw_datasets.items():
+                       self.all_raw_mouse_acquisitions_datasets[name1+'_'+name2+'_'+name3+'_'+name4]=dataset
 #%% laoding datasets
                        
                        

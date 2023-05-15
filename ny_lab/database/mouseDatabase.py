@@ -61,6 +61,16 @@ class MouseDatabase():
         self.get_cage_number()       
     def close_database(self):
         self.database_connection.close()
+    def reconnect_database(self):
+        self.database_connection=sqlite3.connect(self.database_file_path)
+        self.database_backup()
+        print('Loading Experimental Database')
+        self.Experimental_class=ExperimentalDatabase(self)
+        print('Loading Imaging Database')
+        self.ImagingDatabase_class=ImagingDatabase(self)
+        print('Updating Databases')
+        self.update_variables()
+        
         
     def mouse_previsit(self, new_visit=False):       
         today_date=datetime.date.today().strftime("%Y%m%d")
@@ -622,6 +632,9 @@ class MouseDatabase():
                line=5
         elif 2 in lines:
                line=2
+        elif 12 in lines :
+               line=12
+           
                  
                
              

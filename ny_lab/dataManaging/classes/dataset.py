@@ -21,7 +21,7 @@ module_logger = logging.getLogger(__name__)
 try:
     # from ...AllFunctions.save_imagej_hdf5_tiff  import  save_imagej_hdf5
     from ...data_pre_processing.bidicorrect_image import shiftBiDi, biDiPhaseOffsets
-    from ..functions.functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
+    from ..functions.functionsDataOrganization import open_directory,check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
     # from functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
     from .standalone.motionCorrectedKalman import MotionCorrectedKalman
     from .standalone.summaryImages import SummaryImages
@@ -75,81 +75,8 @@ class ImageSequenceDataset:
                 module_logger.info('Processing raw data ' + self.selected_dataset_raw_path)
     
                 self.dataset_frame_number=len(os.listdir(self.selected_dataset_raw_path))
-                try :
-                    if self.associated_aquisiton.subaq_object=='TestAquisition':
-                        self.do_bidishift()
-    
-                        if  self.dataset_frame_number>100:
-                            if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
-                                self.apply_green_MC_to_red_channel()
-                            else:
-    
-                                self.do_initial_caiman_extraction()
-                            self.do_initial_kalman()
-                            self.do_summary_images(self.kalman_movie_path)
-                            self.do_summary_images(self.gauss_path)
-
-                            
-                        elif self.dataset_frame_number>1:   
-                            self.do_summary_images(self.shifted_movie_path)
-                            module_logger.info('SHort file doing summary images directly')
-    
-                        else:
-                            module_logger.info('File Problem')
-    
-                    elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
-                        self.do_bidishift()
-    
-                        self.do_summary_images(self.shifted_movie_path)
-    
-                    elif self.associated_aquisiton.subaq_object=='NonimagingAquisition':
-                        # self.do_bidishift()
-    
-                        module_logger.info('Non imaging ')
-    
-                        
-                    elif self.associated_aquisiton.Atlas_object:  
-                        pass
-                        
-                    elif self.associated_aquisiton.FOV_object:   
-                        
-                        if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
-                            self.do_bidishift()
-    
-                            if  self.dataset_frame_number>100:
-                                if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
-                                    self.apply_green_MC_to_red_channel()
-                                else:
-                                    self.do_initial_caiman_extraction()
-                                self.do_initial_kalman()
-                                self.do_summary_images(self.kalman_movie_path)
-                                
-                                self.do_summary_images(self.gauss_path)
-                                
-                            elif self.dataset_frame_number>1:   
-                                self.do_summary_images(self.shifted_movie_path)
-                                module_logger.info('SHort file doing summary images directly')
-    
-                            else:
-                                module_logger.info('File Problem')
-    
-    
-                        elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
-                            module_logger.info('High Res Stack')
-                            self.do_bidishift()
-                            self.do_summary_images(self.shifted_movie_path)
-                    
-                        else:
-                            self.do_bidishift()
-    
-                            self.do_summary_images(self.shifted_movie_path)
-                            
-                    # self.unload_dataset()        
-                    module_logger.info('Finished processing dataset ' + self.selected_dataset_raw_path 
-                                       + '_____' + self.selected_dataset_mmap_path)
-    
-                except:
-                    module_logger.exception('Something wrong with raw processing ' +   self.selected_dataset_raw_path)
+                # self.process_raw_dataset()
+             
     
             else:
                 self.read_all_paths()
@@ -159,7 +86,146 @@ class ImageSequenceDataset:
             self.raw_dataset_object=RawAcquisitionManager(dataset_object=self)
             self.bidishift_object=BidiShiftManager( raw_dataset_object= self.raw_dataset_object, custom_start_end=True)
             
+    def process_raw_dataset(self):
+        try :
+            open_directory(self.selected_dataset_mmap_path)
+            if self.associated_aquisiton.subaq_object=='TestAquisition':
+                self.do_bidishift()
+                self.do_summary_images(self.shifted_movie_path)
 
+
+            elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
+                self.do_bidishift()
+
+                self.do_summary_images(self.shifted_movie_path)
+
+            elif self.associated_aquisiton.subaq_object=='NonimagingAquisition':
+                # self.do_bidishift()
+
+                module_logger.info('Non imaging ')
+
+                
+            elif self.associated_aquisiton.Atlas_object:  
+                pass
+                
+            elif self.associated_aquisiton.FOV_object:   
+                
+                if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
+                    self.do_bidishift()
+                    self.do_summary_images(self.shifted_movie_path)
+                    module_logger.info('SHort file doing summary images directly')
+
+
+                elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
+                    module_logger.info('High Res Stack')
+                    self.do_bidishift()
+                    self.do_summary_images(self.shifted_movie_path)
+            
+                else:
+                    self.do_bidishift()
+                    self.do_summary_images(self.shifted_movie_path)
+                    
+            # self.unload_dataset()        
+            module_logger.info('Finished processing dataset ' + self.selected_dataset_raw_path 
+                               + '_____' + self.selected_dataset_mmap_path)
+            
+            self.unload_dataset()
+
+        except:
+            module_logger.exception('Something wrong with raw processing ' +   self.selected_dataset_raw_path)
+        
+        
+        
+    
+
+    
+    def full_process_raw_dataset(self):
+        try :
+            if self.associated_aquisiton.subaq_object=='TestAquisition':
+                self.do_bidishift()
+
+                if  self.dataset_frame_number>100:
+                    if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
+                        self.apply_green_MC_to_red_channel()
+                    else:
+
+                        self.do_initial_caiman_extraction()
+                    self.do_initial_kalman(self.mc_onacid_path)
+                    self.do_summary_images(self.kalman_movie_path)
+                    self.do_summary_images(self.gauss_path)
+
+                    
+                elif self.dataset_frame_number>1:   
+                    self.do_summary_images(self.shifted_movie_path)
+                    module_logger.info('SHort file doing summary images directly')
+
+                else:
+                    module_logger.info('File Problem')
+
+            elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
+                self.do_bidishift()
+
+                self.do_summary_images(self.shifted_movie_path)
+
+            elif self.associated_aquisiton.subaq_object=='NonimagingAquisition':
+                # self.do_bidishift()
+
+                module_logger.info('Non imaging ')
+
+                
+            elif self.associated_aquisiton.Atlas_object:  
+                pass
+                
+            elif self.associated_aquisiton.FOV_object:   
+                
+                if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
+                    self.do_bidishift()
+
+                    if  self.dataset_frame_number>100:
+                        if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
+                            self.apply_green_MC_to_red_channel()
+                        else:
+                            self.do_initial_caiman_extraction()
+                        self.do_initial_kalman(self.mc_onacid_path)
+                        self.do_summary_images(self.kalman_movie_path)
+                        
+                        self.do_summary_images(self.gauss_path)
+                        
+                    elif self.dataset_frame_number>1:   
+                        self.do_summary_images(self.shifted_movie_path)
+                        module_logger.info('SHort file doing summary images directly')
+
+                    else:
+                        module_logger.info('File Problem')
+
+
+                elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
+                    module_logger.info('High Res Stack')
+                    self.do_bidishift()
+                    self.do_summary_images(self.shifted_movie_path)
+            
+                else:
+                    self.do_bidishift()
+
+                    self.do_summary_images(self.shifted_movie_path)
+                    
+            # self.unload_dataset()        
+            module_logger.info('Finished processing dataset ' + self.selected_dataset_raw_path 
+                               + '_____' + self.selected_dataset_mmap_path)
+
+        except:
+            module_logger.exception('Something wrong with raw processing ' +   self.selected_dataset_raw_path)
+        
+        
+        pass
+        
+        
+    def load_motion_corrected_movie(self):
+        self.mc_movie=cm.load(self.mc_onacid_path)
+        
+        
+        
+        
     def define_dataset_info(self):
         
         
@@ -221,12 +287,13 @@ class ImageSequenceDataset:
         #     deeep_onacod
         #     standard_cnmf
             
-
  
     def read_all_paths(self):
  
         self.bidishift_object=BidiShiftManager(temporary_path=self.selected_dataset_mmap_path , dataset_object=self, custom_start_end=True)
+        self.shifted_movie_path=self.bidishift_object.shifted_movie_full_caiman_path        
         self.most_updated_caiman=CaimanExtraction(temporary_path=self.selected_dataset_mmap_path, dataset_object=self)
+        self.mc_onacid_path=self.most_updated_caiman.mc_onacid_path
         self.kalman_object=MotionCorrectedKalman(dataset_object=self)                                           
         self.summary_images_object=SummaryImages(dataset_object=self)
 
@@ -267,10 +334,7 @@ class ImageSequenceDataset:
         
         
         pass     
-    
 
-    
-    
     def do_bidishift(self, force=False):  
         module_logger.info('Bidishifting ' + self.selected_dataset_raw_path)
 
@@ -282,64 +346,56 @@ class ImageSequenceDataset:
         self.initial_caiman_custom=None
         self.initial_caiman=None
         try:
-            module_logger.info('Running Initial Caiman ' + self.selected_dataset_raw_path)
+            module_logger.info('Running Initial Caiman ' + self.dataset_name)
             
             if self.bidishift_object.start_end_flag and self.shifted_movie_path and self.bidishift_object.shifted_movie_full_caiman_path==self.bidishift_object.shifted_movie_custom_files_path:
                 module_logger.info('Running Caiman custom length ' + self.selected_dataset_raw_path)
                 self.initial_caiman_custom=CaimanExtraction(self.shifted_movie_path, temporary_path= self.selected_dataset_mmap_path, first_pass_mot_correct=True, force_run=True, dataset_object=self)
                 self.initial_caiman=  self.initial_caiman_custom
             elif not self.bidishift_object.start_end_flag and self.shifted_movie_path and self.bidishift_object.shifted_movie_full_caiman_path==self.bidishift_object.shifted_movie_files_path:
-                module_logger.info('Running Unaltered Caiman ' + self.selected_dataset_raw_path)
+                module_logger.info('Running Unaltered Caiman ' + self.dataset_name)
                 self.initial_caiman_full=CaimanExtraction(self.shifted_movie_path, temporary_path=self.selected_dataset_mmap_path, first_pass_mot_correct=True, dataset_object=self)
                 self.initial_caiman= self.initial_caiman_full
-                
             if self.initial_caiman:
                 self.mc_onacid_path=self.initial_caiman.mc_onacid_path
                 self.initial_caiman.load_cnmf_object()
-                
-
         except:
-            module_logger.exception('Something wrong with On Acid '  +  self.selected_dataset_raw_path)
+            self.bidishift_object.load_shifted_movie_from_mmap()
+            self.shifted_movie_path=self.bidishift_object.shifted_movie_full_caiman_path
+            self.initial_caiman_full=CaimanExtraction(self.shifted_movie_path, temporary_path=self.selected_dataset_mmap_path, first_pass_mot_correct=True, dataset_object=self)
+            self.initial_caiman= self.initial_caiman_full
 
-    def do_initial_kalman(self): 
+            module_logger.exception('Something wrong with On Acid '  +  self.dataset_name)
+
+    def do_initial_kalman(self,shifted_mmap_path): 
         try:
-            module_logger.info('Running Kalman Filter ' + self.selected_dataset_raw_path)
-
-            self.kalman_object=MotionCorrectedKalman(shifted_mmap_path=self.mc_onacid_path, dataset_object=self)                                           
+            module_logger.info('Running Kalman Filter ' + self.dataset_name)
+            self.kalman_object=MotionCorrectedKalman(shifted_mmap_path=shifted_mmap_path, dataset_object=self)                                           
             self.kalman_movie_path =self.kalman_object.kalman_path
-            self.gauss_path =self.kalman_object.gauss_path
-
-                                               
+            self.gauss_path =self.kalman_object.gauss_path                
         except:
-            module_logger.exception('Something wrong with kalman ' +   self.selected_dataset_raw_path)
-        
-        
+            module_logger.exception('Something wrong with kalman ' +   self.dataset_name)
+
     def do_summary_images(self, source_movie_path): 
         try:
             
-            module_logger.info('Getting  summary images ' + self.selected_dataset_raw_path)
+            module_logger.info('Getting  summary images ' + self.dataset_name)
 
             if source_movie_path==self.kalman_movie_path:
-                module_logger.info('Getting kalman summary images ' + self.selected_dataset_raw_path)
+                module_logger.info('Getting kalman summary images ' + self.dataset_name)
                 
             elif source_movie_path==self.shifted_movie_path:
-                module_logger.info('Getting non kalman summary images ' + self.selected_dataset_raw_path)
-                
-                
-                
+                module_logger.info('Getting non kalman summary images ' + self.dataset_name)
+
             if   source_movie_path: 
                 self.summary_images_object=SummaryImages(image_sequence_path= source_movie_path, dataset_object=self)
             else:
-                module_logger.warning('FIle for summary images worng ' + self.selected_dataset_raw_path)
-
-
+                module_logger.warning('FIle for summary images worng ' + self.dataset_name)
         except:
-            module_logger.exception('Something wrong with non kalman summary images ' +   self.selected_dataset_raw_path)        
-          
-            
+            module_logger.exception('Something wrong with non kalman summary images ' +   self.dataset_name)        
+                     
     def apply_green_bidishifts_to_red_channel(self):
         print('doing')
-        
         
     def check_for_mc_with_green_files(self):
         
@@ -402,9 +458,7 @@ class ImageSequenceDataset:
     def find_associated_channel_dataset(self):
         if self.selected_dataset_raw_path:
             try:
-        
                 self.associated_channel_dataset_object=None
-        
                 module_logger.info('getting associated channel dataset ' +   self.selected_dataset_raw_path)
                 self.assocated_channel_raw_paths=[key for key in self.associated_aquisiton.dataset_path_equivalences.keys() if (self.plane in key) and   (self.channel not in key)]
                 if  self.assocated_channel_raw_paths:
@@ -419,30 +473,22 @@ class ImageSequenceDataset:
                         if  self.associated_dataset_name in self.associated_aquisiton.all_raw_datasets.keys():
                             self.associated_channel_dataset_object=self.associated_aquisiton.all_raw_datasets[ self.associated_dataset_name]
                             module_logger.info('gotten associated channel dataset ' +  self.dataset_name+' '+  self.associated_dataset_name)
-        
                         else:    
                             module_logger.info('no green ' + self.selected_dataset_raw_path)
-            
                     else:
                         module_logger.info('no green ' + self.selected_dataset_raw_path)
                 else:
                     module_logger.info('no green associated ' + self.selected_dataset_raw_path)
-                    
             except:
                 module_logger.exception('Something wrong with getting associated dataset ' +   self.selected_dataset_raw_path)
-                
-        else:
-            
+        else:      
             self.associated_channel_datasets={key:dataset for key, dataset in self.associated_aquisiton.all_datasets.items() if self.plane in key and 'Red' in key}
             self.associated_channel_dataset_object=list(self.associated_channel_datasets.values())[0]
-
-
-            
+  
     def find_associated_fov_tomato_dataset(self):   
         
         self.associated_aquisiton.get_associated_tomato_fov_datasets()        
         self.plane=os.path.split(os.path.split(self.selected_dataset_mmap_path)[0])[1]
-
         self.associated_fov_tomato_datasets={key:dataset for key, dataset in self.associated_aquisiton.associated_fov_tomato_acquisition.all_datasets.items() if self.plane in key}
         
         for dataset_name in list(   self.associated_fov_tomato_datasets.keys()):
@@ -452,15 +498,21 @@ class ImageSequenceDataset:
                 self.associated_fov_tomato_dataset_red_object=self.associated_aquisiton.associated_fov_tomato_acquisition.all_datasets[dataset_name]
          
     def  redo_initial_caiman(self):
-        
-        self.initial_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True)        
+        # this i dont know why is here
+        self.initial_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True)       
+
 
     def do_deep_caiman(self, new_parameters: dict=None):
         
-        if self.metadata.imaging_metadata_database[0]['ToDoDeepCaiman']:
-            self.deep_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True, new_parameters=new_parameters)
+        # self.deep_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True, new_parameters=new_parameters)
+        self.deep_caiman=CaimanExtraction(self.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, force_run=True, deep=True, new_parameters=new_parameters)
+        # self.read_all_paths()
+
+        
+        
             
     def galois_caiman(self, new_parameters: dict=None):
+        
         self.deep_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, new_parameters=new_parameters, galois=True)
         
     def open_dataset_directory(self):
@@ -468,6 +520,7 @@ class ImageSequenceDataset:
 
     def open_raw_video_on_imagej(self):
         pass
+    
 if __name__ == "__main__":
     
     # dataset_image_sequence_path=r'F:\Projects\LabNY\Imaging\2022\20220428\Mice\SPMT\FOV_1\Aq_1\220428_SPMT_FOV2_AllenA_25x_920_52570_570620_without-000\Ch2Green\plane1'

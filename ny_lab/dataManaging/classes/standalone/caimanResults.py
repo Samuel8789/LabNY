@@ -13,7 +13,7 @@ import pickle
 import glob
 import scipy.signal as sg
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-
+import sys
 
 import tifffile
 from PIL import Image
@@ -29,7 +29,10 @@ import mat73
 import caiman as cm
 from caiman.source_extraction import cnmf as cnmf
 import time
-import matlab.engine
+try:
+    import matlab.engine
+except:
+        print('Not able to install matlabengine')
 import scipy.io as spio
 from .caimanSorterYSResults_legacy import CaimanSorterYSResults
 import keyboard
@@ -183,6 +186,7 @@ class CaimanResults():
         self.dfdt_std_threshold=2
         
         self.dfdt= self.data['proc']['deconv']['smooth_dfdt']
+        self.dfdt_options=self.dfdt['params']
         self.dfdt_spikes= self.dfdt['S']
         self.dfdt_std= self.dfdt['S_std']
         self.dfdt_accepted_matrix= self.dfdt['S'][ self.accepted_indexes_sorter,:]
@@ -205,18 +209,21 @@ class CaimanResults():
         pass
 
     def load_mcmc_traces(self):
-
+        self.z_scored_binarized_mcmc_binarized=np.zeros(1)
+        self.convolved_MCMC=np.zeros(1)
+        self.binarized_MCMC=np.zeros(1)
         self.mcmc= self.data['proc']['deconv']['MCMC']
         self.mcmc_good_components=[cell[0] for cell in np.array(self.mcmc['S'])[self.accepted_indexes_sorter] if cell[0] is not None]
-        self.MCMC_matrix=np.zeros(1)
-        self.MCMC_matrix=np.array(self.mcmc_good_components).squeeze().astype('float64')
-        self.convolved_MCMC=np.apply_along_axis(self.gaussian_smooth_kernel_convolution, axis=1, arr=self.MCMC_matrix,  sigma=self.MCMC_sigma)
-        self.convolved_MCMC=np.squeeze(self.convolved_MCMC)
-        self.binarized_MCMC=np.where( self.convolved_MCMC > 0, 1, 0)
-        # binarized_MCMC=(mcmc_good_components > 0.0001).astype(np.int_)
-        self.z_scored_binarized_mcmc=self.z_score(self.convolved_MCMC)
-        self.mcmcscoredsigma=3
-        self.z_scored_binarized_mcmc_binarized=np.where( self.z_scored_binarized_mcmc > self.mcmcscoredsigma, 1, 0)
+        if self.mcmc_good_components:
+            self.MCMC_matrix=np.zeros(1)
+            self.MCMC_matrix=np.array(self.mcmc_good_components).squeeze().astype('float64')
+            self.convolved_MCMC=np.apply_along_axis(self.gaussian_smooth_kernel_convolution, axis=1, arr=self.MCMC_matrix,  sigma=self.MCMC_sigma)
+            self.convolved_MCMC=np.squeeze(self.convolved_MCMC)
+            self.binarized_MCMC=np.where( self.convolved_MCMC > 0, 1, 0)
+            # binarized_MCMC=(mcmc_good_components > 0.0001).astype(np.int_)
+            self.z_scored_binarized_mcmc=self.z_score(self.convolved_MCMC)
+            self.mcmcscoredsigma=3
+            self.z_scored_binarized_mcmc_binarized=np.where( self.z_scored_binarized_mcmc > self.mcmcscoredsigma, 1, 0)
         
 
     def get_all_sorting_indexes(self):
@@ -236,6 +243,9 @@ class CaimanResults():
     def open_caiman_sorter(self):
         self.check_if_mat_file()
         self.options_path=r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_pre_processing\caiman_sorter-master\caiman_sorter_options.mat'
+        #testing new versions
+        # self.options_path=r'C:\Users\sp3660\Downloads\caiman_sorter-master\caiman_sorter_options.mat'
+
         self.options_mat=self.loadmat(self.options_path)
     #%%
         self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.hdf5_file_path, fast_output=False)
@@ -243,15 +253,21 @@ class CaimanResults():
         if  self.mat_results_path:
             self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.mat_results_path, fast_output=False)            
         spio.savemat(self.options_path, self.options_mat)
-                
-        eng = matlab.engine.start_matlab()
-        eng.addpath(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_pre_processing\caiman_sorter-master',nargout=0)
         self.dataset_object.open_dataset_directory()
-        eng.caiman_sorter(nargout=0)
-        print('Press Home To Finish')
-        while True:
-            if keyboard.is_pressed('home'):  # The same. you can put any key you like instead of 'space'
-                break
+
+        if 'matlab.engine' in sys.modules:        
+            eng = matlab.engine.start_matlab()
+            eng.addpath(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\data_pre_processing\caiman_sorter-master',nargout=0)
+        #testing new versions
+        #         eng.addpath(r'C:\Users\sp3660\Downloads\caiman_sorter-master',nargout=0)
+
+            eng.caiman_sorter(nargout=0)
+            print('Press Home To Finish')
+            while True:
+                if keyboard.is_pressed('home'):  # The same. you can put any key you like instead of 'space'
+                    break
+        else:
+            print('Cant connect to matlab')
         self.check_if_mat_file() 
 
     def load_movie(self):

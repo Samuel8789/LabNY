@@ -62,7 +62,7 @@ class VoltageSignalsExtractions():
             self.correct_signals_names()
     
             locomotion_df=self.voltage_signals['Locomotion'].T
-            self.locomotion_aray=locomotion_df.to_numpy()
+            self.locomotion_array=locomotion_df.to_numpy()
             visualstim_df=self.voltage_signals['VisStim'].T
             self.visualstim_array['Prairire']['VisStim']=visualstim_df.to_numpy().squeeze()
             self.process_allenA_signals()
@@ -121,12 +121,32 @@ class VoltageSignalsExtractions():
     def path_managing(self):
         
         filenames_suffixes=['_transitions_indexes.pkl', 
-         '_drifting_grating_indexes_on.pkl', '_drifting_grating_indexes_off.pkl',
-         '_drifting_grating_sliced_indexes_on.pkl', '_drifting_grating_sliced_indexes_off.pkl', 
+         '_drifting_grating_indexes_on.pkl', 
+         '_drifting_grating_indexes_off.pkl',
+         '_drifting_grating_sliced_indexes_on.pkl',
+         '_drifting_grating_sliced_indexes_off.pkl', 
          '_drifting_grating_blank_sweeps_indexes_on.pkl',
          '_drifting_grating_blank_sweeps_indexes_off.pkl',
          '_drifting_grating_sliced_blank_sweeps_indexes_on.pkl',
          '_drifting_grating_sliced_blank_sweeps_indexes_off.pkl', 
+         '_static_grating_indexes_even.pkl', 
+         '_static_grating_indexes_odd.pkl',
+         '_static_grating_sliced_indexes_even.pkl',
+         '_static_grating_sliced_indexes_odd.pkl', 
+         '_natural_images_indexes_even.pkl', 
+         '_natural_images_indexes_odd.pkl',
+         '_natural_images_sliced_indexes_even.pkl',
+         '_natural_images_sliced_indexes_odd.pkl', 
+         '_movie_one_frame_indexes.pkl', 
+         '_movie_one_frame_sliced_indexes.pkl',
+         '_movie_two_frame_indexes.pkl', 
+         '_movie_two_frame_sliced_indexes.pkl',
+         '_movie_three_frame_indexes.pkl', 
+         '_movie_three_frame_sliced_indexes.pkl',
+         
+         
+         
+         
          ]
         indexes_full_file_names=[self.acquisition_name+i for i in filenames_suffixes]
         self.indexes_full_file_paths_to_save=[os.path.join(self.vis_stim_slow_storage_path,i) for i in indexes_full_file_names]
@@ -142,7 +162,9 @@ class VoltageSignalsExtractions():
         
         if protocol :  
             
-            if 'Allen' in protocol:        
+            if 'Allen' in protocol:   
+                self.vis_stim_protocol=protocol
+
                 self.load_indexes_from_file()
                 self.process_allen_paradigms()
                
@@ -302,6 +324,8 @@ class VoltageSignalsExtractions():
                  
         elif scale=='min':
             self.time_scale=self.minutes_scale
+            
+            
 
 #%% Allen
 
@@ -314,22 +338,35 @@ class VoltageSignalsExtractions():
 
     def process_allenA_signals(self):   
         module_logger.info('Analysing AllenA Gratings')
-        # fist get transitions between stimulaton paradigms
         self.get_drifting_gratings_indexes()
+        self.get_movie_one_trial_structure()
+        self.get_movie_three_trial_structure()
+        module_logger.info('Finished Analysing AllenA Gratings')
+
+
         
     def process_allenB_signals(self):   
-        module_logger.info('Analysing AllenA Gratings')
+        module_logger.info('Analysing AllenB Gratings')
+        self.get_static_gratings_trial_structure()
+        self.get_natural_images_trial_structure()
+        self.get_movie_one_trial_structure()
+        module_logger.info('Finished Analysing AllenB Gratings')
+
         
-        # fist get transitions between stimulaton paradigms
-        pass
-        # self.get_drifting_gratings_indexes()
     
-    def process_allenC_signals(self):   
-        module_logger.info('Analysing AllenA Gratings')
+    def process_allenC_signals(self):  
+        module_logger.info('Analysing AllenC Gratings')
+        self.get_movie_one_trial_structure()
+        self.get_movie_two_trial_structure()
+        self.get_sparse_noise_trial_structure()
+        module_logger.info('Finished Analysing AllenC Gratings')
+
+
+
+
         
         # fist get transitions between stimulaton paradigms
         pass
-        # self.get_drifting_gratings_indexes()
         
     def get_paradigm_indexes(self):   
         '''
@@ -361,10 +398,10 @@ class VoltageSignalsExtractions():
         if not self.transitions_dictionary:
             
    
-            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-7).flatten()
+            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-6.8).flatten()
             # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-9).flatten()+1
-            self.start_transitions=np.delete(self.start_transitions, -1)
-            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>7).flatten()  
+            self.start_transitions=np.delete(self.start_transitions, [9,10,11])
+            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>6.8).flatten()  
             # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>9.5).flatten()  +1
 
             self.end_transitions=np.delete(self.end_transitions, 0)
@@ -385,6 +422,9 @@ class VoltageSignalsExtractions():
             ax[0].plot(self.time_scale['Prairire'][self.end_transitions],self.visualstim_array['Prairire']['VisStim'][self.end_transitions],'go') 
             ax[1].plot(self.time_scale['Prairire'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.end_transitions],'go') 
                       
+            
+            
+            
             """
             for the newest protocols is differnet
             """
@@ -392,20 +432,20 @@ class VoltageSignalsExtractions():
                 self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
                                             'first_drifting_set_last': self.end_transitions[0],
                                             
-                                            'first_movie_set_first':self.start_transitions[2],                                   
-                                            'first_movie_set_last': self.end_transitions[2],
-                                            
-                                            'short_movie_set_first':self.start_transitions[4],
-                                            'short_movie_set_last':self.end_transitions[4],
-                                            
+                                            'natural_movie_three_first_set_first':self.start_transitions[2],
+                                            'natural_movie_three_first_set_last':self.end_transitions[2],
+                                                                                       
+                                            'natural_movie_one_set_first':self.start_transitions[4],                                   
+                                            'natural_movie_one_set_last': self.end_transitions[4],
+                                                                                 
                                             'second_drifting_set_first':self.start_transitions[6],
                                             'second_drifting_set_last':self.end_transitions[6],
                                             
                                             'spont_first':self.start_transitions[7],
                                             'spont_last':self.end_transitions[7],
                                             
-                                            'second_movie_set_first':self.start_transitions[8],
-                                            'second_movie_set_last': self.end_transitions[8],
+                                            'natural_movie_three_second_set_first':self.start_transitions[8],
+                                            'natural_movie_three_second_set_last': self.end_transitions[8],
                                             
                                             'third_drifting_set_first':self.start_transitions[10],
                                             'third_drifting_set_last':self.last_down_transition+1,
@@ -413,24 +453,42 @@ class VoltageSignalsExtractions():
                 pass
             
             elif self.vis_stim_protocol =='AllenB':
-                # self.transitions_dictionary={'first_static_set_first':self.start_transitions[0],
-                #                             'first_static_set_last': self.end_transitions[0],
-                #                             'second_static_set_first':self.start_transitions[6],
-                #                             'second_static_set_last':self.end_transitions[5],
-                #                             'third_static_set_first':self.start_transitions[10],
-                #                             'third_static_set_last':self.last_down_transition+1,
-                #                             'movie_set_first':self.start_transitions[2],
-                #                             'movie_set_last': self.end_transitions[2],
-                #                             'first_images_set_first':self.start_transitions[8],
-                #                             'first_images_set_last': self.end_transitions[7],
-                #                             'second_images_set_first':self.start_transitions[4],
-                #                             'second_images_set_last':self.end_transitions[4],
-                                            # 'third_images_set_first':self.start_transitions[4],
-              #                               'third_images_set_last':self.end_transitions[4],
-                #                             'spont_first':self.spont_start_transitions[3],
-                #                             'spont_last':self.end_transitions[6]-1,
-                #                             }
-                pass
+                selected_start_indexes=[0,2,3,4,6,8,10,12]
+                selected_end_indexes=[0,2,3,4,6,7,9,11]
+                fig, ax = plt.subplots(2, sharex=True)
+                line, = ax[0].plot(self.visualstim_array['Prairire']['VisStim']) 
+                line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairire']['VisStim']) 
+                # line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairire']['VisStim'],'r') 
+                # line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
+                # line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
+                
+                ax[0].plot(self.time_scale['Prairire'][self.start_transitions[selected_start_indexes]],self.visualstim_array['Prairire']['VisStim'][self.start_transitions[selected_start_indexes]],'rx') 
+                ax[1].plot(self.time_scale['Prairire'][self.start_transitions[selected_start_indexes]],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.start_transitions[selected_start_indexes]],'rx') 
+                ax[0].plot(self.time_scale['Prairire'][self.end_transitions[selected_end_indexes]],self.visualstim_array['Prairire']['VisStim'][self.end_transitions[selected_end_indexes]],'go') 
+                ax[1].plot(self.time_scale['Prairire'][self.end_transitions[selected_end_indexes]],self.dfdt_rounded_vis_stim['Prairire']['VisStim'][self.end_transitions[selected_end_indexes]],'go') 
+                
+                
+                
+                self.transitions_dictionary={'first_static_set_first':self.start_transitions[0],
+                                            'first_static_set_last': self.end_transitions[0],
+                                            'first_images_set_first':self.start_transitions[2],
+                                            'first_images_set_last': self.end_transitions[2],
+                                            'spont_first':self.start_transitions[3],
+                                            'spont_last':self.end_transitions[3],
+                                            'second_images_set_first':self.start_transitions[4],
+                                            'second_images_set_last':self.end_transitions[4],
+                                            'second_static_set_first':self.start_transitions[6],
+                                            'second_static_set_last':self.end_transitions[6],
+                                            'natural_movie_one_set_first':self.start_transitions[8],
+                                            'natural_movie_one_set_last': self.end_transitions[7],                                             
+                                            'third_images_set_first':self.start_transitions[10],
+                                            'third_images_set_last':self.end_transitions[9],
+                                            'third_static_set_first':self.start_transitions[12],
+                                            'third_static_set_last':self.end_transitions[11],
+                                            
+                                          
+                                            
+                                            }
             
             elif self.vis_stim_protocol =='AllenC':
                 
@@ -440,10 +498,10 @@ class VoltageSignalsExtractions():
                                             'second_noise_set_last':self.end_transitions[4],
                                             'third_noise_set_first':self.start_transitions[8],
                                             'third_noise_set_last':self.end_transitions[8],
-                                            'first_movie_set_first':self.start_transitions[2],
-                                            'first_movie_set_last': self.end_transitions[2],
-                                            'second_movie_set_first':self.start_transitions[6],
-                                            'second_movie_set_last': self.end_transitions[6],
+                                            'natural_movie_one_set_first':self.start_transitions[2],
+                                            'natural_movie_one_set_last': self.end_transitions[2],
+                                            'natural_movie_two_set_first':self.start_transitions[6],
+                                            'natural_movie_two_set_last': self.end_transitions[6],
                                             'spont1_first':self.start_transitions[1],
                                             'spont1_last':self.end_transitions[1],
                                             'spont2_first':self.start_transitions[7],
@@ -454,9 +512,86 @@ class VoltageSignalsExtractions():
                 
                 
             self.save_transition_indexes()
+        else:
+            # correct renaming of move keys
+            if self.vis_stim_protocol=='AllenA':
+                
+                if 'natural_movie_one_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_first']= self.transitions_dictionary['short_movie_set_first']
+                    self.transitions_dictionary.pop('short_movie_set_first', None)
+                    
+                if 'natural_movie_one_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_last']= self.transitions_dictionary['short_movie_set_last']
+                    self.transitions_dictionary.pop('short_movie_set_last', None)
+                
+                  
+                if 'natural_movie_three_first_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_three_first_set_first']= self.transitions_dictionary['first_movie_set_first']
+                    self.transitions_dictionary.pop('first_movie_set_first', None)
+                    
+                if 'natural_movie_three_first_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_three_first_set_last']= self.transitions_dictionary['first_movie_set_last']
+                    self.transitions_dictionary.pop('first_movie_set_last', None)
+                    
+                      
+                if 'natural_movie_three_second_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_three_second_set_first']= self.transitions_dictionary['second_movie_set_first']
+                    self.transitions_dictionary.pop('second_movie_set_first', None)
+                    
+                if 'natural_movie_three_second_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_three_second_set_last']= self.transitions_dictionary['second_movie_set_last']
+                    self.transitions_dictionary.pop('second_movie_set_last', None)
+                
+                
+            elif self.vis_stim_protocol=='AllenB':
+                
+                if 'natural_movie_one_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_first']= self.transitions_dictionary['movie_set_first']
+                    self.transitions_dictionary.pop('movie_set_first', None)
+                    
+                if 'natural_movie_one_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_last']= self.transitions_dictionary['movie_set_last']
+                    self.transitions_dictionary.pop('movie_set_last', None)
+                    
+            elif self.vis_stim_protocol=='AllenC':
+                
+                if 'natural_movie_one_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_first']= self.transitions_dictionary['first_movie_set_first']
+                    self.transitions_dictionary.pop('first_movie_set_first', None)
+                    
+                if 'natural_movie_one_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_one_set_last']= self.transitions_dictionary['first_movie_set_last']
+                    self.transitions_dictionary.pop('first_movie_set_last', None)
+                    
+                if 'natural_movie_one_set_first' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_two_set_first']= self.transitions_dictionary['second_movie_set_first']
+                    self.transitions_dictionary.pop('second_movie_set_first', None)
+                    
+                if 'natural_movie_one_set_last' not in self.transitions_dictionary.keys():
+                    
+                    self.transitions_dictionary['natural_movie_two_set_last']= self.transitions_dictionary['second_movie_set_last']
+                    self.transitions_dictionary.pop('second_movie_set_last', None)
 
-                
-                
+      
+            
+            
+                pass
+            
+            os.remove(self.indexes_full_file_paths_to_save[0])
+            self.save_transition_indexes()
+
+ 
             # newest signals thre allen sessions
             # self.transitions_dictionary={'first_noise_set_first':self.start_transitions[0],
             #                             'first_noise_set_last': self.end_transitions[0],
@@ -464,10 +599,10 @@ class VoltageSignalsExtractions():
             #                             'second_noise_set_last':self.end_transitions[4],
             #                             'third_noise_set_first':self.start_transitions[8],
             #                             'third_noise_set_last':self.end_transitions[8],
-            #                             'first_movie_set_first':self.start_transitions[2],
-            #                             'first_movie_set_last': self.end_transitions[2],
-            #                             'second_movie_set_first':self.start_transitions[6],
-            #                             'second_movie_set_last': self.end_transitions[6],
+            #                             'natural_movie_one_set_first':self.start_transitions[2],
+            #                             'natural_movie_one_set_last': self.end_transitions[2],
+            #                             'natural_movie_two_set_first':self.start_transitions[6],
+            #                             'natural_movie_two_set_last': self.end_transitions[6],
             #                             'spont1_first':self.start_transitions[1],
             #                             'spont1_last':self.end_transitions[1],
             #                             'spont2_first':self.start_transitions[7],
@@ -482,19 +617,17 @@ class VoltageSignalsExtractions():
             #                             'second_noise_set_last':self.end_transitions[4],
             #                             'third_noise_set_first':self.start_transitions[8],
             #                             'third_noise_set_last':self.end_transitions[8],
-            #                             'first_movie_set_first':self.start_transitions[2],
-            #                             'first_movie_set_last': self.end_transitions[2],
-            #                             'second_movie_set_first':self.start_transitions[6],
-            #                             'second_movie_set_last': self.end_transitions[6],
+            #                             'natural_movie_one_first_set_first':self.start_transitions[2],
+            #                             'natural_movie_one_first_set_last': self.end_transitions[2],
+            #                             'natural_movie_one_second_set_first':self.start_transitions[6],
+            #                             'natural_movie_one_second_set_last': self.end_transitions[6],
             #                             'spont1_first':self.start_transitions[1],
             #                             'spont1_last':self.end_transitions[1],
             #                             'spont2_first':self.start_transitions[7],
             #                             'spont2_last':self.end_transitions[7],
             #                             }
             
-            
-        
-     
+
             # for  211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000_transitions_indexes
             # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']<-6.5).flatten()+1
             # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairire']['VisStim']>6.5).flatten()+1   
@@ -509,10 +642,10 @@ class VoltageSignalsExtractions():
             #                             'second_drifting_set_last':self.end_transitions[5],
             #                             'third_drifting_set_first':self.start_transitions[10],
             #                             'third_drifting_set_last':self.last_down_transition+1,
-            #                             'first_movie_set_first':self.start_transitions[2],
-            #                             'first_movie_set_last': self.end_transitions[2],
-            #                             'second_movie_set_first':self.start_transitions[8],
-            #                             'second_movie_set_last': self.end_transitions[7],
+            #                             'natural_movie_one_first_set_first':self.start_transitions[2],
+            #                             'natural_movie_one_first_set_last': self.end_transitions[2],
+            #                             'natural_movie_one_second_set_first':self.start_transitions[8],
+            #                             'natural_movie_one_second_set_last': self.end_transitions[7],
             #                             'short_movie_set_first':self.start_transitions[4],
             #                             'short_movie_set_last':self.end_transitions[4],
             #                             'spont_first':self.spont_start_transitions[3],
@@ -529,21 +662,17 @@ class VoltageSignalsExtractions():
             #                             'second_drifting_set_last':self.start_transitions[8],
             #                             'third_drifting_set_first':self.end_transitions[8],
             #                             'third_drifting_set_last':self.last_down_transition+1000,
-            #                             'first_movie_set_first':self.end_transitions[2],
-            #                             'first_movie_set_last': self.start_transitions[4],
-            #                             'second_movie_set_first':self.end_transitions[6],
-            #                             'second_movie_set_last': self.start_transitions[9],
+            #                             'natural_movie_one_first_set_first':self.end_transitions[2],
+            #                             'natural_movie_one_first_set_last': self.start_transitions[4],
+            #                             'natural_movie_one_second_set_first':self.end_transitions[6],
+            #                             'natural_movie_one_second_set_last': self.start_transitions[9],
             #                             'short_movie_set_first':self.end_transitions[4],
             #                             'short_movie_set_last':self.start_transitions[7],
             #                             'spont_first':self.start_transitions[8],
             #                             'spont_last':self.end_transitions[6]-3,
             #                             }
             
-           
-         
 
-         
-         
     def slice_visstim_by_paradigm (self): 
         
         self.paradigm_sliced_vis_stim={}
@@ -553,17 +682,17 @@ class VoltageSignalsExtractions():
             self.first_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
             self.second_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
             self.third_drifting_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-            self.first_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.short_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+            self.natural_movie_three_first_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_three_first_set_first']:self.transitions_dictionary['natural_movie_three_first_set_last']]
+            self.natural_movie_three_second_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_three_second_set_first']:self.transitions_dictionary['natural_movie_three_second_set_last']]
+            self.natural_movie_one_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]     
             self.spont=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
         
             self.first_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
             self.second_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
             self.third_drifting_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-            self.first_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-            self.short_movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+            self.natural_movie_three_first_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_three_first_set_first']:self.transitions_dictionary['natural_movie_three_first_set_last']]
+            self.natural_movie_three_second_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_three_second_set_first']:self.transitions_dictionary['natural_movie_three_second_set_last']]
+            self.natural_movie_one_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]     
             self.spont=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
             
         elif self.vis_stim_protocol =='AllenB':
@@ -574,7 +703,7 @@ class VoltageSignalsExtractions():
             self.first_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['first_images_set_first']:self.transitions_dictionary['first_images_set_last']]
             self.second_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['second_images_set_first']:self.transitions_dictionary['second_images_set_last']]
             self.third_images_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['third_images_set_first']:self.transitions_dictionary['third_images_set_last']]
-            self.movie_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['movie_set_first']:self.transitions_dictionary['movie_set_last']]
+            self.natural_movie_one_set=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]
             self.spont=self.visualstim_array['Prairire']['VisStim'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
             
         elif self.vis_stim_protocol =='AllenC':
@@ -582,12 +711,11 @@ class VoltageSignalsExtractions():
             self.first_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
             self.second_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
             self.third_noise_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
-            self.first_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.natural_movie_one_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]
+            self.natural_movie_two_set=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['natural_movie_two_set_first']:self.transitions_dictionary['natural_movie_two_set_last']]
             self.spont1=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
             self.spont2=self.rounded_vis_stim['Prairire']['VisStim'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
                
-
     def slice_locomotion_by_paradigm (self):  
          
         if self.vis_stim_protocol =='AllenA':
@@ -595,59 +723,136 @@ class VoltageSignalsExtractions():
              self.first_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_drifting_set_first']:self.transitions_dictionary['first_drifting_set_last']]
              self.second_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_drifting_set_first']:self.transitions_dictionary['second_drifting_set_last']]
              self.third_drifting_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_drifting_set_first']:self.transitions_dictionary['third_drifting_set_last']]
-             self.first_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-             self.second_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
-             self.short_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['short_movie_set_first']:self.transitions_dictionary['short_movie_set_last']]     
+             self.natural_movie_three_first_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_three_first_set_first']:self.transitions_dictionary['natural_movie_three_first_set_last']]
+             self.natural_movie_three_second_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_three_second_set_first']:self.transitions_dictionary['natural_movie_three_second_set_last']]
+             self.natural_movie_one_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]     
              self.spont_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]    
         
         elif self.vis_stim_protocol =='AllenB':
-            pass
+            self.first_static_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_static_set_first']:self.transitions_dictionary['first_static_set_last']]
+            self.second_static_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_static_set_first']:self.transitions_dictionary['second_static_set_last']]
+            self.third_static_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_static_set_first']:self.transitions_dictionary['third_static_set_last']]
+            self.first_images_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_images_set_first']:self.transitions_dictionary['first_images_set_last']]
+            self.second_images_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_images_set_first']:self.transitions_dictionary['second_images_set_last']]
+            self.third_images_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_images_set_first']:self.transitions_dictionary['third_images_set_last']]
+            self.natural_movie_one_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]
+            self.spont_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont_first']:self.transitions_dictionary['spont_last']]
+            
         elif self.vis_stim_protocol =='AllenC':
         
             self.first_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
             self.second_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
             self.third_noise_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
-            self.first_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['first_movie_set_first']:self.transitions_dictionary['first_movie_set_last']]
-            self.second_movie_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['second_movie_set_first']:self.transitions_dictionary['second_movie_set_last']]
+            self.natural_movie_one_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]
+            self.natural_movie_two_set_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['natural_movie_two_set_first']:self.transitions_dictionary['natural_movie_two_set_last']]
             self.spont2_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
             self.spont1_speed=self.rectified_speed_array['Prairire']['Locomotion'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
+
+
+
+#%% common processing
+
+    def get_movie_one_trial_structure(self):
+         
+        self.movie_one_frame_index_full_recording =np.zeros((1))
+        self.load_movie_one_indexes()
+        if not (self.movie_one_frame_index_full_recording.any() and self.movie_one_frame_indexes_by_trial.any()):
+
+            fix, ax=plt.subplots(1)
+            ax.plot( self.natural_movie_one_set)
+            
+            
+            temp=np.diff(np.around(sg.medfilt(self.natural_movie_one_set, kernel_size=29),1))
+            temp2=np.around(temp,3)
+    
+            fix, ax=plt.subplots(1)
+            ax.plot(temp)
+            ax.plot(temp2)
+            self.movie_one_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.movie_one_errors_pairs = self.correct_voltage_split_transitions(self.natural_movie_one_set)
+            
+            initial_transitions_odd=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2, self.movie_one_diff_voltage_slice_filtered_rounded_corrected<2))
+            
+            
+            movie_trial_starts=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2 , self.movie_one_diff_voltage_slice_filtered_rounded_corrected>1)).flatten()
+            movie_trial_ends=np.argwhere(self.movie_one_diff_voltage_slice_filtered_rounded_corrected<-2).flatten()
+    
+            self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
+            
+            fix, ax=plt.subplots(1)
+            ax.plot( self.movie_one_diff_voltage_slice_filtered_rounded_corrected)
+            for i, start in enumerate(movie_trial_starts):
+                if i==9:
+                   movie_trial_starts=np.insert(movie_trial_starts,10,len(self.movie_one_diff_voltage_slice_filtered_rounded_corrected))
+                
+                movietrial=self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]]
+                ups=np.argwhere(movietrial==2).flatten()+start
+                down=np.argwhere(movietrial==-2).flatten()+start
         
+                
+                ups=np.insert(ups, 0, start)
+                down=np.insert(down, 0, movie_trial_ends[i])
+                if i!=9:
+                    down=np.append(down, movie_trial_starts[i+1])
+                else:
+                    down=np.append(down, movie_trial_starts[-1]-1)
+                    
+                   
+                self.movie_one_frame_indexes_by_trial[i,:,0]=ups
+                self.movie_one_frame_indexes_by_trial[i,:,1]=down
+    
+      
+                ax.plot(np.arange(start,movie_trial_starts[i+1]),self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]])
+                ax.plot( ups, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[ups],'bo')
+                ax.plot( down, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[down],'ko')
+    
+                framelengths= self.movie_one_frame_indexes_by_trial[i,:,1]- self.movie_one_frame_indexes_by_trial[i,:,0]
+
+
+
+            self.correct_movie_one_indexes_for_full_movie()
+     
+    
+            self.save_movie_one_indexes()  
+        else:
+            pass
+            
+            
+        # import scipy.io as spio
+        # import caiman as cm
+        # movie=spio.loadmat(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\visual_stim\BehaviourCode\AllenStimuli\Smalles\natural_movie_one.mat')
+        # movie=movie['natural_movie_one_all_warped_frames']
         
+        # mov=np.moveaxis(movie, -1, 0)
+        # mov=cm.movie(mov)
+        # mov.play(fr=300)
+
         
-    def get_noise_trial_structure(self):
+        # fix, ax=plt.subplots(1)
+        # ax.imshow(mov[1,:,:])
         
-   
+    def correct_movie_one_indexes_for_full_movie(self):
+        
+        self.movie_one_frame_index_full_recording = self.movie_one_frame_indexes_by_trial+self.transitions_dictionary['natural_movie_one_set_first']
+        self.movie_one_frame_index_full_recording=self.movie_one_frame_index_full_recording.astype('uint32')
+        movie_one_frame_indexes_by_trial=self.movie_one_frame_indexes_by_trial
+        
+
+        fig,axo=plt.subplots()
+        axo.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+        axo.plot(self.movie_one_frame_index_full_recording[:,:,0].flatten(), self.rounded_vis_stim['Prairire']['VisStim'][self.movie_one_frame_index_full_recording[:,:,0].flatten()],'rx')
+        axo.plot(self.movie_one_frame_index_full_recording[:,:,1].flatten(), self.rounded_vis_stim['Prairire']['VisStim'][self.movie_one_frame_index_full_recording[:,:,1].flatten()],'bo')
+
+
+#%% ALLEN C PROCESSING                      
+    def get_sparse_noise_trial_structure(self):
+        
         self.noise_on_index_full_recording =np.zeros((1))
         self.noise_off_index_full_recording=np.zeros((1))
         self.load_noise_indexes()
         
         self.combined_noise_raw=np.concatenate((self.first_noise_set, self.second_noise_set, self.third_noise_set))
         
-        
-    def get_movie_three_trial_structure(self):
-        
-        self.movie_three_on_index_full_recording =np.zeros((1))
-        self.movie_three_off_index_full_recording=np.zeros((1))
-        self.load_movie_three_indexes()
-        
-        self.combined_movie_threes_raw=np.concatenate(self.first_movie_three_set, self.second_movie_three_set)
-        
-    def get_movie_one_trial_structure(self):
-         
-        self.movie_one_on_index_full_recording =np.zeros((1))
-        self.movie_one_off_index_full_recording=np.zeros((1))
-        self.load_movie_one_indexes()
 
-        if 'A':
-            self.combined_movie_ones_raw=np.concatenate(self.short_movie_one_set)
-            
-        elif 'B':
-            self.combined_movie_ones_raw=np.concatenate(self.movie_set)
-            
-        elif 'C':
-            self.combined_movie_ones_raw=np.concatenate(self.first_movie_one_set )
-            
-            
     def get_movie_two_trial_structure(self):
          
         self.movie_two_on_index_full_recording =np.zeros((1))
@@ -658,24 +863,192 @@ class VoltageSignalsExtractions():
         if 'C':
             self.combined_movie_twos_raw=np.concatenate(self.second_movie_two_set )
 
+#%% ALLEN B PROCESSING
         
     def get_static_gratings_trial_structure(self):
-        
-        self.static_on_index_full_recording =np.zeros((1))
-        self.static_off_index_full_recording=np.zeros((1))
+        trial_voltages=[2,-2]
+        voltage=2
+  
+        self.static_grat_even_index_full_recording =np.zeros((1))
+        self.static_grat_odd_index_full_recording=np.zeros((1))
         self.load_static_indexes()
-        
         self.combined_static_raw=np.concatenate((self.first_static_set, self.second_static_set, self.third_static_set))
+        
+        if not (self.static_grat_even_index_full_recording.any() and self.static_grat_odd_index_full_recording.any()):
+            fix, ax=plt.subplots(1)
+            ax.plot(self.combined_static_raw)
+            
+            temp=np.diff(np.around(sg.medfilt(self.combined_static_raw, kernel_size=29),1))
+            temp2=np.around(temp,3)
+            static_transition_indexes1=[np.argwhere(temp== voltage) for voltage in trial_voltages]
+            static_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in trial_voltages]
+            fix, ax=plt.subplots(1)
+            ax.plot(temp)
+            ax.plot(temp2)
+            self.static_voltage_slice_filtered_rounded_corrected,self.static_diff_voltage_slice_filtered_rounded_corrected,self.static_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.static_errors_pairs = self.correct_voltage_split_transitions(self.combined_static_raw)
+            
+            initial_transitions_odd=np.argwhere(np.logical_and(self.static_diff_voltage_slice_filtered_rounded_corrected>0.8 , self.static_diff_voltage_slice_filtered_rounded_corrected<2))
+    
+            
+            all_even_transition_indexes=np.argwhere(self.static_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() 
+            all_even_transition_indexes2=np.argwhere(self.static_diff_voltage_slice_filtered_rounded_corrected_rerounded== voltage).squeeze()  
+            all_odd_transition_indexes=np.argwhere(self.static_diff_voltage_slice_filtered_rounded_corrected== -voltage).squeeze()  
+            all_odd_transition_indexes2=np.argwhere(self.static_diff_voltage_slice_filtered_rounded_corrected_rerounded== -voltage).squeeze()  
+            self.static_even_transition_indexes=all_even_transition_indexes
+            self.static_odd_transition_indexes=np.sort(np.append(all_odd_transition_indexes,initial_transitions_odd))
+            # self.static_odd_transition_indexes[960]=self.static_odd_transition_indexes[960]+3 #SPJZ allenb
+            # self.static_odd_transition_indexes[1920]=self.static_odd_transition_indexes[1920]+1#SPJZ allenb
+     
+
+            
+            fig,ax=plt.subplots()
+            ax.plot(self.static_voltage_slice_filtered_rounded_corrected)  
+            ax.plot(self.static_even_transition_indexes,self.static_voltage_slice_filtered_rounded_corrected[self.static_even_transition_indexes],'ro')
+            ax.plot(self.static_odd_transition_indexes,self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes],'gx')
+            ax.plot(self.static_odd_transition_indexes[960],self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes[960]],'yo')
+            ax.plot(self.static_odd_transition_indexes[1920],self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes[1920]],'yo')
+
+
+    
+    
+            self.correct_static_indexes_for_full_movie()
+            # self.static_grat_odd_index_full_recording[960]=self.static_grat_odd_index_full_recording[960]-1#SPJZ allenb
+            # self.static_grat_odd_index_full_recording[1920]=self.static_grat_odd_index_full_recording[1920]-1#SPJZ allenb
+            # name = input("Say ok to follow natural image indexing: ")
+
+            self.save_static_indexes()
+        else:
+            fig,axo=plt.subplots()
+            axo.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+            axo.plot(self.static_grat_even_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.static_grat_even_index_full_recording],'rx')
+            axo.plot(self.static_grat_odd_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.static_grat_odd_index_full_recording],'bo')
 
     def get_natural_images_trial_structure(self):
-        
-        self.images_on_index_full_recording =np.zeros((1))
-        self.images_off_index_full_recording=np.zeros((1))
+        trial_voltages=[2,-2]
+        voltage=2
+        self.natural_image_even_index_full_recording =np.zeros((1))
+        self.natural_image_odd_index_full_recording=np.zeros((1))
         self.load_images_indexes()
-        
         self.combined_images_raw=np.concatenate((self.first_images_set, self.second_images_set, self.third_images_set))
+        
+        
+        
+        if not (self.natural_image_even_index_full_recording.any() and self.natural_image_odd_index_full_recording.any()):
+            fix, ax=plt.subplots(1)
+            ax.plot(self.combined_images_raw)
+            
+            temp=np.diff(np.around(sg.medfilt(self.combined_images_raw, kernel_size=29),1))
+            temp2=np.around(temp,3)
+            static_transition_indexes1=[np.argwhere(temp== voltage) for voltage in trial_voltages]
+            static_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in trial_voltages]
+            fix, ax=plt.subplots(1)
+            ax.plot(temp)
+            ax.plot(temp2)
+            self.images_voltage_slice_filtered_rounded_corrected,self.images_diff_voltage_slice_filtered_rounded_corrected,self.images_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.images_errors_pairs = self.correct_voltage_split_transitions(self.combined_images_raw)
+            
+            initial_transitions_odd=np.argwhere(np.logical_and(self.images_diff_voltage_slice_filtered_rounded_corrected>0.8 , self.images_diff_voltage_slice_filtered_rounded_corrected<2))
+    
+            
+            all_even_transition_indexes=np.argwhere(self.images_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() 
+            all_even_transition_indexes2=np.argwhere(self.images_diff_voltage_slice_filtered_rounded_corrected_rerounded== voltage).squeeze()  
+            all_odd_transition_indexes=np.argwhere(self.images_diff_voltage_slice_filtered_rounded_corrected== -voltage).squeeze()  
+            all_odd_transition_indexes2=np.argwhere(self.images_diff_voltage_slice_filtered_rounded_corrected_rerounded== -voltage).squeeze()  
+            self.natural_image_even_transition_indexes=all_even_transition_indexes
+            self.natural_image_odd_transition_indexes=np.sort(np.append(all_odd_transition_indexes,initial_transitions_odd))
+            # self.natural_image_odd_transition_indexes[960]=self.natural_image_odd_transition_indexes[960]+2 #SPJZ allenb
+            # self.natural_image_odd_transition_indexes[1920]=self.natural_image_odd_transition_indexes[1920]+2#SPJZ allenb
+     
+            
+            
+            fig,ax=plt.subplots()
+            ax.plot(self.images_voltage_slice_filtered_rounded_corrected)  
+            ax.plot(self.natural_image_even_transition_indexes,self.images_voltage_slice_filtered_rounded_corrected[self.natural_image_even_transition_indexes],'ro')
+            ax.plot(self.natural_image_odd_transition_indexes,self.images_voltage_slice_filtered_rounded_corrected[self.natural_image_odd_transition_indexes],'gx')
+         
+    
+    
+            self.correct_image_indexes_for_full_movie()
+            # self.natural_image_odd_index_full_recording[960]=1298187#SPJZ allenb
+            # self.natural_image_odd_index_full_recording[1920]=self.natural_image_odd_index_full_recording[1920]#SPJZ allenb
+            # name = input("Say ok to follow natural image indexing: ")
+            self.save_images_indexes()
+        else:
+            fig,axo=plt.subplots()
+            axo.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+            axo.plot(self.natural_image_even_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.natural_image_even_index_full_recording],'rx')
+            axo.plot(self.natural_image_odd_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.natural_image_odd_index_full_recording],'bo')
 
+    def correct_static_indexes_for_full_movie(self):
+        first_length=self.first_static_set.shape[0]
+        second_length=self.second_static_set.shape[0]
+        mivies_indexes=[self.transitions_dictionary['first_static_set_first'],
+                        self.transitions_dictionary['first_static_set_last'],
+                        self.transitions_dictionary['second_static_set_first'],
+                        self.transitions_dictionary['second_static_set_last'],
+                        self.transitions_dictionary['third_static_set_first'],
+                        self.transitions_dictionary['third_static_set_last']]
+        
+        def correctindex(indx, first_length, second_length, mivies_indexes0, mivies_indexes2, mivies_indexes4,):
+            if indx < first_length:
+                return indx + mivies_indexes0
+            elif np.logical_and(indx<first_length+second_length,indx>first_length) :
+                return indx + mivies_indexes2-first_length
+            elif indx > second_length:
+                return indx + mivies_indexes4-first_length-second_length
+            
+        vfunc = np.vectorize(correctindex)
+       
+        self.static_grat_even_index_full_recording = vfunc(self.static_even_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
+        self.static_grat_odd_index_full_recording = vfunc(self.static_odd_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
+        
+        
 
+        fig,axo=plt.subplots()
+        axo.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+        axo.plot(self.static_grat_even_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.static_grat_even_index_full_recording],'rx')
+        axo.plot(self.static_grat_odd_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.static_grat_odd_index_full_recording],'bo')
+
+    def correct_image_indexes_for_full_movie(self):
+        first_length=self.first_images_set.shape[0]
+        second_length=self.second_images_set.shape[0]
+        mivies_indexes=[self.transitions_dictionary['first_images_set_first'],
+                        self.transitions_dictionary['first_images_set_last'],
+                        self.transitions_dictionary['second_images_set_first'],
+                        self.transitions_dictionary['second_images_set_last'],
+                        self.transitions_dictionary['third_images_set_first'],
+                        self.transitions_dictionary['third_images_set_last']]
+        
+        def correctindex(indx, first_length, second_length, mivies_indexes0, mivies_indexes2, mivies_indexes4,):
+            if indx < first_length:
+                return indx + mivies_indexes0
+            elif np.logical_and(indx<first_length+second_length,indx>first_length) :
+                return indx + mivies_indexes2-first_length
+            elif indx > second_length:
+                return indx + mivies_indexes4-first_length-second_length
+            
+        vfunc = np.vectorize(correctindex)
+       
+        self.natural_image_even_index_full_recording = vfunc(self.natural_image_even_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
+        self.natural_image_odd_index_full_recording = vfunc(self.natural_image_odd_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
+        
+        
+    
+        fig,axo=plt.subplots()
+        axo.plot(self.rounded_vis_stim['Prairire']['VisStim'])
+        axo.plot(self.natural_image_even_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.natural_image_even_index_full_recording],'rx')
+        axo.plot(self.natural_image_odd_index_full_recording, self.rounded_vis_stim['Prairire']['VisStim'][self.natural_image_odd_index_full_recording],'bo')
+            
+            
+        
+#%% ALLEN A PROCESSING
+    def get_movie_three_trial_structure(self):
+        
+        self.movie_three_on_index_full_recording =np.zeros((1))
+        self.movie_three_off_index_full_recording=np.zeros((1))
+        self.load_movie_three_indexes()
+        
+        self.combined_movie_threes_raw=np.concatenate((self.natural_movie_three_first_set, self.natural_movie_three_second_set))
+        
 
 
     def correct_voltage_split_transitions(self, voltage_slice):
@@ -756,9 +1129,9 @@ class VoltageSignalsExtractions():
             
             # this will correct transtions over multiple frame to the corresponding first frame that has a change of voltage(all voltage signals appear after screen flip)
             
-            self.drifting_voltage_slice_filtered_rounded_corrected,
-            self.drifting_diff_voltage_slice_filtered_rounded_corrected,
-            self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,
+            self.drifting_voltage_slice_filtered_rounded_corrected,\
+            self.drifting_diff_voltage_slice_filtered_rounded_corrected,\
+            self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,\
             self.drifting_errors_pairs=self.correct_voltage_split_transitions(self.combined_gratings_raw)
 
             all_on_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() for voltage in self.orientations_and_blank_sweep]
@@ -1065,23 +1438,122 @@ class VoltageSignalsExtractions():
     def save_noise_indexes(self):
         pass
     
-    def load_movie_indexes(self):
-        pass
+    def load_movie_one_indexes(self):
+        
+        
+        if os.path.isfile(self.indexes_full_file_paths_to_save[17]):
+            with open(self.indexes_full_file_paths_to_save[17], 'rb') as f:
+                self.movie_one_frame_index_full_recording=pickle.load(f)
+                
+                
+                                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[18]):
+            with open(self.indexes_full_file_paths_to_save[18], 'rb') as f:
+                self.movie_one_frame_indexes_by_trial=pickle.load(f)
+                
+   
+        
     
-    def save_movie_indexes(self):
-        pass
+    def save_movie_one_indexes(self):
+        
+        
+        with open( self.indexes_full_file_paths_to_save[17], 'wb') as f:
+            pickle.dump(self.movie_one_frame_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[18], 'wb') as f:
+            pickle.dump(self.movie_one_frame_indexes_by_trial, f, pickle.HIGHEST_PROTOCOL)
+            
+    def load_movie_three_indexes(self):
+        
+        
+        if os.path.isfile(self.indexes_full_file_paths_to_save[21]):
+            with open(self.indexes_full_file_paths_to_save[21], 'rb') as f:
+                self.movie_three_frame_index_full_recording=pickle.load(f)
+                
+                
+                                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[22]):
+            with open(self.indexes_full_file_paths_to_save[22], 'rb') as f:
+                self.movie_three_frame_indexes_by_trial=pickle.load(f)
+                
+   
+        
+    
+    def save_movie_three_indexes(self):
+        
+        
+        with open( self.indexes_full_file_paths_to_save[21], 'wb') as f:
+            pickle.dump(self.movie_three_frame_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[22], 'wb') as f:
+            pickle.dump(self.movie_three_frame_indexes_by_trial, f, pickle.HIGHEST_PROTOCOL)
+
+  
     
     def load_static_indexes(self):
-        pass
+        if os.path.isfile(self.indexes_full_file_paths_to_save[9]):
+            with open(self.indexes_full_file_paths_to_save[9], 'rb') as f:
+                self.static_grat_even_index_full_recording=pickle.load(f)
+
+        if os.path.isfile(self.indexes_full_file_paths_to_save[10]):
+            with open( self.indexes_full_file_paths_to_save[10], 'rb') as f:
+                self.static_grat_odd_index_full_recording=pickle.load(f)
+                
+                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[11]):
+            with open(self.indexes_full_file_paths_to_save[11], 'rb') as f:
+                self.static_even_transition_indexes=pickle.load(f)
+
+        if os.path.isfile(self.indexes_full_file_paths_to_save[12]):
+            with open( self.indexes_full_file_paths_to_save[12], 'rb') as f:
+                self.static_odd_transition_indexes=pickle.load(f)
+   
     
     def save_static_indexes(self):
-        pass
+     
+        
+        with open( self.indexes_full_file_paths_to_save[9], 'wb') as f:
+            pickle.dump(self.static_grat_even_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[10], 'wb') as f:
+            pickle.dump(self.static_grat_odd_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+            
+        with open( self.indexes_full_file_paths_to_save[11], 'wb') as f:
+            pickle.dump(self.static_even_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[12], 'wb') as f:
+            pickle.dump(self.static_odd_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
     
     def load_images_indexes(self):
-        pass
+        if os.path.isfile(self.indexes_full_file_paths_to_save[13]):
+            with open(self.indexes_full_file_paths_to_save[13], 'rb') as f:
+                self.natural_image_even_index_full_recording=pickle.load(f)
+
+        if os.path.isfile(self.indexes_full_file_paths_to_save[14]):
+            with open( self.indexes_full_file_paths_to_save[14], 'rb') as f:
+                self.natural_image_odd_index_full_recording=pickle.load(f)
+
+        if os.path.isfile(self.indexes_full_file_paths_to_save[15]):
+            with open(self.indexes_full_file_paths_to_save[15], 'rb') as f:
+                self.natural_image_even_transition_indexes=pickle.load(f)
+
+        if os.path.isfile(self.indexes_full_file_paths_to_save[16]):
+            with open( self.indexes_full_file_paths_to_save[16], 'rb') as f:
+                self.natural_image_odd_transition_indexes=pickle.load(f)
     
     def save_images_indexes(self):
-        pass
+        
+        with open( self.indexes_full_file_paths_to_save[13], 'wb') as f:
+            pickle.dump(self.natural_image_even_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[14], 'wb') as f:
+            pickle.dump(self.natural_image_odd_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+            
+        with open( self.indexes_full_file_paths_to_save[15], 'wb') as f:
+            pickle.dump(self.natural_image_even_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[16], 'wb') as f:
+            pickle.dump(self.natural_image_odd_transition_indexes, f, pickle.HIGHEST_PROTOCOL)
          
          
     #%%plotting
@@ -1111,11 +1583,11 @@ class VoltageSignalsExtractions():
         # fig.set_title('Snapping cursor')
         for i in range(0,3):
             if i==0:
-                line, = ax[i].plot(self.time_scale['Prairire'],self.locomotion_aray) 
+                line, = ax[i].plot(self.time_scale['Prairire'],self.locomotion_array['Prairire']['Locomotion']) 
             elif i==1:
                 line, = ax[i].plot(self.time_scale['Prairire'],self.rectified_speed_array['Prairire']['Locomotion'])  
             elif i==2:
-                line, = ax[i].plot(self.time_scale['Prairire'],self.acceleration_array['Prairire']['Locomotion'])  
+                line, = ax[i].plot(self.time_scale['Prairire'],self.rectified_acceleration_array['Prairire']['Locomotion'])  
          
         # snap_cursor = SnappingCursor(ax[0], line)  
         # fig.canvas.mpl_connect('motion_notify_event', snap_cursor.on_mouse_move)
@@ -1129,9 +1601,11 @@ class VoltageSignalsExtractions():
     def plotting_paradigm_transitions(self):   
         
         if self.vis_stim_protocol=='AllenA':
-            datasets_to_plot=[self.first_drifting_set, self.second_drifting_set, self.third_drifting_set, self.first_movie_set,self.second_movie_set,self.short_movie_set,self.spont]
+            datasets_to_plot=[self.first_drifting_set, self.second_drifting_set, self.third_drifting_set, self.natural_movie_one_set,self.natural_movie_three_first_set_set,self.natural_movie_three_second_set_set,self.spont]
+        elif self.vis_stim_protocol=='AllenB':
+            datasets_to_plot=[self.first_static_set, self.second_static_set, self.third_static_set, self.first_images_set,self.second_images_set,self.third_images_set,self.natural_movie_one_set, self.spont]
         elif self.vis_stim_protocol=='AllenC':
-            datasets_to_plot=[self.first_noise_set, self.second_noise_set, self.third_noise_set, self.first_movie_set,self.second_movie_set,self.spont1,self.spont2]
+            datasets_to_plot=[self.first_noise_set, self.second_noise_set, self.third_noise_set, self.natural_movie_one_set,self.natural_movie_two_set,self.spont1,self.spont2]
 
         
         datasets_to_plot.append(self.rounded_vis_stim['Prairire']['VisStim'])

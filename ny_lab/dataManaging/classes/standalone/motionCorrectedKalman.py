@@ -101,13 +101,12 @@ class MotionCorrectedKalman:
         
                     self.remove_unclipped_issue_shifted_kalmans()
                     self.unload_kalman_movie()
-                    
-                    
-                    
+                          
             else:
                 if self.kalman_path:
                     module_logger.info('kalman initialized not loaded')
                 else:
+                    self.check_MC_info_mmap_directory()
                     module_logger.info('no kalman in directory')
 
 
@@ -253,7 +252,10 @@ class MotionCorrectedKalman:
 
     def do_temporal_gaussian_smoothing(self, sigma):
         
-        frame=self.dataset_object.metadata.translated_imaging_metadata['FinalFrequency']
+        if self.dataset_object.metadata.translated_imaging_metadata:
+            frame=self.dataset_object.metadata.translated_imaging_metadata['FinalFrequency']
+        else:
+            frame=10
         sigma=100#ms
 
         def gaussian_smooth_kernel_convolution(signal, fr, sigma):

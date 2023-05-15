@@ -754,9 +754,11 @@ class ImagingDatabase():
         # ExpID=MouseDat.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['ID']
       
         MouseRawPath=mice_code_path
-        
+        WideFieldPath=None
         WideFieldFolderPath=os.path.join(MouseRawPath, 'Widefield')
-        WideFieldPath=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)[0]
+        WideFieldPaths=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)
+        if WideFieldPaths:
+            WideFieldPath=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)[0]
         WideFieldID=np.nan
     
 
@@ -769,7 +771,8 @@ class ImagingDatabase():
         
         for aq in true_aq_folders:
             self.add_new_acquisition(gui,aq, slowstoragepath, workingstoragepath,imaged_mice_id )
-         
+        IsWideFIeld=np.nan
+
         if WideFieldPath:
             IsWideFIeld=1
             WideFieldID=self.add_new_widefield(gui,imaged_mice_id, WideFieldPath,slowstoragepath, workingstoragepath)
@@ -903,6 +906,7 @@ class ImagingDatabase():
     def add_new_acquisition(self,gui, acquisition_path, mousesessionslowstoragepath, mousesessionworkingstoragepath, imaged_mice_ID=False ):
         self.update_variables()
         acquisition_id=self.max_acquisition_id+1
+        imaging_aq_time=False 
         IsMouse=0
         
         if imaged_mice_ID:
@@ -1211,6 +1215,9 @@ class ImagingDatabase():
         ExcitationWavelength=np.nan
         CoherentPower=np.nan
         CalculatedPower=np.nan
+        IsVoltageRecording=np.nan
+        VoltageRecordingChannels=np.nan
+        VoltageRecordingFrequency=np.nan
         Comments=np.nan
         IsChannel1Red=np.nan
         IsChannel2Green=np.nan
@@ -1238,146 +1245,162 @@ class ImagingDatabase():
         correctedETLPositions=np.nan
         Is10MinRec=np.nan
         
+        Xpositions=np.nan
+        Ypositions=np.nan
+        ImagingTime=np.nan
+        MicronsPerPixelX=np.nan
+        MicronsPerPixelY=np.nan
+        Zoom=np.nan
+        CaimanComments=np.nan
         
-      
-       
-        if not locomotion_only:
-            PowerSetting=metadata.imaging_metadata[1]['Planepowers']    
-            Objective=metadata.imaging_metadata[0]['Objective']       
-            PMT1GainRed=metadata.imaging_metadata[1]['pmtGains_Red']
-            PMT2GainGreen=metadata.imaging_metadata[1]['pmtGains_Green']
-            FrameAveraging=metadata.imaging_metadata[0]['RasterAveraging']   
-            ObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
-            ETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
-            Xpositions=metadata.imaging_metadata[1]['XPositions'] 
-            Ypositions=metadata.imaging_metadata[1]['YPositions'] 
-            ImagingTime=metadata.imaging_metadata[0]['ImagingTime'] 
-            MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX'] 
-            MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY'] 
-            Zoom=metadata.imaging_metadata[0]['OpticalZoom'] 
-            correctedObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
-            correctedETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
-
-
-            if metadata.imaging_metadata[1]['PlaneNumber']=='Single':
+        
+        atlas=0
+        if metadata.imaging_metadata:
+            if not locomotion_only:
+                PowerSetting=metadata.imaging_metadata[1]['Planepowers']    
+                Objective=metadata.imaging_metadata[0]['Objective']       
+                PMT1GainRed=metadata.imaging_metadata[1]['pmtGains_Red']
+                PMT2GainGreen=metadata.imaging_metadata[1]['pmtGains_Green']
+                FrameAveraging=metadata.imaging_metadata[0]['RasterAveraging']   
+                ObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
+                ETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
+                Xpositions=metadata.imaging_metadata[1]['XPositions'] 
+                Ypositions=metadata.imaging_metadata[1]['YPositions'] 
+                ImagingTime=metadata.imaging_metadata[0]['ImagingTime'] 
+                MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX'] 
+                MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY'] 
+                Zoom=metadata.imaging_metadata[0]['OpticalZoom'] 
+                correctedObjectivePositions=metadata.imaging_metadata[1]['PlanePositionsOBJ']
+                correctedETLPositions=metadata.imaging_metadata[1]['PlanePositionsETL'] 
+    
+    
+                if metadata.imaging_metadata[1]['PlaneNumber']=='Single':
+                        IsETLStack=0
+                        IsObjectiveStack=0
+                        PlaneNumber=1
+                        TotalFrames=metadata.imaging_metadata[1]['FrameNumber']
+                        InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']*FrameAveraging
+                        FinalVolumePeriod=InterFramePeriod
+                        FinalFrequency=1/InterFramePeriod
+                        TotalVolumes=TotalFrames
+                else:
+                    TotalVolumes=metadata.imaging_metadata[1]['VolumeNumber']
                     IsETLStack=0
                     IsObjectiveStack=0
-                    PlaneNumber=1
-                    TotalFrames=metadata.imaging_metadata[1]['FrameNumber']
-                    InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']*FrameAveraging
-                    FinalVolumePeriod=InterFramePeriod
-                    FinalFrequency=1/InterFramePeriod
-                    TotalVolumes=TotalFrames
-            else:
-                TotalVolumes=metadata.imaging_metadata[1]['VolumeNumber']
-                IsETLStack=0
-                IsObjectiveStack=0
-                PlaneNumber=metadata.imaging_metadata[1]['PlaneNumber']
-               
-                InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']
-                if not isinstance(metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod'], str):
-                    FinalVolumePeriod=metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod']*PlaneNumber
-                else:
-                    FinalVolumePeriod= metadata.imaging_metadata[0]['framePeriod']*PlaneNumber
-                    
-                FinalFrequency=1/FinalVolumePeriod
-                TotalFrames=TotalVolumes*PlaneNumber
-                PowerSetting=str(PowerSetting)
-                correctedObjectivePositions=[float(i[8:]) if isinstance(i, str) else i for i in ObjectivePositions]
-                correctedETLPositions=[float(i[8:]) if isinstance(i, str) else i for i in ETLPositions]
-                if not all(element == correctedObjectivePositions[0] for element in correctedObjectivePositions):
-                    IsObjectiveStack=1
-                if not all(element == correctedETLPositions[0] for element in correctedETLPositions):
-                    IsETLStack=1
-
-            FOVNumber=np.nan
-            if 'FOV_' in imaging_path:            
-                 FOVNumber=imaging_path[ imaging_path.index('FOV_')+4]
-                 
-                    
-                 
-            self.add_imaging_info_window=AddImagingInfo(gui, ImagingFilename)
-            self.add_imaging_info_window.wait_window()
-            get_values= self.add_imaging_info_window.values
-            # root = Tkinter.Tk()
-            # app = add_imaging_info(root, ImagingFilename)
-            # root.mainloop()
-            # get_values=app.values
-            RedFilter=get_values[2][1]
-            GreenFilter=get_values[1][1]
-            DichroicBeamsplitter=get_values[3][1]
-            filtervalues=[RedFilter,GreenFilter,DichroicBeamsplitter]
-            filtercodes=transform_filterinfo_to_codes(filtervalues, self.databse_ref)
-            
-            
-
-            IsBlockingDichroic=0   
-            if 'Yes' in get_values[4][1]:
-                IsBlockingDichroic=1
-                
-            if 'No' in get_values[5][1]:
-                IsGoodObjective=1
-
-            ExcitationWavelength=get_values[6][1]
-            CoherentPower=get_values[7][1]
-            CalculatedPower=np.nan
-            Comments=get_values[8][1]
-            
-            ToDoDeepCaiman=0
-            if 'Yes' in get_values[12][1]:
-                ToDoDeepCaiman=1
-
-            
-            Xpositions=metadata.imaging_metadata[1]['XPositions']
-            Ypositions=metadata.imaging_metadata[1]['YPositions']
-            ImagingTime=metadata.imaging_metadata[0]['ImagingTime']
-            MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX']
-            MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY']
-            Zoom=metadata.imaging_metadata[0]['OpticalZoom']
-            
-            
-            if 'Atlas' in  metadata.imaging_metadata[1]['MultiplanePrompt']:
-                OverlapPercentage=get_values[9][1]
-                AtlasZStructure=get_values[10][1]
-                AtlasDirection=get_values[11][1]
-                AtlasOverlap=str((metadata.imaging_metadata[1]['StageGridXOverlap'],  metadata.imaging_metadata[1]['StageGridYOverlap'] ))
-                OverlapPercentageMetadata= metadata.imaging_metadata[1]['StageGridOverlapPercentage']
-                AtlasGridSize=str((metadata.imaging_metadata[1]['StageGridNumXPositions'],  metadata.imaging_metadata[1]['StageGridNumYPositions']))
-                Xpositions=str(tuple(Xpositions))
-                Ypositions=str(tuple(Ypositions))
-               
-
-            IsChannel1Red=0
-            IsChannel2Green=0
+                    PlaneNumber=metadata.imaging_metadata[1]['PlaneNumber']
+                   
+                    InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']
+                    if not isinstance(metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod'], str):
+                        FinalVolumePeriod=metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod']*PlaneNumber
+                    else:
+                        FinalVolumePeriod= metadata.imaging_metadata[0]['framePeriod']*PlaneNumber
+                        
+                    FinalFrequency=1/FinalVolumePeriod
+                    TotalFrames=TotalVolumes*PlaneNumber
+                    PowerSetting=str(PowerSetting)
+                    correctedObjectivePositions=[float(i[8:]) if isinstance(i, str) else i for i in ObjectivePositions]
+                    correctedETLPositions=[float(i[8:]) if isinstance(i, str) else i for i in ETLPositions]
+                    if not all(element == correctedObjectivePositions[0] for element in correctedObjectivePositions):
+                        IsObjectiveStack=1
+                    if not all(element == correctedETLPositions[0] for element in correctedETLPositions):
+                        IsETLStack=1
     
-            if not metadata.imaging_metadata[1]['RedChannelName']=='No Channel':
-                IsChannel1Red=1
-            if not metadata.imaging_metadata[1]['GreenChannelName']=='No Channel':
-                IsChannel2Green=1
-            IsGalvo=1
-            IsResonant=0
-            if 'Resonant' in  metadata.imaging_metadata[0]['ScanMode']:
-                 IsResonant=1
-                 IsGalvo=0
-                 Multisampling=metadata.imaging_metadata[0]['ResonantSampling']
-            
-            Resolution=str(metadata.imaging_metadata[0]['LinesPerFrame'])+'x'+ str(metadata.imaging_metadata[0]['PixelsPerLine'])
-            DwellTime=metadata.imaging_metadata[0]['dwellTime']
-            
-            BitDepth=metadata.imaging_metadata[0]['BitDepth']
+                FOVNumber=np.nan
+                if 'FOV_' in imaging_path:            
+                     FOVNumber=imaging_path[ imaging_path.index('FOV_')+4]
+                     
+                        
+                Xpositions=metadata.imaging_metadata[1]['XPositions']
+                Ypositions=metadata.imaging_metadata[1]['YPositions']
+                ImagingTime=metadata.imaging_metadata[0]['ImagingTime']
+                MicronsPerPixelX=metadata.imaging_metadata[0]['MicronsPerPixelX']
+                MicronsPerPixelY=metadata.imaging_metadata[0]['MicronsPerPixelY']
+                Zoom=metadata.imaging_metadata[0]['OpticalZoom']
                 
-            LinePeriod=metadata.imaging_metadata[0]['ScanLinePeriod']
-            FramePeriod=metadata.imaging_metadata[0]['framePeriod']
-            FullAcquisitionTime=metadata.imaging_metadata[1]['FullAcquisitionTime']
+                if 'Atlas' in  metadata.imaging_metadata[1]['MultiplanePrompt']:
+                    atlas=1
+
+                 
+                    AtlasOverlap=str((metadata.imaging_metadata[1]['StageGridXOverlap'],  metadata.imaging_metadata[1]['StageGridYOverlap'] ))
+                    OverlapPercentageMetadata= metadata.imaging_metadata[1]['StageGridOverlapPercentage']
+                    AtlasGridSize=str((metadata.imaging_metadata[1]['StageGridNumXPositions'],  metadata.imaging_metadata[1]['StageGridNumYPositions']))
+                    Xpositions=str(tuple(Xpositions))
+                    Ypositions=str(tuple(Ypositions))
+                    
+                IsChannel1Red=0
+                IsChannel2Green=0
+        
+                if not metadata.imaging_metadata[1]['RedChannelName']=='No Channel':
+                    IsChannel1Red=1
+                if not metadata.imaging_metadata[1]['GreenChannelName']=='No Channel':
+                    IsChannel2Green=1
+                    
+                IsGalvo=1
+                IsResonant=0
+                if 'Resonant' in  metadata.imaging_metadata[0]['ScanMode']:
+                     IsResonant=1
+                     IsGalvo=0
+                     Multisampling=metadata.imaging_metadata[0]['ResonantSampling']
+                
+                Resolution=str(metadata.imaging_metadata[0]['LinesPerFrame'])+'x'+ str(metadata.imaging_metadata[0]['PixelsPerLine'])
+                DwellTime=metadata.imaging_metadata[0]['dwellTime']
+                
+                BitDepth=metadata.imaging_metadata[0]['BitDepth']
+                    
+                LinePeriod=metadata.imaging_metadata[0]['ScanLinePeriod']
+                FramePeriod=metadata.imaging_metadata[0]['framePeriod']
+                FullAcquisitionTime=metadata.imaging_metadata[1]['FullAcquisitionTime']
+                
+                IsVoltageRecording=0
+                VoltageRecordingChannels=np.nan
+                VoltageRecordingFrequency=np.nan
+                if hasattr(metadata, 'full_voltage_recording_metadata'):
+                    IsVoltageRecording=1
+                    VoltageRecordingChannels=str((metadata.recorded_signals and metadata_object.recorded_signals_csv))
+                    VoltageRecordingFrequency=metadata.translated_imaging_metadata['VoltageRecordingFrequency']
+                           
+                          
+                 
+        self.add_imaging_info_window=AddImagingInfo(gui, ImagingFilename)
+        self.add_imaging_info_window.wait_window()
+        get_values= self.add_imaging_info_window.values
+        # root = Tkinter.Tk()
+        # app = add_imaging_info(root, ImagingFilename)
+        # root.mainloop()
+        # get_values=app.values
+        RedFilter=get_values[2][1]
+        GreenFilter=get_values[1][1]
+        DichroicBeamsplitter=get_values[3][1]
+        filtervalues=[RedFilter,GreenFilter,DichroicBeamsplitter]
+        filtercodes=transform_filterinfo_to_codes(filtervalues, self.databse_ref)
+        
+        
+
+        IsBlockingDichroic=0   
+        if 'Yes' in get_values[4][1]:
+            IsBlockingDichroic=1
+            
+        if 'No' in get_values[5][1]:
+            IsGoodObjective=1
+
+        ExcitationWavelength=get_values[6][1]
+        CoherentPower=get_values[7][1]
+        CalculatedPower=np.nan
+        Comments=get_values[8][1]
+        
+        ToDoDeepCaiman=0
+        if 'Yes' in get_values[12][1]:
+            ToDoDeepCaiman=1
+            
+
+        
+        if atlas:
+            OverlapPercentage=get_values[9][1]
+            AtlasZStructure=get_values[10][1]
+            AtlasDirection=get_values[11][1]
 
    
-        IsVoltageRecording=0
-        VoltageRecordingChannels=np.nan
-        VoltageRecordingFrequency=np.nan
-        if hasattr(metadata, 'full_voltage_recording_metadata'):
-            IsVoltageRecording=1
-            VoltageRecordingChannels=str((metadata.recorded_signals and metadata_object.recorded_signals_csv))
-            VoltageRecordingFrequency=metadata.translated_imaging_metadata['VoltageRecordingFrequency']
+       
 
         CaimanComments=None
     
