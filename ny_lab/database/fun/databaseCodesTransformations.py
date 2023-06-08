@@ -25,7 +25,7 @@ def get_combination_from_virus(virus_tuple, database_object):
         viruscomb = pd.read_sql_query(query_viruscomb, database_connection, params=(good_virus_codes[0],)).values.tolist()
         
     if len(good_virus_codes)==2:
-        if any(x in virus_tuple for x in ['B', 'C1V1', 'I']):
+        if any(x in virus_tuple for x in ['B', 'C1V1', 'I','T','Z']):
             query_viruscomb="SELECT ID FROM VirusCombinations_table WHERE Virus1=? AND Virus2 IS NULL AND Virus3=?"
             viruscomb = pd.read_sql_query(query_viruscomb, database_connection, params=(good_virus_codes[0],good_virus_codes[1])).values.tolist()
         else:
@@ -36,7 +36,10 @@ def get_combination_from_virus(virus_tuple, database_object):
         query_viruscomb="SELECT ID FROM VirusCombinations_table WHERE Virus1=? AND Virus2=? AND Virus3=?"
         viruscomb = pd.read_sql_query(query_viruscomb, database_connection, params=(good_virus_codes[0],good_virus_codes[1],good_virus_codes[2])).values.tolist()
         
-    return viruscomb
+    if not viruscomb:
+        print('Not visur combination found, add new one')
+    else:
+        return viruscomb
 
 def get_next_twolettercode(last_code):
 

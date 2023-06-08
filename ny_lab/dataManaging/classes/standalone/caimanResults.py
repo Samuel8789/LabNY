@@ -34,7 +34,6 @@ try:
 except:
         print('Not able to install matlabengine')
 import scipy.io as spio
-from .caimanSorterYSResults_legacy import CaimanSorterYSResults
 import keyboard
 import copy
 try:
@@ -85,12 +84,11 @@ class CaimanResults():
             self.movie_path=self.dataset_object.kalman_object.kalman_path
             self.hdf5_file_path=self.caiman_object.caiman_full_path
          
+            #%%
+            self.caiman_object.check_caiman_files()
+         #%%
         self.check_if_mat_file()    
-         
-    def load_YsSorter_results_legacy(self):
-        if self.mat_results_path:
-            self.ys_sorter_object=CaimanSorterYSResults(self.mat_results_path)
-         
+                 
     def load_pyhton_cnm_object(self) :      
         self.cnm = cnmf.online_cnmf.OnACID(path=self.hdf5_file_path)
 
@@ -247,9 +245,7 @@ class CaimanResults():
         # self.options_path=r'C:\Users\sp3660\Downloads\caiman_sorter-master\caiman_sorter_options.mat'
 
         self.options_mat=self.loadmat(self.options_path)
-    #%%
         self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.hdf5_file_path, fast_output=False)
-        #%%
         if  self.mat_results_path:
             self.options_mat['ops']['file_path_from_python']='\\\\?\\'+transform_path(self.mat_results_path, fast_output=False)            
         spio.savemat(self.options_path, self.options_mat)

@@ -11,13 +11,14 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import pickle
+import copy
 import glob
 import gc
 import sys
 from matplotlib.backends.backend_pdf import PdfPages
 import logging 
 module_logger = logging.getLogger(__name__)
-
+from operator import itemgetter
 import tkinter as Tkinter
 import random
 from tkinter import *
@@ -25,8 +26,10 @@ import pandas as pd
 import tkinter as tk
 import numpy as np
 import scipy.io as sio
-
-
+import caiman as cm
+from PIL import Image
+from matplotlib.patches import Rectangle
+import matplotlib.ticker as mtick
 from matplotlib import gridspec
 # import torch
 # import torch.nn as nn
@@ -35,7 +38,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.cluster import AgglomerativeClustering
 from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist, squareform
-from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore
+from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore, mode
 import copy
 from scipy import interpolate
 import seaborn as sns
@@ -45,6 +48,8 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.io import loadmat, savemat
 import skimage.io
 import math
+from statsmodels.nonparametric.smoothers_lowess import lowess
+
 # from .caimanSorterYSResults_legacy import CaimanSorterYSResults
 # from .voltageSignalsExtractions import VoltageSignalsExtractions
 # from .metadata import Metadata
@@ -60,7 +65,17 @@ from matplotlib.lines import Line2D
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib import animation 
 from IPython.display import HTML
-
+import caiman as cm
+import os
+import glob
+import scipy.io as spio
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+import scipy
+import scipy.signal as sg
+from scipy import signal
+from scipy import interpolate
 
 try:
     from .allenAnalysis import AllenAnalysis
@@ -101,7 +116,11 @@ sns.set(style='white', context='notebook', rc={'figure.figsize':(14,10)})
 mpl.rcParams['pdf.fonttype'] = 42
 mpl.rcParams['ps.fonttype'] = 42
 mpl.rcParams['font.family'] = 'Arial'
-
+from numbers import Number
+from scipy.signal import firwin, filtfilt
+from typing import Optional
+from numba import njit
+from tqdm import tqdm
 
 #%%
 
@@ -116,7 +135,7 @@ class ResultsAnalysis():
             
         Alignmenet of voltage signals and imageing
         Create a visstim class to integrate info form voltage sigblas and visstim mat files
-        Integrate daq signals and prairire voltage sognals
+        Integrate daq signals and Prairie voltage sognals
         Integrate with facecam
         
       attributes
@@ -170,6 +189,8 @@ class ResultsAnalysis():
         
         if self.acquisition_object:
             self.set_up_some_paths()
+            self.correction_for_LED_clipping()
+
 
             self.metadata_object=self.acquisition_object.metadata_object
             self.acquisition_object.voltage_signal_object
@@ -184,6 +205,7 @@ class ResultsAnalysis():
             self.signals_object.process_all_signals()
             self.create_full_data_container()
             self.create_stim_table()
+
 
       
             #%  pyr int identification
@@ -296,7 +318,9 @@ class ResultsAnalysis():
     def load_all_acquisition_subobjects(self):
         self.acquisition_object.load_all(camera=False, kalman=False)
         self.acquisition_object.metadata_object.get_timestamps()
-        self.all_planes_timestamps= self.acquisition_object.metadata_object.timestamps
+        
+        
+        
         self.split_channel_datasets()
 
     def split_channel_datasets(self):
@@ -314,12 +338,18 @@ class ResultsAnalysis():
         self.volt_object.signal_extraction_object()
         # reference to voltage extraction oject
         self.signals_object=self.volt_object.extraction_object
-        self.signals_object.update_frame_rates_with_metadata(self.metadata_object.translated_imaging_metadata['VoltageRecordingFrequency'], 1000)
-        self.signals_object.choose_time_scale('secs')
-
-    def update_voltage_signals_frame_rates(self,prairire_frame_rate, daq_frame_rate):
         
-        self.signals_object.update_frame_rates_with_metadata(prairire_frame_rate, daq_frame_rate)
+        if self.signals_object.all_signals:
+            self.are_signals=True
+
+            self.signals_object.update_frame_rates_with_metadata(self.metadata_object.translated_imaging_metadata['VoltageRecordingFrequency'], 1000)
+            self.signals_object.choose_time_scale('secs')
+        else:
+            self.are_signals=None
+
+    def update_voltage_signals_frame_rates(self,Prairie_frame_rate, daq_frame_rate):
+        
+        self.signals_object.update_frame_rates_with_metadata(Prairie_frame_rate, daq_frame_rate)
         
         
     def load_visual_stim_protocol(self):
@@ -356,6 +386,14 @@ class ResultsAnalysis():
         self.full_data['imaging_data']['Plane1']['Traces']['binarization_threshold']=threshold
 
         
+
+    def correction_for_LED_clipping(self):
+        #things that require correction
+        # timestamps
+        # voltage synchroniztion
+        
+        
+        self.start_frame, self.end_frame=self.acquisition_object.all_datasets[list(self.acquisition_object.all_datasets.keys())[0]].bidishift_object.load_LED_tips()
         
         
     def create_full_data_container_allen(self):
@@ -471,7 +509,8 @@ class ResultsAnalysis():
                 self.extract_calcium_traces()
                 
             if self.signals_object:
-                self.extrac_voltage_visstim_signals()
+                if self.are_signals:
+                    self.extrac_voltage_visstim_signals()
             
             if not self.nondatabase:
                 self.save_full_data()
@@ -522,6 +561,22 @@ class ResultsAnalysis():
 #%% calcium data managing
     def extract_calcium_traces(self):
         self.pyr_int_identification={}
+        self.all_planes_timestamps= copy.deepcopy(self.acquisition_object.metadata_object.timestamps)
+        self.all_planes_clipped_timestamps=copy.deepcopy(self.all_planes_timestamps)
+        self.clipped_timestamps=False
+        if self.start_frame or self.end_frame:
+            for key,val in  self.all_planes_timestamps.items():
+                all_planes_timestamps_LED_clipped=np.array(val[self.start_frame:self.end_frame])
+                self.all_planes_clipped_timestamps[key]=all_planes_timestamps_LED_clipped
+                self.clipped_timestamps=True
+        else:
+            for key,val in  self.all_planes_timestamps.items():
+                self.all_planes_clipped_timestamps[key]=np.array(val)
+
+            
+        self.all_planes_clipped_timestamps_shifted={}
+        for k in self.all_planes_clipped_timestamps.keys():
+            self.all_planes_clipped_timestamps_shifted[k]=self.all_planes_clipped_timestamps[k]-self.all_planes_clipped_timestamps[k][0]
         
         # Define dictionary names
         for dataset_name in list(self.caiman_results.keys()):
@@ -558,8 +613,10 @@ class ResultsAnalysis():
                           'mcmc_binary':selected_plane_caiman.binarized_MCMC,
                           'mcmc_scored_binary':selected_plane_caiman.z_scored_binarized_mcmc_binarized}
             
-            self.full_data['imaging_data'][plane]['Traces']=plane_traces
-            self.full_data['imaging_data'][plane]['Timestamps']=(self.all_planes_timestamps[plane][0:-1], (np.arange(0,len(self.all_planes_timestamps[plane][0:-1]))/self.full_data['imaging_data']['Frame_rate'])+self.full_data['imaging_data']['Interplane_period']*plane_number)
+            self.full_data['imaging_data'][plane]['Traces']=plane_traces 
+            self.full_data['imaging_data'][plane]['Timestamps']=(self.all_planes_clipped_timestamps[plane][0:],\
+                                                                 (np.arange(0,len(self.all_planes_clipped_timestamps[plane][0:]))/self.full_data['imaging_data']['Frame_rate'])\
+                                                                     +self.full_data['imaging_data']['Interplane_period']*plane_number)
             self.full_data['imaging_data'][plane]['CellNumber']=selected_plane_caiman.accepted_cells_number
             self.full_data['imaging_data'][plane]['CellIds']=selected_plane_caiman.final_accepted_cells_matlabcorrected_indexes
             # self.full_data['imaging_data'][plane]['Pyr_Int_Ident']= TO DO
@@ -572,7 +629,7 @@ class ResultsAnalysis():
                 self.full_data['imaging_data']['All_planes_timestamped']['Traces']= {key:np.empty((0, len(self.full_data['imaging_data']['Plane1']['Timestamps'][0]))) for key in plane_traces.keys()}
 
             for matrix_name, matrix in  self.full_data['imaging_data'][plane]['Traces'].items():
-                if matrix.any() and self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name].shape[0]!=0:
+                if matrix.any() :
                     self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name]=np.concatenate((self.full_data['imaging_data']['All_planes_rough']['Traces'][matrix_name],  matrix), axis=0)
         
         # cell_numbers={k:len(plane['CellIds']) for k,plane in self.full_data['imaging_data'].items() if 'Plane' in k }
@@ -580,25 +637,172 @@ class ResultsAnalysis():
         self.full_data['imaging_data']['All_planes_rough']['CellIds']={k:plane['CellIds'] for k,plane in self.full_data['imaging_data'].items() if 'Plane' in k }
         self.full_data['imaging_data']['All_planes_rough']['Timestamps']= self.full_data['imaging_data']['Plane1']['Timestamps']
         self.full_data['imaging_data']['All_planes_rough']['CellNumber']= sum(len(plane) for plane in  self.full_data['imaging_data']['All_planes_rough']['CellIds'].values())
+        
+        self.mov_timestamps_seconds={'raw':np.array(self.all_planes_timestamps['Plane1']), # from metadata
+                        'clipped':self.full_data['imaging_data']['Plane1']['Timestamps'][0], # clipped to start frame
+                        'shifted':self.all_planes_clipped_timestamps_shifted['Plane1'], #substracting first timstamp to clipped
+                        'shifted_recalculated':self.full_data['imaging_data']['Plane1']['Timestamps'][1] # by taking shifted and doin linspace with imaging para,meters
+                        }
+        
+        self.mov_timestamps_miliseconds={k:v*1000 for k,v in self.mov_timestamps_seconds.items()}
 
 #%% signal data managing
     def resample(self, x, factor, kind='linear'):
         n = int(np.floor(x.size / factor))
         f = interpolate.interp1d(np.linspace(0, 1, x.size), x, kind)
         return f(np.linspace(0, 1, n))     
+    
+    
+    # THis method I will move to acquisition when finsihed, for the moment keep it here. Ruuning during analysis but integrate in acquisition as weel as in the allen processing
+    # THIs loads the rasw video to do the mean so it takes time to load
+    # at the moment I have single planes only so I will have to dapat to multiplane somwhow
+    # this hsould be done only once, after i will have to save the synchornization and clippinh somehow
+    
+    
+     
+
+
+    def review_aligned_signals_and_transitions(self,led_clipeed=False):
+        
+        self.mean_movie_path =self.calcium_datasets[list(self.calcium_datasets.keys())[0]].bidishift_object.mean_movie_path
+        mean_mov=np.load(self.mean_movie_path)
+        timestamps_voltage_signals=self.full_data['voltage_traces']['Full_signals']['Prairie']['LED_aligned']['traces']['PhotoTrig'].index.values
+        mov=self.scale_signal(mean_mov)
+        surrounddown=np.array([[i-1,i,i+1] for i in [self.start_frame]])
+        surroundup=np.array([[i-1,i,i+1] for i in [self.end_frame]])
+       
+     
+
+        
+        deriv=lambda x:np.diff(x,prepend=x[0] )
+        rectified=lambda x:np.absolute(x)
+ 
+        signals_to_plot=[ 'VisStim',  'LED',  'PhotoStim',  'PhotoTrig',  'AcqTrig']
+        self.full_data['voltage_traces']['Full_signals']['Prairie']['LED_aligned']['traces']
+        
+        
+        #plot prairie daq alignment
+        # plt.close('all')
+        for sig in reversed(self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'].columns[:-1]): 
+            daq_sig=sg.medfilt(np.squeeze( self.full_data['voltage_traces']['Full_signals']['daq']['Raw']['traces'][sig].values), kernel_size=1)
+            prairie_sig=sg.medfilt(np.squeeze(  self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'][sig].values), kernel_size=1)           
+            f,ax=plt.subplots()
+            ax.plot(daq_sig)
+            ax.plot(prairie_sig,'r')
+            f,ax=plt.subplots()
+            ax.plot( self.full_data['voltage_traces']['Full_signals']['daq']['Prairie_aligned']['traces'][sig].values)
+            ax.plot(self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'][sig].values,'r')
+        
+
+        #plotting clipped signal to video length
+        signals_to_plot=[  'LED',  'AcqTrig']
+        for record_to_plot, process in self.full_data['voltage_traces']['Full_signals'].items():
+            f,ax=plt.subplots()
+            for sig in  signals_to_plot:
+                ax.plot(self.scale_signal(process['Raw']['traces'][sig].values),label=sig)
+                ax.plot(self.scale_signal(process['Movie_length_clipped']['traces'][sig].values),label=sig)   
+            ax.plot(self.mov_timestamps_miliseconds['raw'],mov,label='Video')
+            ax.legend()
+
+      
+        
+        
+        #plot LED aligned not clipped signals
+        # plt.close('all')
+        for record_to_plot, process in self.full_data['voltage_traces']['Full_signals'].items():
+            f,ax=plt.subplots(len(signals_to_plot)+1,sharex=True)
+            for k,sigk in enumerate(signals_to_plot):
+                sig=self.scale_signal(process['LED_aligned']['traces'][sigk].values)
+                locomotion=process['LED_aligned']['traces']['Locomotion'].values
+                speed=self.scale_signal(rectified(deriv(locomotion)))
+                speedtimestamps=process['LED_aligned']['traces']['Locomotion'].index.values
+                upt=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned'][record_to_plot]['up']
+                downt=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned'][record_to_plot]['down']
+                upt_downsampled=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned_downsampled'][record_to_plot]['up']
+                downt_downsampled=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned_downsampled'][record_to_plot]['down']
+                surrounddown=np.array([[i-1,i,i+1] for i in downt_downsampled])
+                surroundup=np.array([[i-1,i,i+1] for i in upt_downsampled])
+
+
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'], mov)
+                ax[k].plot(speedtimestamps, speed)
+                ax[k].vlines(self.mov_timestamps_miliseconds['raw'][self.start_frame],0,1,linestyles='solid',alpha=1)
+                ax[k].vlines(self.mov_timestamps_miliseconds['raw'][self.end_frame],0,1,linestyles='solid',alpha=1)
+                ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
+                if surroundup.any():
+                    ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surroundup], 0,1,linestyles='dashdot',alpha=0.2)
+                ax[k].plot( timestamps_voltage_signals,sig )
+                ax[k].plot( upt,sig[upt] ,'^')
+                ax[k].plot( downt,sig[downt] ,'v')
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int),sig[ self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int)] ,'<')
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int),sig[self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int)] ,'>')
+                ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
+                if surroundup.any():
+                    ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surroundup], 0,1,linestyles='dashdot',alpha=0.2)
+            ax[-1].plot(self.mov_timestamps_miliseconds['raw'], mov)
+            ax[-1].plot(speedtimestamps, speed,alpha=0.2) 
+            ax[-1].set_ylim(0,0.02)            
+              
+                    
+        #plot led clipeed signals
+        signals_to_plot=[ 'VisStim', 'PhotoStim',  'PhotoTrig', ]
+        for record_to_plot, process in self.full_data['voltage_traces']['Full_signals'].items():
+            f,ax=plt.subplots(len(signals_to_plot)+1,sharex=True)
+            for k,sigk in enumerate(signals_to_plot):
+                sig=self.scale_signal(process['LED_clipped']['traces'][sigk].values)
+                locomotion=process['LED_clipped']['traces']['Locomotion'].values
+                speed=self.scale_signal(rectified(deriv(locomotion)))
+                speedtimestamps=process['LED_clipped']['traces']['Locomotion'].index.values
+                mov_clipped=self.scale_signal(mean_mov[self.start_frame:self.end_frame])
+                upt=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned_downsampled_LEDshifted'][record_to_plot]['up']
+                downt=self.full_data['voltage_traces']['Full_signals_transitions'][sigk]['aligned_downsampled_LEDshifted'][record_to_plot]['down']
+                surrounddown=np.array([[i-1,i,i+1] for i in downt])
+                surroundup=np.array([[i-1,i,i+1] for i in upt])
+                 
+                ax[k].plot(self.mov_timestamps_miliseconds['shifted'], mov_clipped)
+                ax[k].plot(speedtimestamps,sig )
+                ax[k].plot(speedtimestamps,speed )
+                ax[k].plot(self.mov_timestamps_miliseconds['shifted'][upt].astype(int),sig[ self.mov_timestamps_miliseconds['shifted'][upt].astype(int)] ,'<')
+                ax[k].plot(self.mov_timestamps_miliseconds['shifted'][downt].astype(int),sig[self.mov_timestamps_miliseconds['shifted'][downt].astype(int)] ,'>')
+                ax[k].vlines(self.mov_timestamps_miliseconds['shifted'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
+                ax[k].vlines(self.mov_timestamps_miliseconds['shifted'][surroundup], 0,1,linestyles='dashdot',alpha=0.2)
+
+            ax[-1].plot(self.mov_timestamps_miliseconds['shifted'], mov_clipped)
+            ax[-1].plot(speedtimestamps, speed,alpha=0.2) 
+                  
+
+    
+        plt.show()
+            
+        
+
+        # def check_clip_voltages_to_movie_length(self):
+        
+       
+        
+       
+            
+
+  
 
     def extrac_voltage_visstim_signals(self):
+ 
+    
+        
         self.milisecond_period=1000/self.full_data['imaging_data']['Frame_rate']
         voltagerate=self.metadata_object.translated_imaging_metadata['VoltageRecordingFrequency']
-        self.full_data['voltage_traces']['Speed']=self.resample(self.signals_object.rectified_speed_array['Prairire']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze()
-        self.full_data['voltage_traces']['Acceleration']=self.resampled_acceleration_matrix=self.resample(self.signals_object.rectified_acceleration_array['Prairire']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze() 
+        self.full_data['voltage_traces']['Speed']=self.resample(self.signals_object.rectified_speed_array['Prairie']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze()
+        self.full_data['voltage_traces']['Acceleration']=self.resample(self.signals_object.rectified_acceleration_array['Prairie']['Locomotion'][:], factor=self.milisecond_period, kind='linear').squeeze() 
         if self.signals_object.rounded_vis_stim:
-            self.full_data['voltage_traces']['VisStim']=self.resample(self.signals_object.rounded_vis_stim['Prairire']['VisStim'][:], factor=self.milisecond_period, kind='linear').squeeze()
+            self.full_data['voltage_traces']['VisStim']=self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['VisStim'].values
         self.full_data['voltage_traces']['Photodiode']=''
-        self.full_data['voltage_traces']['Start_End']=''
-        self.full_data['voltage_traces']['LED']=''
-        self.full_data['voltage_traces']['Optopockels']=''
-        self.full_data['voltage_traces']['OptoTrigger']=''
+        self.full_data['voltage_traces']['Start_End']=self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['AcqTrig'].values
+        self.full_data['voltage_traces']['LED']=self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['LED'].values
+        self.full_data['voltage_traces']['Optopockels']=self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['PhotoStim'].values
+        self.full_data['voltage_traces']['OptoTrigger']=self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['PhotoTrig'].values
+        self.full_data['voltage_traces']['Full_signals']=self.signals_object.all_final_signals
+        self.full_data['voltage_traces']['Full_signals_transitions']=self.signals_object.signal_transitions
+
 
         if self.signals_object.vis_stim_protocol and self.signals_object.transitions_dictionary:
             self.full_data['visstim_info']['Paradigm_Indexes']={key:(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
@@ -614,8 +818,8 @@ class ResultsAnalysis():
             for y in it:                
                 frame_ends[it.multi_index]=np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -y/voltagerate).argmin()
             
-            self.full_data['visstim_info']['Full']={ 'Resampled_sliced_speed':self.resample(self.signals_object.rectified_speed_array['Prairire']['Locomotion'], factor=self.milisecond_period, kind='linear').squeeze(),
-                                                    'Resampled_sliced_visstim':self.resample(self.signals_object.rounded_vis_stim['Prairire']['VisStim'], factor=self.milisecond_period, kind='linear').squeeze(),
+            self.full_data['visstim_info']['Full']={ 'Resampled_sliced_speed':self.resample(self.signals_object.rectified_speed_array['Prairie']['Locomotion'], factor=self.milisecond_period, kind='linear').squeeze(),
+                                                    'Resampled_sliced_visstim':self.resample(self.signals_object.rounded_vis_stim['Prairie']['VisStim'], factor=self.milisecond_period, kind='linear').squeeze(),
                }
             self.full_data['visstim_info']['Movie1']={'Frame_Starts':frame_starts,
                                                       'Frame_Ends':frame_ends,                                                    
@@ -721,6 +925,768 @@ class ResultsAnalysis():
                                                                                                                    self.signals_object.third_images_set)), factor=self.milisecond_period, kind='linear').squeeze()
                                                             }
          
+            
+            
+            
+    def scale_signal(self,signal,method='ZeroOne'):
+        import scipy.stats as stats
+        if method=='ZeroOne':
+            scaled_signal=(signal-np.min(signal))/(np.max(signal)-np.min(signal))
+                                            
+        elif method=='ZScored':
+            scaled_signal=stats.zscore(signal)
+                             
+        return scaled_signal
+
+        
+    def manually_setting_opto_times_and_cells(self):
+        
+        if os.path.split(self.acquisition_object.aquisition_name)[1]=='230321_SPRB_3MinTest_25x_920_51020_63075_with-001':
+            plt.close('all')
+
+            self.mean_movie_palth =self.calcium_datasets[list(self.calcium_datasets.keys())[0]].bidishift_object.mean_movie_path
+            mean_mov=np.load(self.mean_movie_path)
+        
+            cell=[0,4,6,9]
+            # this come form the preliminary matlab analysis i did for rafa
+            estimatedoptotimes=np.array([1003,1422, 1647, 2110, 2221, 2923, 3525, 3666, 3806, 4209])
+            estimatedoptotimes=estimatedoptotimes-1
+            
+            estimatedlocomotionbouts=np.array([1230, 1985, 2698,3325,  4010, 4500])
+            estimatedlocomotionbouts=estimatedlocomotionbouts-1
+            prestim=20
+            poststim=40
+            
+            
+            
+            backgroundcorrection=mean_mov[2786:2877]
+            
+            firstcorrectionlenght=len(np.arange(994,1079))
+            secondtcorrectionlenght=len(np.arange(1432,1494))
+            thirdcorrectionlenght=len(np.arange(3575,3619))
+            fourthcorrectionlenght=len(np.arange(4214,4252))
+            
+            
+            mean_mov[994:1079]=np.random.choice(backgroundcorrection, firstcorrectionlenght)
+            mean_mov[1432:1494]=np.random.choice(backgroundcorrection, secondtcorrectionlenght)
+            mean_mov[3575:3619]=np.random.choice(backgroundcorrection, thirdcorrectionlenght)
+            mean_mov[4214:4252]=np.random.choice(backgroundcorrection, fourthcorrectionlenght)
+            
+            
+            
+            f,ax=plt.subplots(2, sharex=True)
+            ax[0].plot(self.smooth_trace(mean_mov,10))
+            baseline=138
+            mean_mov[mean_mov<baseline]=0
+            mean_mov[mean_mov>baseline]=1
+            ax[1].plot(self.smooth_trace(mean_mov,10))
+            
+            t=np.arange(len(mean_mov))
+            threshold=baseline
+    
+            #this i think is to creqate the locomotion based on the video signals
+            # # Load the recorded voltage trace data
+            # input_trace = mean_mov
+            
+            # # Define the threshold voltage value
+            # threshold = 0.5
+            
+            # # Create a new output trace array initialized with all zeros
+            # output_trace = np.zeros_like(input_trace)
+            
+            # # Define the parameters for the variable frequency oscillation
+            # freq_range = (1, 10)  # Hz
+            # amplitude = 1.0  # V
+            # duration = 0.1  # seconds
+            
+            # # Iterate over the input trace array
+            # for i, v in enumerate(input_trace):
+            #     if v > threshold:
+            #         # Set the corresponding segment in the output trace to the variable frequency oscillation
+            #         freq = np.random.uniform(*freq_range)
+            #         t = np.linspace(0, duration, int(duration * 1000), endpoint=False)
+            #         oscillation = amplitude * np.sin(2 * np.pi * freq * t)
+            #         output_trace[i:i+len(oscillation)] = oscillation
+            #     else:
+            #         # Set the corresponding segment in the output trace to zero
+            #         output_trace[i] = 0
+            
+            # # Plot the input and output traces
+            # plt.plot(input_trace, label='Input')
+            # plt.plot(output_trace, label='Output')
+            # plt.legend()
+            # plt.show()
+            
+            
+            stimnumber=5
+            frequency=20#hz
+            duration=20/1000#ms
+            stimperiod=1/frequency #s
+            isi=stimperiod-duration
+            
+            optotimes=np.arange(0,5*stimperiod,stimperiod)
+    
+            plt.rcParams["figure.figsize"] = [16, 5]
+            plt.rcParams["figure.autolayout"] = True
+            smoothwindows=10
+            fr=self.metadata_object.translated_imaging_metadata['FinalFrequency']
+            framen=self.full_data['imaging_data']['Plane1']['Traces']['demixed'].shape[1]
+            
+            
+            lengthtime=framen/fr
+            period=1/fr
+            fulltimevector=np.arange(0,lengthtime,period)
+    
+            f,ax=plt.subplots(6)    
+            for i in range(6):
+                trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][i,:]
+                if i==3:
+                    ax[i].plot(fulltimevector,self.smooth_trace(trace,10),c='y')
+                else:
+                    ax[i].plot(fulltimevector,self.smooth_trace(trace,10),c='g')
+    
+                for i,a in enumerate(ax):
+                    a.margins(x=0)
+                    if i<len(ax)-1:
+                        a.axis('off')
+                 
+                    elif i==len(ax)-1:
+                        
+                        a.spines['top'].set_visible(False)
+                        a.spines['right'].set_visible(False)
+                        a.spines['left'].set_visible(False)
+                        a.get_yaxis().set_ticks([])
+                        
+            
+            f,ax=plt.subplots(1)
+            f.tight_layout()
+            for i in range(3,6):
+                trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][i,:]
+                ax.plot(fulltimevector,self.smooth_trace(trace,smoothwindows))
+                
+                ax.margins(x=0)
+                for j in range(len(estimatedoptotimes)):
+                    ax.axvline(x=fulltimevector[estimatedoptotimes[j]],c='r')  
+                ax.set_xlabel('Time(s)')
+                ax.set_ylabel('Activity(a.u.)')
+                f.suptitle('Optogenetic Stimulation of Chandelier Cells', fontsize=16)
+    
+               
+            smoothedtraces=np.zeros_like(self.full_data['imaging_data']['Plane1']['Traces']['demixed'])        
+            for i in range(6):
+                smoothedtraces[i,:]=self.smooth_trace(self.full_data['imaging_data']['Plane1']['Traces']['demixed'][i,:],smoothwindows)
+                  
+            self.optotrialarraysmoothed=np.zeros((3,10,60))
+            self.trialtimevector=np.arange(-period*prestim,period*poststim,period)
+    
+    
+            for i,opto  in enumerate(estimatedoptotimes):
+                for j in range(3,6):
+                    self.optotrialarraysmoothed[j-3,i,:]=smoothedtraces[j,opto-prestim:opto+poststim]
+            
+            meanactivations=self.optotrialarraysmoothed[:,[0,4,6,9],:].mean(axis=1)
+            meanalocomotion=self.optotrialarraysmoothed[:,7,:]
+            meannonactivations=self.optotrialarraysmoothed[:,[1,2,3,5,8],:].mean(axis=1)
+            
+            self.optotrialarraysmoothedDF=np.zeros_like(self.optotrialarraysmoothed)
+            meanbaselinesmoothed=self.optotrialarraysmoothed[:,:,0:20].mean(axis=2)
+            for i in range(3):
+                for j in range(10):
+                    self.optotrialarraysmoothedDF[i,j,:]=(self.optotrialarraysmoothed[i,j,:]-meanbaselinesmoothed[i,j])
+
+
+            f,ax=plt.subplots(5,2)
+            for i,opto  in enumerate(estimatedoptotimes):
+                for j in range(3,6):
+                    row = i // 2  # determine the row index based on the iteration index
+                    col = i % 2   # determine the column index based on the iteration index
+                    ax[row, col].plot(self.trialtimevector,self.optotrialarraysmoothedDF[j-3,i,:])
+                    ax[row, col].axvline(x=0,c='r')  
+                    ax[row, col].set_ylim(-1,3)
+                    ax[row, col].margins(x=0)
+                    for m in optotimes:
+                        ax[row, col].add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
+                    ax[row, col].set_xlabel('Time(s)')
+                    ax[row, col].set_ylabel('Activity(a.u.)')
+                    
+                f.suptitle('Single Trial Optogenetic Stimulation', fontsize=16)
+
+                           
+            #plotting all trials and mean for chandelier
+            fullmeandf=self.optotrialarraysmoothedDF.mean(axis=1)
+            cells=['Chand','Pyr1','Pyr2']
+            for j in range(3,6):
+                f,ax=plt.subplots(1)
+                for i,opto  in enumerate(estimatedoptotimes):
+                    ax.plot(self.trialtimevector,self.optotrialarraysmoothedDF[j-3,i,:],c='k',alpha=0.2)
+                    ax.plot(self.trialtimevector,fullmeandf[j-3,:],c='k')
+                    ax.axvline(x=0,c='r')  
+                    ax.set_ylim(-1,3)
+                    ax.margins(x=0)
+                    
+                    ax.set_xlabel('Time(s)')
+                    ax.set_ylabel('Activity(a.u.)')
+                    for m in optotimes:
+                        ax.add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
+                    
+                f.suptitle(f'Global Optostimulation PSTH {cells[j-3]}', fontsize=16)
+                
+                
+            meanactivationsbasesub=self.optotrialarraysmoothedDF[:,[0,4,6,9],:].mean(axis=1)
+            meanalocomotionbasesub=self.optotrialarraysmoothedDF[:,7,:]
+            meannonactivationsbasesub=self.optotrialarraysmoothedDF[:,[1,2,3,5,8],:].mean(axis=1)       
+            for i in range(3):
+                f,ax=plt.subplots(3)
+    
+                ax[0].plot(self.trialtimevector,meanactivationsbasesub[i,:])
+                ax[1].plot(self.trialtimevector,meannonactivationsbasesub[i,:])  
+                ax[2].plot(self.trialtimevector,meanalocomotionbasesub[i,:])
+                for k in [0,4,6,9]:
+                    ax[0].plot(self.trialtimevector,self.optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)
+                for k in [7]:
+                    ax[2].plot(self.trialtimevector,self.optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)  
+                for k in [1,2,3,5,8]:
+                    ax[1].plot(self.trialtimevector,self.optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)
+                
+                for j in range(3):
+                    ax[j].margins(x=0)
+                    ax[j].set_ylim(-1,3)
+                    ax[j].axvline(x=0,c='r')  
+                    for m in optotimes:
+                        ax[j].add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
+                    
+                    ax[j].set_xlabel('Time(s)')
+                    ax[j].set_ylabel('Activity(a.u.)')
+                ax[0].set_title('Responsive Trials')
+                ax[1].set_title('Unresponsive Trials')
+                ax[2].set_title('Running Trials')
+    
+    
+                    
+                f.suptitle(f'Trial segmented PSTH {cells[i]}', fontsize=16)
+                    
+            f,ax=plt.subplots(1)
+            for i in range(3,6):
+                trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][i,:]
+                ax.plot(self.smooth_trace(trace,10))
+                for j in range(len(estimatedlocomotionbouts)):
+                    ax.axvline(x=estimatedlocomotionbouts[j],c='r')  
+               
+            smoothedtraces=np.zeros_like(self.full_data['imaging_data']['Plane1']['Traces']['demixed'])        
+            for i in range(6):
+                smoothedtraces[i,:]=self.smooth_trace(self.full_data['imaging_data']['Plane1']['Traces']['demixed'][i,:],10)
+                  
+                
+            locomotiontrialarraysmoothed=np.zeros((3,6,60))
+            locomotiontrialarraydenoised=np.zeros((3,6,60))
+
+            f,ax=plt.subplots(3,2)
+            for i,opto  in enumerate(estimatedlocomotionbouts):
+
+                for j in range(3,6):
+                    row = i // 2  # determine the row index based on the iteration index
+                    col = i % 2   # determine the column index based on the iteration index
+                    locomotiontrialarraysmoothed[j-3,i,:]=smoothedtraces[j,opto-prestim:opto+poststim]
+
+                    ax[row, col].plot(locomotiontrialarraysmoothed[j-3,i,:])
+
+                    ax[row, col].axvline(x=prestim,c='r')  
+                    ax[row, col].set_ylim(-1,5)
+                            
+            locomeanactivations=locomotiontrialarraysmoothed[:,:,:].mean(axis=1)
+
+            f,ax=plt.subplots(2)
+            for i in range(locomeanactivations.shape[0]):
+                ax[0].plot(locomeanactivations[i,:])
+                ax[1].plot(meanactivations[i,:])
+
+                ax[1].axvline(x=20,c='r')  
+                ax[0].axvline(x=20,c='r')  
+                ax[0].set_ylim(-1,4)
+                ax[1].set_ylim(-1,4)
+                 
+            #% making some scatter for rafa
+            
+                        
+            from sklearn.linear_model import LinearRegression
+            from sklearn.metrics import mean_squared_error, r2_score
+            import statsmodels.api as sm
+
+            
+            responsivetrials=[0,4,6,9]
+            locomotiontrials=[7]
+            nonresponsivetrials=[1,2,3,5,8]
+            
+            trislstruct=[responsivetrials,nonresponsivetrials,locomotiontrials]
+            meantrislstructsubs=[meanactivationsbasesub,meannonactivationsbasesub,meanalocomotionbasesub]
+            meantrislstruct=[meanactivations,meannonactivations,meanalocomotion]
+
+            colors=['r','b','y','tab:orange','k']
+            shape=['x','o','v','^','<']
+            legend=['Pyr1','Pyr2']
+
+            f,ax=plt.subplots(3)
+            line_handles=[]
+            for m in range(3):
+                for j in range(1,3):
+                    activity=self.optotrialarraysmoothed[:,trislstruct[m],:]
+                    for i in range(activity.shape[1]):
+                        scatter=ax[m].scatter(activity[0,i,:],activity[j,i,:],color=colors[i],marker=shape[j-1])
+                        line_handles.append(scatter)
+                        ax[m].set_ylim(-1,2.5)               
+                    ax[0].set_title('Responsive Trials')
+                    ax[1].set_title('Unresponsive Trials')
+                    ax[2].set_title('Running Trials')            
+                    
+                    
+                # ax[0].legend(,
+                #    ,
+                #    scatterpoints=1,
+                #    loc='lower left',
+                #    ncol=3,
+                #    fontsize=8)
+                    
+            f.suptitle(f'Trial segmented Scatter Raw', fontsize=16)
+            
+
+          
+
+            f,ax=plt.subplots(3)
+            for m in range(3):
+                for j in range(1,3):
+                    activity=meantrislstruct[m]
+                    ax[m].scatter(activity[0,:],activity[j,:],color=colors[j-1])
+                    ax[m].set_ylim(-0.6,1.5)
+                    ax[m].set_xlim(-0.5,2)
+                    
+                    x=activity[0,:].reshape((-1, 1))
+                    y=activity[j,:]
+                    model = LinearRegression().fit(x,y)
+                    r_sq = model.score(x, y)
+                    print(f"coefficient of determination: {r_sq}")
+
+                    x_new=np.linspace(-0.5,2).reshape((-1, 1))
+                    y_new = model.predict(x_new)
+
+                    ax[m].plot(x_new,y_new,color=colors[j-1])
+                    ax[m].set_xlabel('Time(s)')
+                    ax[m].set_ylabel('Activity(a.u.)')
+                    ax[m].legend(legend)
+                    x = sm.add_constant(x)
+                    #fit linear regression model
+                    model = sm.OLS(y, x).fit()            
+                    #view model summary
+                    print(model.summary())
+            ax[0].set_title('Responsive Trials')
+            ax[1].set_title('Unresponsive Trials')
+            ax[2].set_title('Running Trials')
+            f.suptitle(f'Mean Trial segmented Scatter Raw', fontsize=16)
+            
+
+            f,ax=plt.subplots(3)
+            for m in range(3):
+                for j in range(1,3):
+                    activity=self.optotrialarraysmoothedDF[:,trislstruct[m],:]
+                    for i in range(activity.shape[1]):
+                        ax[m].scatter(activity[0,i,:],activity[j,i,:],color=colors[i],marker=shape[j-1])
+                        ax[m].set_ylim(-1,2.5)                
+                    ax[0].set_title('Responsive Trials')
+                    ax[1].set_title('Unresponsive Trials')
+                    ax[2].set_title('Running Trials')   
+            f.suptitle(f'Trial segmented Scatter Substracted', fontsize=16)
+
+
+            f,ax=plt.subplots(3)
+            for m in range(3):
+                for j in range(1,3):
+                    activity=meantrislstructsubs[m]
+                    ax[m].scatter(activity[0,:],activity[j,:],color=colors[j-1])
+                    ax[m].set_ylim(-0.5,1)
+                    ax[m].set_xlim(-0.5,2.1)
+                    
+                    x=activity[0,:].reshape((-1, 1))
+                    y=activity[j,:]
+                    model = LinearRegression().fit(x,y)
+                    r_sq = model.score(x, y)
+                    print(f"coefficient of determination: {r_sq}")
+
+                    x_new=np.linspace(-0.5,2).reshape((-1, 1))
+                    y_new = model.predict(x_new)
+                    ax[m].plot(x_new,y_new,color=colors[j-1])
+                    
+                    ax[m].set_xlabel('Time(s)')
+                    ax[m].set_ylabel('Activity(a.u.)')
+                    ax[m].legend(legend) 
+            ax[0].set_title('Responsive Trials')
+            ax[1].set_title('Unresponsive Trials')
+            ax[2].set_title('Running Trials')
+            f.suptitle(f'Mean Trial segmented Scatter Substracted', fontsize=16)               
+                            
+        
+    def trace_screening(self,array_ids):
+        smoothwindows=10
+        demixed_traces=self.full_data['imaging_data']['All_planes_rough']['Traces']['demixed']
+
+        plt.close('all')
+        for cell_id in array_ids:
+
+            n_subplots=4
+            f,ax=plt.subplots(n_subplots,sharex=True)
+            ax[0].plot(demixed_traces[cell_id,:])
+            ax[1].plot(self.smooth_trace(demixed_traces[cell_id,:],smoothwindows))
+            ax[2].plot(self.accepteddff[cell_id,:])
+            ax[3].plot(self.smooth_trace(self.accepteddff[cell_id,:],smoothwindows))
+        
+            for i in range(n_subplots): 
+                ax[i].margins(x=0)
+                ax[i].set_xlabel('Time(s)')
+                if i<2:
+                    ax[i].set_ylabel('Fluorescence(a.u.)')
+                    ax[i].set_title('Demixed Fluorescence')
+                else:
+                    ax[i].set_title('Detrended DF/F')
+                    ax[i].set_ylabel('DF/F(%)')
+                    ax[i].yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1.0))
+        
+            f.suptitle('Fluorescence_Detrended-DF/F comparison', fontsize=16)
+            
+            plt.show()
+        
+       
+
+    def photostim_stim_table_and_optanalysisrafatemp(self):
+        # plt.close('all')
+        ext=self.caiman_extractions[list(self.caiman_results.keys())[0]]
+        cnmf=ext.cnm_object
+        dff=cnmf.estimates.detrend_df_f()
+        self.accepteddff=dff.F_dff[self.full_data['imaging_data']['Plane1']['CellIds'],:]
+        
+        locomotion=self.full_data['voltage_traces']['Full_signals']['Prairie']['LED_clipped']['traces']['Locomotion'].values
+        deriv=lambda x:np.diff(x,prepend=x[0] )
+        rectified=lambda x:np.absolute(x)
+        speed=rectified(deriv(locomotion))
+        speedtimestamps=self.full_data['voltage_traces']['Full_signals']['Prairie']['LED_clipped']['traces']['Locomotion'].index.values
+        
+        
+        self.full_data['voltage_traces']['Full_signals']
+        self.full_data['voltage_traces']['Full_signals_transitions']
+        self.signals_object.all_final_signals['Prairie']['LED_clipped']['traces']['PhotoStim']
+        up=self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['up']
+        down=self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['down']
+        zz=self.acquisition_object.visstimdict
+        
+        ref_image=Image.fromarray(self.acquisition_object.reference_image_dic[[i for i in self.acquisition_object.reference_image_dic.keys() if 'Red-8bit' in i][0]])
+        total_opt_number=len(self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['up'])
+
+        trial_delay=self.acquisition_object.visstimdict['opto']['intertrialtime']
+        nTrials=self.acquisition_object.metadata_object.mark_points_experiment['Iterations']
+        cell_number=len(self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries'])
+        repetitions=int(self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['Repetitions'])
+        frequency=self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['RepFrequency']
+        opto_duration=self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['StimDuration']
+        iteration_duration=self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['StimDuration']
+        inter_rep_time=self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['RepTime']
+        inter_point_time=self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['InterpointDuration']
+        
+        metadata_total_opt_number=repetitions*cell_number*nTrials
+    
+        signals_to_review=['PhotoStim','PhotoTrig']
+        metadata_transitions=[metadata_total_opt_number,nTrials]
+        for sig in zip(signals_to_review,metadata_transitions):
+            transitions=len(self.full_data['voltage_traces']['Full_signals_transitions'][sig[0]]['aligned_downsampled_LEDshifted']['Prairie']['up'])
+            if sig[1]==transitions:
+                good='Correct'
+            else:
+                good='Incorrect'
+            print(f'{good} number of {sig[0]} transitions detected')
+    
+        
+        if 1/frequency==inter_rep_time:
+            print('Seems correct opto timings)')
+
+            
+        transition_array=np.zeros([cell_number,nTrials,repetitions,2],dtype=int)
+
+        for it in range(nTrials):
+
+            for cell in range(cell_number):
+                se=cell_number*it+cell
+                transition_array[cell,it,:,0]=up[se*repetitions:(se+1)*repetitions]
+                transition_array[cell,it,:,1]=down[se*repetitions:(se+1)*repetitions]
+
+
+        res=self.caiman_results[list(self.caiman_results.keys())[0]]
+        
+        
+        coordinates=[]
+        for key, v in   self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries'].items():
+        
+          coordinates.append((float(v['points']['Point_1']['x_pos'])*256,float(v['points']['Point_1']['y_pos'])*256,float(v['points']['Point_1']['spiral_width'])*256))
+          
+        res.data['est']['contours']
+        A=res.data['est']['A']
+
+        nA = np.sqrt(np.ravel(A.power(2).sum(axis=0)))
+        nA_inv_mat = scipy.sparse.spdiags(1. / nA, 0, nA.shape[0], nA.shape[0])
+        A = A * nA_inv_mat
+        A=A.toarray().reshape([256,256,len(res.data['est']['contours'])])
+       
+    
+        ttt=res.centers_of_mass
+        tttt=np.vstack(ttt)
+ 
+        
+        optocellids=np.zeros(len(coordinates),dtype=int)
+        for cell in range(len(coordinates)):
+            dist=[]
+            for i in range(len(tttt[:,0])):
+                dist.append(np.linalg.norm(np.array((tttt[i,0], tttt[i,1]))- np.array((coordinates[cell][0], coordinates[cell][1]))))
+            optocellids[cell]=np.argmin(dist)
+        
+        optocellids.sort()
+               
+
+        f,ax=plt.subplots(1,3)
+        ax[0].imshow(A[:,:,self.full_data['imaging_data']['Plane1']['CellIds']].sum(axis=2).T)
+        ax[1].imshow(A[:,:,optocellids].sum(axis=2).T)
+        ax[2].imshow(ref_image.resize((256, 256)))
+        for coord in coordinates:
+            circles=[]
+            for i in range(3):
+                ax[i].add_patch(plt.Circle((coord[0], coord[1]), coord[2]/2, color='r', fill=False))
+
+
+            
+     
+            
+        self.array_ids=np.searchsorted(self.full_data['imaging_data']['Plane1']['CellIds'] , optocellids)
+        non_opto_ids=np.delete(self.full_data['imaging_data']['Plane1']['CellIds'],  self.array_ids)
+        self.non_opto_ids=np.searchsorted(self.full_data['imaging_data']['Plane1']['CellIds'] , non_opto_ids)
+        
+        self.optotraces=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][self.array_ids,:]
+        self.non_opto_traces=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][self.non_opto_ids,:]
+        self.full_traces=self.full_data['imaging_data']['Plane1']['Traces']['demixed']
+        
+        
+        
+        
+        # self.optotraces=self.accepteddff[self.array_ids,:]
+
+        fr=self.full_data['imaging_data']['Frame_rate']   
+        
+        # window_size = int(np.round(30000/28))
+
+        # def dff(a, n=3) :
+        #     dff=np.zeros_like(a)
+        #     for frame in range(len(a)):
+        #         if frame>n:
+        #             ret = np.percentile(a[frame-n:frame],1)
+        #             ret = np.mean(a[frame-n:frame])
+
+        #         else:
+        #             ret = np.percentile(a[:frame+1],1)
+        #             ret = np.mean(a[:frame+1])
+
+        #         dff[frame]=(a[frame]-ret)/ret
+        #     return dff
+
+        # tt=dff(self.optotraces[0,:],window_size)
+        # f,ax=plt.subplots(2,sharex=True)
+        # ax[0].plot(self.smooth_trace(tt,10),'k')
+        # ax[1].plot(self.smooth_trace(self.optotraces[0,:],10),'b')
+
+       
+
+       
+
+         
+        pretime=1#s
+        posttime=3#S
+        prestim=int(pretime*fr)
+        poststim=int(posttime*fr)        
+
+        self.trialtimevector=np.linspace(-pretime,posttime,prestim+poststim)
+        
+        prestimspeed=int(pretime*1000)
+        poststimspeed=int(posttime*1000)  
+        
+        self.trialspeedtimevector=np.linspace(-pretime,posttime,prestimspeed+poststimspeed)
+        interoptoframes=mode(np.diff(transition_array[0,0,:,0]))[0][0]
+
+        print('Creating stim arrays')
+
+        self.optotrialarray=np.zeros((cell_number,cell_number,nTrials,prestim+poststim))
+        for cell in range(cell_number):
+            for opto_idx in range(cell_number):
+                for i, opto  in enumerate(transition_array[opto_idx,:,0,0]):
+                    self.optotrialarray[cell,opto_idx,i,:]=self.optotraces[cell,opto-prestim:opto+poststim]
+
+        self.fulloptotrialarray=np.zeros((self.full_traces.shape[0],cell_number,nTrials,prestim+poststim))
+        for cell in range(self.full_traces.shape[0]):
+            for opto_idx in range(cell_number):
+                for i, opto  in enumerate(transition_array[opto_idx,:,0,0]):
+                    self.fulloptotrialarray[cell,opto_idx,i,:]=self.full_traces[cell,opto-prestim:opto+poststim]
+
+                    
+        print('Scaling and smoothing speed')
+
+        self.speedtrialrarray=np.zeros((cell_number,nTrials,prestimspeed+poststimspeed))
+        for opto_idx in range(cell_number):
+            for i, opto  in enumerate(transition_array[opto_idx,:,0,0]):
+                voltopto= np.round(self.mov_timestamps_miliseconds['shifted'][opto]).astype(int)
+                self.speedtrialrarray[opto_idx,i,:]=self.scale_signal(speed)[voltopto-prestimspeed:voltopto+poststimspeed]
+
+        print('Substracting baseline')
+
+        prestimsubstracted=np.zeros_like(self.optotrialarray)
+        for cell in range(cell_number):
+            for opto_idx in range(cell_number):
+                for trial  in range(nTrials):
+                    prestimsubstracted[cell,opto_idx,trial,:]=(self.optotrialarray[cell,opto_idx,trial,:]- self.optotrialarray[cell,opto_idx,trial,:prestim].mean())/self.optotrialarray[cell,opto_idx,trial,:prestim].mean()
+
+        meanoptotracessubstracted=prestimsubstracted.mean(axis=2)
+        meanoptotraces=self.optotrialarray.mean(axis=2)
+
+
+        #smooth sigblas for plotting after processing
+        print('Smoothing signals')
+        smoothwindows=10
+        smoothedoptotraces=np.zeros_like(self.optotrialarray)
+        smoothedoptotracessubstracetd=np.zeros_like(prestimsubstracted)
+        smoothedmeanoptotraces=np.zeros_like(meanoptotraces) 
+        smoothedmeanoptotracessubstracted=np.zeros_like(meanoptotracessubstracted) 
+
+        for cell in range(cell_number):
+            for opto_idx in range(cell_number):
+                smoothedmeanoptotraces[cell,opto_idx,:]=self.smooth_trace(meanoptotraces[cell,opto_idx,:],smoothwindows)
+                smoothedmeanoptotracessubstracted[cell,opto_idx,:]=self.smooth_trace(meanoptotracessubstracted[cell,opto_idx,:],smoothwindows)
+                for trial  in range(nTrials):
+                    smoothedoptotraces[cell,opto_idx,trial,:]=self.smooth_trace(self.optotrialarray[cell,opto_idx,trial,:],smoothwindows)
+                    smoothedoptotracessubstracetd[cell,opto_idx,trial,:]=self.smooth_trace(prestimsubstracted[cell,opto_idx,trial,:],smoothwindows)
+
+
+        print('plotting')
+        #plot all chandelier traces and first opt
+        # plt.close('all')
+        fig,ax=plt.subplots(self.optotraces.shape[0],sharex=True)
+        fig.tight_layout()
+        for i in range(self.optotraces.shape[0]):
+            trace=self.optotraces[i,:]
+            ax[i].plot(self.mov_timestamps_miliseconds['shifted'],self.smooth_trace(trace,smoothwindows),'k')
+            ax[i].plot(speedtimestamps,self.scale_signal(speed),'r',alpha=0.5)
+            ax[i].margins(x=0)
+            for j in range(len(transition_array[i,:,0,0])):
+                ax[i].axvline(x=self.mov_timestamps_miliseconds['shifted'][transition_array[i,j,0,0]])  
+            ax[i].set_xlabel('Time(s)')
+            ax[i].set_ylabel('Activity(a.u.)')
+            fig.suptitle('Optogenetic Stimulation of Chandelier Cells', fontsize=16)
+
+        #lpot clean traces of all opt and some non oppto cells
+        
+       
+        plt.rcParams["figure.figsize"] = [16, 5]
+        plt.rcParams["figure.autolayout"] = True
+        non_opto_toplot=10
+        totalcells=self.optotraces.shape[0]+non_opto_toplot
+        f,ax=plt.subplots(totalcells+1,sharex=True)    
+        for i in range(self.optotraces.shape[0]):
+            trace=self.optotraces[i,:]
+            ax[i].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='y')
+            for j in range(len(transition_array[i,:,0,0])):
+                ax[i].axvline(x=self.mov_timestamps_seconds['shifted'][transition_array[i,j,0,0]])  
+            
+        for i in range(non_opto_toplot):
+            # trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][self.non_opto_ids[i],:]
+            trace=  self.non_opto_traces[self.non_opto_ids[i],:]
+
+            ax[i+self.optotraces.shape[0]].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='g')
+            
+        ax[-1].plot(speedtimestamps/1000,speed,'r')
+        for i,a in enumerate(ax):
+            a.margins(x=0)
+            if i<len(ax)-1:
+                a.axis('off')
+            elif i==len(ax)-1:
+                a.spines['top'].set_visible(False)
+                a.spines['right'].set_visible(False)
+                a.spines['left'].set_visible(False)
+                a.get_yaxis().set_ticks([])
+                a.set_xlabel('Time(s)')
+                
+                
+        #plot single optotirals individually 
+        for l in range(cell_number):
+            f,ax=plt.subplots(5,2)
+            for i,opto  in enumerate(transition_array[l,:,0,0]):
+                row = i // 2  # determine the row index based on the iteration index
+                col = i % 2   # determine the column index based on the iteration index
+                # ax[row, col].plot(self.trialtimevector,self.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
+                ax[row, col].plot(self.trialtimevector,smoothedoptotraces[l,l,i,:]),'k'
+
+                # ax[row, col].plot(self.trialtimevector,smoothedoptotracessubstracetd[l,l,i,:],'b')
+                ax[row, col].plot(self.trialspeedtimevector,self.speedtrialrarray[l,i,:],'r')
+                ax[row, col].axvline(x=0)  
+                # ax[row, col].set_ylim(-3,8)
+                ax[row, col].margins(x=0)
+                for m in range(repetitions):               
+                    ax[row, col].add_patch(Rectangle((self.trialtimevector[prestim+interoptoframes*m], 0.8), 0.01, 0.2,color='r'))
+    
+                ax[row, col].set_xlabel('Time(s)')
+                ax[row, col].set_ylabel('Activity(a.u.)')
+                
+            f.suptitle(f'Single Trial Optogenetic Stimulation Cell{str(l+1)}', fontsize=16)
+                  
+           
+        
+        #plot opto cells in tiled array with mean of all traces and then a individual figure for single trials
+        
+    
+        f,ax=plt.subplots(cell_number,cell_number,sharex=True, sharey=True)
+        for stim_cell_trials in range(cell_number):
+            for cell_trace in range(cell_number):
+                if stim_cell_trials==cell_trace:
+                    color='r'
+                else:
+                    color='b'
+    
+                ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedmeanoptotraces[cell_trace,stim_cell_trials,:],color)
+                ax[stim_cell_trials, cell_trace].axvline(x=0)  
+                ax[stim_cell_trials, cell_trace].axis('off')
+  
+        # plt.close('all')
+        for trial in range(nTrials):
+            f,ax=plt.subplots(cell_number,cell_number,sharex=True, sharey=True)
+            for stim_cell_trials in range(cell_number):
+                for cell_trace in range(cell_number):
+                    if stim_cell_trials==cell_trace:
+                        color='r'
+                    else:
+                        color='b'
+           
+                    ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedoptotraces[cell_trace,stim_cell_trials,trial,:],color)
+                    ax[stim_cell_trials, cell_trace].axvline(x=0)  
+                    ax[stim_cell_trials, cell_trace].axis('off')
+        
+
+
+
+        #selecting traces by locomotion, active or inactive   based on single trial plootting
+        
+        
+               # meanactivations=self.optotrialarraysmoothed[:,[0,4,6,9],:].mean(axis=1)
+               # meanalocomotion=self.optotrialarraysmoothed[:,7,:]
+               # meannonactivations=self.optotrialarraysmoothed[:,[1,2,3,5,8],:].mean(axis=1)
+                
+                
+        plt.show()
+
+    def smooth_trace(self, trace,window):
+        framenumber=len(trace)
+        frac=window/framenumber
+        filtered = lowess(trace, np.arange(framenumber), frac=frac)
+        
+        return filtered[:,1]  
+            
     def create_stim_table(self):
         
         if self.signals_object.vis_stim_protocol=='AllenA':
@@ -1185,6 +2151,9 @@ class ResultsAnalysis():
 
 #%% INDEXING AND IDENTITI
 
+    #this requires to manually copy the template stroed in desktop TemplateCellIdentity and marking at least wich cells are toimato+ and accpeted tomato+ the  use the method to read identity form ezcel
+    # self.process_excel_pyr_int_identif_file()
+
     def convert_full_planes_idx_to_single_plane_final_indx(self,full_raster_pyhton_cell_idx, plane):
         
         # THIS IS TO CONVERT THE INDEXES FROM THE RASTER TO ACTUAL INDEXED FROM THE CAIMAN SORTER. IT DOESN WORK WITH CAIMAN SORTER INDEXES so if n=10 cells these indexex  have to be less than N
@@ -1418,6 +2387,52 @@ class ResultsAnalysis():
    
     def check_pyr_int_identif_files(self) :
         self.pyr_int_identif_list=glob.glob(self.data_analysis_path+'\\**pyr_int_identif**', recursive=False)
+        
+        
+    def process_excel_pyr_int_identif_file(self) :
+        
+        timestr = time.strftime("%Y%m%d-%H%M%S")
+        identfile=self.acquisition_object.aquisition_name + '_Cell_Identity.xlsx'
+        fullfilepath=os.path.join(self.data_analysis_path, identfile)
+        pyr_int_identif_path_name='_'.join([self.acquisition_object.aquisition_name, timestr,'pyr_int_identification.pkl'])  
+
+        
+        planes=['Plane1', 'Plane2', 'Plane3']
+        
+        all_df= pd.read_excel(fullfilepath, sheet_name=None, engine="openpyxl")
+        dfs=[df for df in all_df.values()]
+        planes=[plane for plane in all_df.keys()]
+
+        
+        pyr_int_identification={}
+        pyramidal_count={}
+        interneuron_count={}
+
+        for i,plane in enumerate(planes):
+            pyr_int_identification[plane]={'interneuron':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist()),
+                                                           'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist())-1
+                                                           },
+                                            'pyramidals':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist()),
+                                                          'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist())-1
+                                                          }
+                                            }
+
+
+
+            pyramidal_count[plane]=pyr_int_identification[plane]['pyramidals']['python'].shape[0]
+            interneuron_count[plane]=pyr_int_identification[plane]['interneuron']['python'].shape[0]
+
+
+
+
+
+        datapath=os.path.join(datapath, pyr_int_identif_path_name)
+        if not os.path.isfile(datapath):
+            with open(datapath, 'wb') as f:
+                # Pickle the 'data' dictionary using the highest protocol available.
+                pickle.dump(pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
+        
+       
 
     def load_pyr_int_identif(self):
         if self.pyr_int_identif_list:
@@ -1482,36 +2497,7 @@ class ResultsAnalysis():
             #                  'int':(np.array(self.pyr_int_identification['Plane1']['interneuron']['python']),
             #                         np.in1d(self.full_data['imaging_data']['Plane1']['CellIds'], self.pyr_int_identification['Plane1']['interneuron']['python']))}
 
-    def convert_excel_identitty_file(self):
-        timestr = time.strftime("%Y%m%d-%H%M%S")
-        aqname=''
-        datapath=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data'
-        identfile='SPKGcellidentiity.xlsx'
-        fullfilepath=os.path.join(datapath, identfile)
-        pyr_int_identif_path_name='_'.join(['211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000', timestr,'pyr_int_identification.pkl'])  
-        planes=['Plane1', 'Plane2', 'Plane3']
-        pyr_int_identification={}
-        df1 = pd.read_excel(fullfilepath, sheet_name="Plane1", engine="openpyxl")
-        df2 = pd.read_excel(fullfilepath, sheet_name="Plane2", engine="openpyxl")
-        df3 = pd.read_excel(fullfilepath, sheet_name="Plane3", engine="openpyxl")
-        dfs=[df1,df2,df3]
-        pyramidal_count={}
-        interneuron_count={}
-        for i,plane in enumerate(planes):
-            pyr_int_identification[plane]={'interneuron':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist()),
-                                                           'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='+')].iloc[:,0].tolist())-1
-                                                           },
-                                            'pyramidals':{'matlab':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist()),
-                                                          'python':np.array(dfs[i][(dfs[i]['Accepted']=='+')& (dfs[i]['Tomato accepted only']=='-')].iloc[:,0].tolist())-1
-                                                          }
-                                            }
-            pyramidal_count[plane]=pyr_int_identification[plane]['pyramidals']['python'].shape[0]
-            interneuron_count[plane]=pyr_int_identification[plane]['interneuron']['python'].shape[0]
-        datapath=os.path.join(datapath, pyr_int_identif_path_name)
-        if not os.path.isfile(datapath):
-            with open(datapath, 'wb') as f:
-                # Pickle the 'data' dictionary using the highest protocol available.
-                pickle.dump(pyr_int_identification, f, pickle.HIGHEST_PROTOCOL)
+   
 
     # def identify_in_pyr(self):
             

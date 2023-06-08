@@ -3,6 +3,34 @@
 Created on Fri Jan 14 16:12:17 2022
 
 @author: sp3660
+
+THis is a clas to manage the voltage signal from any aquisition. It doe snot do any processing reampling , clipping or synchornization. It main role is
+
+
+Thos calss has to know
+    raw aquisition path substructure
+    slow acquisition path nma dsubstructure
+    
+This class generates paths for
+    transfered raw csv to slo storage
+    frt secondary separated voltage signals 
+ 
+Look for voltage files
+    raw csv from Prairie or scanimage in raw storage
+    raw daq voltage csv
+    tranfered raw csv in slow storage
+    tranfered raw csv in slow storage
+
+load raw files
+
+save secondary frt files
+
+
+load secondary frt files
+
+do some basic plotting of the raw signals as fast check that eerything is working
+
+
 """
 import os
 import pandas as pd
@@ -119,33 +147,9 @@ class VoltageSignals():
             
 #%% methods
 
-    def load_scainimages_csv(self):
-        voltage_signals = pd.read_csv(self.scanimage_voltage_csv_path,names=['VisStim','Locomotion','Nothing'], sep="\t")
-        fig, axes = plt.subplots(nrows=3, ncols=1)
-        voltage_signals.iloc[:,0].plot(ax=axes[0])
-        voltage_signals.iloc[:,1].plot(ax=axes[1])
-        voltage_signals.iloc[:,2].plot(ax=axes[2])
-
-        
-        for signal in voltage_signals.columns.tolist():
-            if 'Locomotion' in signal or  ' Locomotion' in signal:
-                self.voltage_signals_dictionary['Locomotion']=voltage_signals[signal].to_frame()
-            if 'VisStim' in signal or ' VisStim' in signal:
-                self.voltage_signals_dictionary['VisStim']=voltage_signals[signal].to_frame()
-          
-        self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(voltage_signals.shape[0]), columns=['Time'])
-        
-
-    def add_time_to_voltage_signals_dic(self):
-        
-        if self.voltage_signals_dictionary and not set(self.voltage_signals_dictionary).issuperset(['Time']):
-            self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(self.voltage_signals_dictionary['Locomotion'].shape[0]), columns=['Time'])
-            
-            
-
-
-    
+#%% CHECKING PATHS AND CREQATING PATHS AND CHECKING FILES
     def check_slow_files(self):
+        
         self.create_slow_storage_ftr_paths()
         self.check_if_ftr_files_in_slow_storage()
         self.check_for_csv_slow()
@@ -155,7 +159,7 @@ class VoltageSignals():
         
         self.check_for_csv_raw()
         self.check_for_daq_raw()
-
+        
     def create_slow_storage_ftr_paths(self): 
         keys=['locomotion', 'visual stim', 'eye camera', 'photodiode', 'planes', 'photostim']
   
@@ -256,6 +260,33 @@ class VoltageSignals():
                 self.voltage_recording_extra_daq_slow_full_file_path= self.voltage_recording_extra_daq_slow_full_file_paths[0]    
             else:
                 self.voltage_recording_extra_daq_slow_full_file_path=None
+
+#%% WORKING WITH RAW FILES
+#%% WORKING WITH SECONDARY FILES
+
+
+    def load_scainimages_csv(self):
+        voltage_signals = pd.read_csv(self.scanimage_voltage_csv_path,names=['VisStim','Locomotion','Nothing'], sep="\t")
+        fig, axes = plt.subplots(nrows=3, ncols=1)
+        voltage_signals.iloc[:,0].plot(ax=axes[0])
+        voltage_signals.iloc[:,1].plot(ax=axes[1])
+        voltage_signals.iloc[:,2].plot(ax=axes[2])
+
+        
+        for signal in voltage_signals.columns.tolist():
+            if 'Locomotion' in signal or  ' Locomotion' in signal:
+                self.voltage_signals_dictionary['Locomotion']=voltage_signals[signal].to_frame()
+            if 'VisStim' in signal or ' VisStim' in signal:
+                self.voltage_signals_dictionary['VisStim']=voltage_signals[signal].to_frame()
+          
+        self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(voltage_signals.shape[0]), columns=['Time'])
+        
+
+    def add_time_to_voltage_signals_dic(self):
+        
+        if self.voltage_signals_dictionary and not set(self.voltage_signals_dictionary).issuperset(['Time']):
+            self.voltage_signals_dictionary['Time']=pd.DataFrame(np.arange(self.voltage_signals_dictionary['Locomotion'].shape[0]), columns=['Time'])
+
 
     def transfer_to_slow(self):
         
@@ -460,10 +491,10 @@ class VoltageSignals():
               
           #%%  
 if __name__ == "__main__":
-    extra=r'G:\Projects\TemPrairireSSH\20220422\Calibrations\SensoryStimulation\UnprocessedDaq\220422_StimTest_0_AllenC_10minspont10reps_4_22_2022_18_42.mat' 
-    prairiresignals=r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Chandelier_Imaging\VRC\SLF\Ai65\SPKQ\imaging\20211113\data aquisitions\FOV_1\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000\raw_volatge_csv\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
-    # voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals,extra_daq_path=extra)
-    voltagesignals=VoltageSignals(voltage_excel_path=prairiresignals)
+    extra=r'G:\Projects\TemPrairieSSH\20220422\Calibrations\SensoryStimulation\UnprocessedDaq\220422_StimTest_0_AllenC_10minspont10reps_4_22_2022_18_42.mat' 
+    Prairiesignals=r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Chandelier_Imaging\VRC\SLF\Ai65\SPKQ\imaging\20211113\data aquisitions\FOV_1\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000\raw_volatge_csv\211113_SPKQ_FOV1_2planeAllenA_20x_920_50024_narrow_without-000_Cycle00001_VoltageRecording_001.csv'
+    # voltagesignals=VoltageSignals(voltage_excel_path=Prairiesignals,extra_daq_path=extra)
+    voltagesignals=VoltageSignals(voltage_excel_path=Prairiesignals)
 
     # voltagesignals.plot_all_signals_daq()
     # voltagesignals.plot_all_signals()

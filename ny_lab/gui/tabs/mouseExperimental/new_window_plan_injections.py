@@ -62,7 +62,8 @@ class new_window_plan_injections(tk.Toplevel):
         self.virus3_names=[virus_name[0]+': '+virus_name[1] for virus_name in self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==2) | 
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==4) | 
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==10)| 
-                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==21)][['VirusCode', 'VirusName']].values.tolist()]
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==21)|
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==27)][['VirusCode', 'VirusName']].values.tolist()]
         
         
         

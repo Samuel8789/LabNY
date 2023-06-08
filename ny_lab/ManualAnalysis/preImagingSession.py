@@ -34,7 +34,7 @@ class PreImagingSession():
 
         self.WS1_IP='yustelab@128.59.247.96'
         self.WS2_IP='rylab@128.59.39.236'
-        self.Prairire_IP='user@10.60.246.66'
+        self.Prairie_IP='user@10.60.246.66'
         # icacls . /grant yustelab:(OI)(CI)F /T
         
         # yustelab@128.59.247.96:C:\Users\yustelab\Documents\Sam\ssh
@@ -70,12 +70,12 @@ class PreImagingSession():
         self.visstimsessions_dir_WS1=r'C:\Users\yustelab\Documents\Sam\VisualStim\MATLAB\Sessions'
         self.eyecam_dir_WS2=r'C:\Users\rylab\Documents\Sam\EyeCamera'
         self.stimdaq_dir_WS2=r'C:\Users\rylab\Documents\Sam\stim_scripts-master\behavior\NI_DAQ\output_data'
-        self.prairireraw1=r'E:\Sam'
-        self.prairireraw2=r'F:\Sam'
-        self.prairireraw3=r'G:\Sam'
+        self.Prairieraw1=r'E:\Sam'
+        self.Prairieraw2=r'F:\Sam'
+        self.Prairieraw3=r'G:\Sam'
         self.permanent=r'I:\Projects\LabNY\Imaging'
         direchange='cd '
-        self.prairiredrives=['e:','f:','g:']
+        self.Prairiedrives=['e:','f:','g:']
         priairiredrive1='e: & cd '
         priairiredrive2='f: & cd '
         priairiredrive3='g: & cd '
@@ -90,12 +90,12 @@ class PreImagingSession():
         with open(self.tmplater_path, 'w') as file:
             file.writelines( data )
 
-        self.main_dir=[self.widefield_dir_WS1, self.visstimsessions_dir_WS1, self.eyecam_dir_WS2, self.stimdaq_dir_WS2, self.prairireraw1, self.prairireraw2]
-        self.sshfolder=r'G:\Projects\TemPrairireSSH'
+        self.main_dir=[self.widefield_dir_WS1, self.visstimsessions_dir_WS1, self.eyecam_dir_WS2, self.stimdaq_dir_WS2, self.Prairieraw1, self.Prairieraw2]
+        self.sshfolder=r'G:\Projects\TemPrairieSSH'
         
         
         
-        self.prairireraw=[self.prairireraw1,self.prairireraw2,self.prairireraw3]
+        self.Prairieraw=[self.Prairieraw1,self.Prairieraw2,self.Prairieraw3]
         print('prepare_empty_session'.upper())
 
         self.prepare_empty_session()
@@ -111,8 +111,8 @@ class PreImagingSession():
         self.remove_session_from_computer()
         print('ssh '+ self.WS1_IP)
         print('ssh '+ self.WS2_IP)
-        print('scp -r wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{} G:\\Projects\\TemPrairireSSH'.format(self.sessiondate))
-        print(f'scp -r G:\\Projects\\TemPrairireSSH\\20220525Hakim\\Mice\\SPKU\\ToTrack wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{self.sessiondate}\\Mice\\SPKU')
+        print('scp -r wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{} G:\\Projects\\TemPrairieSSH'.format(self.sessiondate))
+        print(f'scp -r G:\\Projects\\TemPrairieSSH\\20220525Hakim\\Mice\\SPKU\\ToTrack wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{self.sessiondate}\\Mice\\SPKU')
         
         print('remove session from ssh folder'.upper())
         print(f'rmdir /s {os.path.join(self.sshfolder,self.sessiondate)}')
@@ -120,9 +120,9 @@ class PreImagingSession():
         
 
         print('navigate to base folders'.upper())
-        print(f'ssh {self.Prairire_IP}')
-        print(f'{self.prairiredrives[0]} & cd {self.prairireraw1} && dir')
-        print(f'{self.prairiredrives[1]} & cd {self.prairireraw2} && dir')
+        print(f'ssh {self.Prairie_IP}')
+        print(f'{self.Prairiedrives[0]} & cd {self.Prairieraw1} && dir')
+        print(f'{self.Prairiedrives[1]} & cd {self.Prairieraw2} && dir')
 
 
         print('ssh '+ self.WS1_IP)
@@ -164,22 +164,22 @@ class PreImagingSession():
         
     def prepare_session(self):
         
-        all_ips=[self.Prairire_IP, self.WS1_IP, self.WS2_IP]
+        all_ips=[self.Prairie_IP, self.WS1_IP, self.WS2_IP]
         
-        all_target_dirs=[[self.prairireraw1, self.prairireraw2],[self.widefield_dir_WS1, self.visstimsessions_dir_WS1],[self.eyecam_dir_WS2, self.stimdaq_dir_WS2]]
+        all_target_dirs=[[self.Prairieraw1, self.Prairieraw2],[self.widefield_dir_WS1, self.visstimsessions_dir_WS1],[self.eyecam_dir_WS2, self.stimdaq_dir_WS2]]
         
         
         alltransfers=[[  self.transfer+self.session_dir + ' '+pc+':'+targdir  for targdir in all_target_dirs[i]] for i, pc in enumerate(all_ips)]
         flat_list = list(itertools.chain(*alltransfers))
 
-        print(self.transfer+ self.tmplater_path+ ' '+ self.Prairire_IP +':' + self.prairireraw1 )
+        print(self.transfer+ self.tmplater_path+ ' '+ self.Prairie_IP +':' + self.Prairieraw1 )
 
         for tr in flat_list:
             print(tr)
             
     def transfer_sessions(self):
-        all_ips=[self.Prairire_IP, self.WS1_IP, self.WS2_IP]
-        all_target_dirs=[[self.prairireraw1, self.prairireraw2],[self.widefield_dir_WS1, self.visstimsessions_dir_WS1],[self.eyecam_dir_WS2, self.stimdaq_dir_WS2]]
+        all_ips=[self.Prairie_IP, self.WS1_IP, self.WS2_IP]
+        all_target_dirs=[[self.Prairieraw1, self.Prairieraw2],[self.widefield_dir_WS1, self.visstimsessions_dir_WS1],[self.eyecam_dir_WS2, self.stimdaq_dir_WS2]]
 
 
         
@@ -200,7 +200,7 @@ class PreImagingSession():
             elif i in [2,3]:
                 ip=self.WS2_IP
             elif i in [4,5]:
-                ip=self.Prairire_IP
+                ip=self.Prairie_IP
             sshtransfers.append(self.transfer+ ip+':'+j+' '+self.sshfolder )
             print(sshtransfers[i])
             
@@ -210,25 +210,25 @@ class PreImagingSession():
     def remove_session_from_computer(self):
         
         
-        trasnfertoslowprairire=self.copyfolder+os.path.join(self.prairireraw1,self.sessiondate) +' '+ os.path.join(self.prairireraw3,self.sessiondate)
+        trasnfertoslowPrairie=self.copyfolder+os.path.join(self.Prairieraw1,self.sessiondate) +' '+ os.path.join(self.Prairieraw3,self.sessiondate)
 
         
-        prairiredrivescd=[i+' & cd ' for i in self.prairiredrives]
+        Prairiedrivescd=[i+' & cd ' for i in self.Prairiedrives]
         new_sessions=[ os.path.join(i,self.sessiondate) for j,i in enumerate(self.main_dir) ]
 
 
-        print(  'ssh '+self.Prairire_IP)
-        print(  trasnfertoslowprairire)
+        print(  'ssh '+self.Prairie_IP)
+        print(  trasnfertoslowPrairie)
 
 
         for i,j in enumerate(new_sessions[4:]):
-            print( prairiredrivescd[i]+j)
+            print( Prairiedrivescd[i]+j)
 
         
         
-        removeprairiresession=[self.removedir+os.path.join(i,self.sessiondate) for i in self.prairireraw[:-1]]
+        removePrairiesession=[self.removedir+os.path.join(i,self.sessiondate) for i in self.Prairieraw[:-1]]
         
-        for i in removeprairiresession:
+        for i in removePrairiesession:
             print(i)
      
     def copy_ssh_to_permanent_dir(self):
@@ -295,8 +295,8 @@ class PreImagingSession():
 # copy 
 # del
 # move 20220216
-# Xcopy /E /I H:\Projects\LabNY\20220306 G:\Projects\TemPrairireSSH\20220306 
-# Xcopy /E /I H:\Projects\LabNY\20220314 G:\Projects\TemPrairireSSH\20220314
+# Xcopy /E /I H:\Projects\LabNY\20220306 G:\Projects\TemPrairieSSH\20220306 
+# Xcopy /E /I H:\Projects\LabNY\20220314 G:\Projects\TemPrairieSSH\20220314
 # ren SPJ_ SPXX
 # Xcopy /E /I ImagingSession 20220217
 # Xcopy /E /I ImagingSessionDate 20220217
@@ -312,11 +312,11 @@ class PreImagingSession():
 # robocopy K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Collaborations D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Collaborations /MIR
 
 
-# Xcopy /E /I G:\Projects\TemPrairireSSH\20220223 F:\Projects\LabNY\Imaging\2022\20220223
+# Xcopy /E /I G:\Projects\TemPrairieSSH\20220223 F:\Projects\LabNY\Imaging\2022\20220223
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20230515'
+    sessiondate='20230517'
     mice=['Test',
         #   'SPPP',
         #   'SPPQ',
@@ -325,25 +325,25 @@ if __name__ == "__main__":
         # 'SPPY',
         # 'SPPZ',
         # 'SPQB',
-        # 'SPQC',
-        # 'SPQD',
-        # 'SPQE',
+        'SPQC',
+        'SPQD',
+        'SPQE',
         'SPQF',
         'SPQG',
         'SPQH',
         'SPQI',
         'SPQJ',
-        'SPQL',
-        'SPQM',
+        # 'SPQL',
+        # 'SPQM',
         # 'SPQU',
         # 'SPQV',        
         # 'SPQW',
         # 'SPQX',
         # 'SPQZ',
         # 'SPRA',
-        'SPRB',
-        'SPRD',
-        'SPRE',
+        # 'SPRB',
+        # 'SPRD',
+        # 'SPRE',
         
  
         ]
@@ -351,7 +351,7 @@ if __name__ == "__main__":
     # pressesion.copy_ssh_to_permanent_dir()
 
 
-sshpath = Path(r"G:\Projects\TemPrairireSSH")
+sshpath = Path(r"G:\Projects\TemPrairieSSH")
 sessionsshpath=sshpath / sessiondate
 
 recursively_eliminate_empty_folders(sessionsshpath)

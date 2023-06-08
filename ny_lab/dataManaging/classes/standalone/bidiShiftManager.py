@@ -196,7 +196,16 @@ class BidiShiftManager:
             self.unload_shifted_movie()
             self.unload_bidishifts()
         
-#%% check what ther is in the directory        
+#%% check what ther is in the directory     
+
+    def save_mean_raw_movie_array(self):
+        
+        if self.image_sequence and self.mean_movie_path:
+            if not os.path.isfile(self.mean_movie_path):
+                m_mean = self.image_sequence.mean(axis=(1, 2))
+                np.save(self.mean_movie_path,m_mean)
+     
+
     def read_custom_start_end(self):
         start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'Start_End.txt')
         if os.path.isfile(start_end_file):
@@ -218,6 +227,8 @@ class BidiShiftManager:
             led_start_end=[int(x) for x in lines]
             self.led_corrected_frame_start= led_start_end[0]
             self.led_corrected_frame_end=led_start_end[1] 
+            
+        return  self.led_corrected_frame_start, self.led_corrected_frame_end
         
 
     def detect_LED_synchs(self):
@@ -476,19 +487,29 @@ class BidiShiftManager:
         self.good_filename=caiman_filename[:caiman_filename.find('_d1_')]   
         # self.caiman_extra=caiman_filename[caiman_filename.find('_d1_'):caiman_filename.find('_mmap')-4]       
             
+    def correc_name_duplication(self):
+        # self.good_filename Shifted_Movie
+        pass
+        
     def create_output_names_if_dont_exist(self):
         
         if self.temporary_path and not self.start_end_flag:
             self.bidiphase_file_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename),'Bidiphases']),'pkl'])
             self.shifted_movie_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename),'Shifted_Movie']),'mmap'])
+            self.mean_movie_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename[:-14]),'mean_raw_Movie']),'npy'])
+
 
         elif self.start_end_flag:
             self.bidiphase_file_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename),'Bidiphases_custom_start_end']),'pkl'])  
             self.shifted_movie_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename),'Shifted_Movie_custom_start_end']),'mmap'])
+            self.mean_movie_path='.'.join( ['_'.join([os.path.join(self.temporary_path,self.good_filename),'mean_raw_Movie_custom_start_end']),'npy'])
+
 
         elif self.mmap_directory:
             self.bidiphase_file_path='.'.join( ['_'.join([os.path.join(self.mmap_directory,self.good_filename),'Bidiphases']),'pkl']) 
             self.shifted_movie_path='.'.join( ['_'.join([os.path.join(self.mmap_directory,self.good_filename),'Shifted_Movie']),'mmap'])
+            self.mean_movie_path='.'.join( ['_'.join([os.path.join(self.mmap_directory,self.good_filename),'mean_raw_Movie']),'npy'])
+
 
         
 #%% load thing if existing files

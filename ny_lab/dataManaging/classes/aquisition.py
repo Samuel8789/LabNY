@@ -673,10 +673,14 @@ class Aquisition:
            module_logger.info('loading voltage signals')
 
            self.voltage_signal_object.load_slow_storage_voltage_signals()
+           self.voltage_signal_object.load_slow_storage_voltage_signals_daq()
+           
        else:
            try:
                self.load_voltage_signals_object()
                self.voltage_signal_object.load_slow_storage_voltage_signals()
+               self.voltage_signal_object.load_slow_storage_voltage_signals_daq()
+
            except:
                module_logger.info('no voltage signals to load')
 
@@ -825,48 +829,213 @@ class Aquisition:
         self.all_vis_stim_mat_files=glob.glob(self.slow_storage_all_paths['visual stim']+'\\**.mat', recursive=False)
         
     def load_vis_stim_info(self):
-        if self.all_vis_stim_mat_files and self.all_vis_stim_mat_files[0]:
-            self.mat = loadmat(self.all_vis_stim_mat_files[0])
-            if 'full_info' in self.mat.keys():
-            
-                outarray=self.mat['full_info']
-                ops=self.mat['ops']
-                durationseconds=np.array([outarray[1:,2][i][0] for i in range(outarray[1:,2].shape[0])])-outarray[1:,1]
-                durationminutes=durationseconds/60
-                outarray[1:,3]=durationseconds
-                stimparadigms=outarray[:,0].tolist()
-                if 'SessionA' in self.all_vis_stim_mat_files[0]:
-                    pass
-                elif 'SessionB' in self.all_vis_stim_mat_files[0]:
-                    staticparadigms=np.where(['Static' in paradigm for paradigm in stimparadigms])[0]
-                    imagesparadigms=np.where(['Images' in paradigm for paradigm in stimparadigms])[0]
-                    movieparadigms=np.where(['Movie' in paradigm for paradigm in stimparadigms])[0]
-            
-                    statictrialinfo=outarray[staticparadigms,:]
-                    imagestrialinfo=outarray[imagesparadigms,:]
-                    movietrialinfo=outarray[movieparadigms,:]
-            
-                    firststaticgratings=statictrialinfo[0][4][1:-1,4].astype(int)
-                    secondstaticgratings=statictrialinfo[1][4][1:-1,4].astype(int)
-                    thirdstaticgratings=statictrialinfo[2][4][1:-1,4].astype(int)
-            
-                    self.allstaticindexes=np.hstack([firststaticgratings,secondstaticgratings,thirdstaticgratings])
-           
-                    firstnaturalimages=imagestrialinfo[0][4][1:-1,4].astype(int)
-                    secondnaturalimages=imagestrialinfo[1][4][1:-1,4].astype(int)
-                    thirdnaturalimages=imagestrialinfo[2][4][1:-1,4].astype(int)
-            
-                    self.allnatiuralindexes=np.hstack([firstnaturalimages,secondnaturalimages,thirdnaturalimages])
-                elif 'SessionC' in self.all_vis_stim_mat_files[0]:
-                    pass
-            else:
+        try:
+            if self.all_vis_stim_mat_files and self.all_vis_stim_mat_files[0]:
+                self.mat = loadmat(self.all_vis_stim_mat_files[0])
+                if 'full_info' in self.mat.keys():
                 
-                ops=self.mat['ops']
-                if 'SessionA' in self.all_vis_stim_mat_files[0]:
+                    outarray=self.mat['full_info']
+                    ops=self.mat['ops']
+                    durationseconds=np.array([outarray[1:,2][i][0] for i in range(outarray[1:,2].shape[0])])-outarray[1:,1]
+                    durationminutes=durationseconds/60
+                    outarray[1:,3]=durationseconds
+                    stimparadigms=outarray[:,0].tolist()
+                    if 'SessionA' in self.all_vis_stim_mat_files[0]:
+                        pass
+                    elif 'SessionB' in self.all_vis_stim_mat_files[0]:
+                        staticparadigms=np.where(['Static' in paradigm for paradigm in stimparadigms])[0]
+                        imagesparadigms=np.where(['Images' in paradigm for paradigm in stimparadigms])[0]
+                        movieparadigms=np.where(['Movie' in paradigm for paradigm in stimparadigms])[0]
+                
+                        statictrialinfo=outarray[staticparadigms,:]
+                        imagestrialinfo=outarray[imagesparadigms,:]
+                        movietrialinfo=outarray[movieparadigms,:]
+                
+                        firststaticgratings=statictrialinfo[0][4][1:-1,4].astype(int)
+                        secondstaticgratings=statictrialinfo[1][4][1:-1,4].astype(int)
+                        thirdstaticgratings=statictrialinfo[2][4][1:-1,4].astype(int)
+                
+                        self.allstaticindexes=np.hstack([firststaticgratings,secondstaticgratings,thirdstaticgratings])
+               
+                        firstnaturalimages=imagestrialinfo[0][4][1:-1,4].astype(int)
+                        secondnaturalimages=imagestrialinfo[1][4][1:-1,4].astype(int)
+                        thirdnaturalimages=imagestrialinfo[2][4][1:-1,4].astype(int)
+                
+                        self.allnatiuralindexes=np.hstack([firstnaturalimages,secondnaturalimages,thirdnaturalimages])
+                    elif 'SessionC' in self.all_vis_stim_mat_files[0]:
+                        pass
+                else:
+                    
+                    ops=self.mat['ops']
+                    if 'SessionA' in self.all_vis_stim_mat_files[0]:
+                        pass
                     pass
-                pass
-            
+                
+                visstim=self.mat
+                #these 3 conditions are for old code that didnet save this info
+                if 'is135' in visstim.keys():
+                    is135=visstim['is135']
+                else:
+                    is135='Not Saved'
+                    
+                if 'isi_color' in visstim.keys():
+                    isi_color=visstim['isi_color']
+                else:
+                    isi_color='Not Saved'
+    
+                if 'isi_color_texture' in visstim.keys():
+                    isi_color_texture=visstim['isi_color_texture']
+                else:
+                    isi_color_texture='Not Saved'
+                
+                if 'opto' in visstim.keys():
+                    opto=visstim['opto']
+                else:
+                    opto='Not Saved'
+                
+                
+                self.visstimdict={'is135':is135,
+                             'isi_color':isi_color,
+                             'isi_color_texture':isi_color_texture,
+                             'ops':visstim['ops'],
+                             'opto':opto,
+                             'full_info':'',  
+                    }
+    
+    
+    
+    
+                if 'full_info' in visstim.keys():
+                    self.visstiminfofull=[]
+    
+                    for l,paradigm in enumerate(            visstim['full_info'][1:,0].tolist()):
+                        self.visstiminfofull.append({paradigm: {k:'' for k in visstim['full_info'][0,1:].tolist()}})
+                        for k,columns1 in enumerate(self.visstiminfofull[l][paradigm].keys()):
+                            if columns1!='Trials':
+                                temp=visstim['full_info'][l+1,k+1] 
+                                self.visstiminfofull[l][paradigm][columns1]=np.array(temp)
+                            else:
+                                self.visstiminfofull[l][paradigm][columns1]=[]
+                                trials=visstim['full_info'][l+1,k+1]
+                                
+                                for trial in trials[1:,0].tolist():
+                                   trisldiact={o:'' for o in trials[0,1:].tolist()}
+                                   
+                                   for k,columns2 in enumerate(trials[0,1:].tolist()):
+                                       if columns2 not in ['Frames','Phases']:
+                                           temp=trials[trial,k+1]
+                                           trisldiact[columns2]=temp
+                               
+                                       else:
+                                           
+                                           trisldiact[columns2]=[]
+                                           extra_struct=trials[trial,k+1]
+    
+                                           for extra in extra_struct[1:,0].tolist():
+                                              if isinstance(extra,int):
+                                                  extradiact={o:'' for o in extra_struct[0,1:].tolist()}
+                                                  
+                                                  for k,columns3 in enumerate(extra_struct[0,1:].tolist()):
+                                                      temp=extra_struct[extra,k+1]
+                                                      extradiact[columns3]=temp
+                                                  if columns2=='Frames' :   
+                                                      extradiact['FrameEnd']=extradiact['FrameTime']
+                                                  elif columns2=='Frames' :   
+                                                      extradiact['PhaseEnd']=extradiact['PhaseTime']
+                                                      
+                                               
+                                                  trisldiact[columns2].append(extradiact)
+                                              
+                                   self.visstiminfofull[l][paradigm][columns1].append(trisldiact)
+                   
+                        self.visstiminfofull[l][paradigm]['ParadigmDuration']= self.visstiminfofull[l][paradigm]['EndParadigmTime'][0]- self.visstiminfofull[l][paradigm]['StartParadigmTime']
           
+            
+                    for p,k in enumerate(self.visstiminfofull):
+                        for n, trial in enumerate(k[list(k.keys())[0]]['Trials']):
+                            if n!=len(k[list(k.keys())[0]]['Trials'])-1:
+                                trial['TrialEnd']= k[list(k.keys())[0]]['Trials'][n+1]['TrialStart']
+                            else:
+                                trial['TrialEnd']=   self.visstiminfofull[p][list(self.visstiminfofull[p].keys())[0]]['EndParadigmTime']
+                            trial['TrialTime']=trial['TrialEnd'][0]-trial['TrialStart'][0]
+                            
+                            # if list(trial.keys())[-1] in ['Phases'] and trial['DrifitingIndex']!=0:# from second drifting grating pradadigm the blak trial has pahases but not thr previous one
+                            if list(trial.keys())[-1] in ['Phases'] and   trial[list(trial.keys())[-1]][1]['PahseStart'].any():
+                                for phn, ph in enumerate(trial[list(trial.keys())[-1]]):
+                                    if phn==0:
+                                        ph['PahseStart']=trial['StimStart']
+                                        # ph['PhaseValue']=
+                                        ph['PhaseEnd']= trial[list(trial.keys())[-1]][phn+1]['PahseStart']
+        
+                                    elif phn!=len(trial[list(trial.keys())[-1]])-1:
+                                        # ph['PhaseValue']=
+                                        ph['PhaseEnd']= trial[list(trial.keys())[-1]][phn+1]['PahseStart']
+        
+                                    else:
+                                        ph['PhaseEnd']= trial['TrialEnd']
+    
+                                        
+                                    
+                                ph['PhaseTime']=ph['PhaseEnd'][0]-ph['PahseStart'][0]
+    
+                            elif list(trial.keys())[-1] in ['Frames']:
+                                
+                                for frn, fr in enumerate(trial[list(trial.keys())[-1]]):
+                                
+                                    if frn==0:
+                                        fr['FrameStart']=trial['TrialStart']
+                                        fr['FrameEnd']= trial[list(trial.keys())[-1]][frn+1]['FrameStart']
+                                   
+                                    elif frn!=len(trial[list(trial.keys())[-1]])-1:
+                                        fr['FrameEnd']= trial[list(trial.keys())[-1]][frn+1]['FrameStart']
+                                   
+                                    else:
+                                        fr['FrameEnd']= trial['TrialEnd']
+        
+                                    fr['FrameTime']=fr['FrameEnd'][0]-fr['FrameStart'][0]
+        
+               
+                    visstimdict['full_info']=self.visstiminfofull
+                
+                
+               
+                else:
+                    print("Old version no info available")
+                    self.visstiminfofull='Old version no info available'
+                    visstimdict['full_info']=self.visstiminfofull
+                    # sequence=visstim['ops']['paradigm_sequence'].tolist()
+    
+                    # titles0=['Paradigms', 'StartParadigmTime','EndParadigmTime','ParadigmDuration','Trials']
+                    # trilacolumns=['Trial','TrialStart','StimStart','TrialEnd','TrialTime']
+                    # stimspecialcolumns=['GratingIndex','SceneIndex','Frames','DriftingIndex','Phases']
+                    
+                    # self.visstiminfofull={}
+                    # for i,column in enumerate(titles0):
+                    #     if i==0:
+                    #         self.visstiminfofull[column]=np.array()
+                    #     elif i==1:
+                    #         self.visstiminfofull[column]=np.zeros([len(sequence),0])
+                    #         # self.visstiminfofull[titles0[2]][0]- self.visstiminfofull[titles0[1]]
+                    #     elif i==4:
+                            
+                            
+                    #         trisldiact={}
+                    #             for k,trial_column in enumerate(trilacolumns):
+                    #                 trisldiact[trial_column]=np.zeros([len(sequence),0])
+                    #                 temp1
+    
+    
+                    #         trilacolumns
+                    #         stimspecialcolumns
+                    #         stim_start=[i for i in visstim['stim_times']    ]
+                    #         trial_end=[i for i in visstim['end_stim_times']    ]
+                    #         drif_index=[i for i in visstim['stim_ang']    ]
+                    #         temp2=[i for i in visstim['frameendtimes']    ]
+                    #         temp3=[i for i in visstim['framestarttimes']    ]
+        except:
+            print('Something wrong with the mat visstim file')
+                              
+                
 #%% loading unloading all
     def load_all(self, camera=True, kalman=True):
         self.load_vis_stim_info()

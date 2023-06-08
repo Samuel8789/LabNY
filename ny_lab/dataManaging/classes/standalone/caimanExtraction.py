@@ -40,8 +40,14 @@ from datetime import datetime
 
 class CaimanExtraction():
     
-    def __init__(self, bidishifted_movie_path=None, metadata_file_path=None, temporary_path=None, first_pass_mot_correct=False, 
-                 save_mot_correct=False, metadata_object=None, force_run=False, dataset_object=None, 
+    def __init__(self, bidishifted_movie_path=None,
+                 metadata_file_path=None,
+                 temporary_path=None,
+                 first_pass_mot_correct=False, 
+                 save_mot_correct=False,
+                 metadata_object=None,
+                 force_run=False,
+                 dataset_object=None, 
                  deep=False,
                  new_parameters: dict=False,
                  galois=False):
@@ -375,6 +381,18 @@ class CaimanExtraction():
         elif self.caiman_full_path:
             self.caiman_path=self.caiman_full_path    
             
+        if self.caiman_path and len(self.caiman_path)>200:
+            src_path=self.caiman_path
+            dst_path=os.path.join(os.path.split(self.caiman_path)[0],'shortened_' +self.caiman_path[self.caiman_path.find('MC_OnACID'):])
+            if not os.path.isfile(dst_path):
+                print('shortening ' + self.caiman_path)
+                shutil.copy(src_path, dst_path)
+            self.caiman_path=dst_path
+                
+            
+            
+            
+            
     def check_shifts_files(self):
     
          self.caiman_shifts_custom_pats=[]
@@ -414,7 +432,7 @@ class CaimanExtraction():
 
     def load_results_object(self, caiman_file_path=None):    
         if not caiman_file_path:
-            caiman_file_path=self.caiman_path       
+            caiman_file_path=self.caiman_path     
         self.CaimanResults_object=CaimanResults(caiman_file_path,  dataset_object=self.dataset_object, caiman_object=self)
         
         

@@ -22,7 +22,7 @@ def smooth_trace(trace,window):
     filtered = lowess(trace, np.arange(framenumber), frac=frac)
     
     return filtered[:,1]
-
+dtset=self.calcium_datasets[list(self.calcium_datasets.keys())[0]]
 dtset.most_updated_caiman.CaimanResults_object.load_all()
 f,ax=plt.subplots(2)
 for i in range(2):
@@ -36,11 +36,12 @@ for i in range(2):
     #%% manually getting optovoltageindexes
     
 volt=dtset.associated_aquisiton.voltage_signal_object
+dtset.most_updated_caiman.CaimanResults_object.load_caiman_hdf5_results()
 cnm=dtset.most_updated_caiman.CaimanResults_object.cnm.estimates
 cnm.view_components()
 full_raw=cnm.C+cnm.YrA
 
-chandeliers=[115,13,16]
+chandeliers=np.array([ 3, 12, 15, 18])
 
 chandeliertraces=full_raw[chandeliers,:]
 
@@ -51,6 +52,7 @@ sig['PhotoTrig'].plot()
     
 phototriggers=sig['PhotoTrig'].values.flatten()
 photosignals=sig['PhotoStim'].values.flatten()
+timestamps=dtset.associated_aquisiton.metadata_object.timestamps['Plane1']
 
     
 
@@ -132,7 +134,6 @@ def detect_opto_trigg():
   
                 ax.plot(x,y,color=colors[cell],marker= shape[rep])
 
-    timestamps=dtset.associated_aquisiton.metadata_object.timestamps['Plane1']
 
     resampler=  lambda t: (np.abs(np.array(timestamps) - t/1000)).argmin() 
     vf = np.vectorize(resampler)

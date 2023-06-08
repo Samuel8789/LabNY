@@ -25,7 +25,7 @@ if ~isempty(app.file_loc)
         
         f_cs_update_log(app, 'Loaded caiman estimated components')
 
-    elseif strcmp(ext,'.mat')
+    elseif strcmp(ext,'.mat') || strcmpi(ext,'.MAT')
         app.mat_file_loc = app.file_loc;
         temp_load = load(app.mat_file_loc);
         if ~issparse(temp_load.est.A)
@@ -43,6 +43,8 @@ if ~isempty(app.file_loc)
         if isfield(temp_load, 'proc')
             app.proc = temp_load.proc;
         end
+        app.proc = f_cs_initialize_new_proc(app.est, app.ops);
+
         f_cs_update_log(app, ['Loaded .mat: ' strrep(app.file_loc, '\', '\\')]);
     end
     

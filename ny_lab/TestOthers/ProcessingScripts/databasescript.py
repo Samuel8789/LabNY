@@ -161,7 +161,13 @@ params=(13, 371, datetime.datetime.today())
 MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
 
 
+query_add_actions=""" 
+INSERT INTO VirusCombinations_table (ID, Combination,Virus1,Virus2)
+VALUES(?,?,?,?)
+"""
+params=(53, 'W + X', 24,25)
 
+MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
     
 #%% removals
 query_remove="""
@@ -221,6 +227,15 @@ WHERE  ID IN (392,393,394,395,396)
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+
+query_remove="""
+DELETE FROM VirusCombinations_table
+WHERE  ID IS NULL
+
+"""
+params=()
+MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+
 
 
 #%% adding ne columns

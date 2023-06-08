@@ -12,7 +12,7 @@ import numpy as np
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
 aqname=''
-datapath=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data'
+datapath=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\G2C\Ai14\SPKG\data\211015_SPKG_FOV1_3planeallenA_920_50024_narrow_without-000'
 identfile='SPKGcellidentiity.xlsx'
 fullfilepath=os.path.join(datapath, identfile)
 
