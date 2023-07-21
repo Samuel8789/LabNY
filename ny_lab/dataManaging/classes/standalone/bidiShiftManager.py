@@ -52,6 +52,7 @@ class BidiShiftManager:
         self.custom_start_end=custom_start_end
         self.temporary_path=temporary_path
         self.shifted_movie=np.array([False])
+        self.image_sequence=np.array([False])
         self.bidiphases=[]
         self.expanded_dataset_name=expanded_dataset_name
         self.dataset_object=dataset_object
@@ -84,7 +85,7 @@ class BidiShiftManager:
     
                         if self.shifted_movie_full_caiman_path==self.shifted_movie_custom_files_path:
                             module_logger.info('bidishifted movie there, not loaded')
-                            # self.load_shifted_movie_from_mmap()              
+                           
                             if self.bidiphase_file_path:
                                 module_logger.info('bidishifs there, not loaded')
                                 # self.load_bidiphases_from_file()
@@ -150,6 +151,7 @@ class BidiShiftManager:
                     module_logger.info('rechecking output files')
                     self.check_shifted_movie_path()
                     self.remove_unclipped_issue_shifted_movies()
+
                     self.unload_shifted_movie()
                     self.unload_bidishifts()
                 
@@ -200,11 +202,14 @@ class BidiShiftManager:
 
     def save_mean_raw_movie_array(self):
         
-        if self.image_sequence and self.mean_movie_path:
+        if self.image_sequence.any() and self.mean_movie_path:
             if not os.path.isfile(self.mean_movie_path):
                 m_mean = self.image_sequence.mean(axis=(1, 2))
                 np.save(self.mean_movie_path,m_mean)
-     
+        elif self.shifted_movie.any() and self.mean_movie_path:
+            if not os.path.isfile(self.mean_movie_path):
+                m_mean = self.shifted_movie.mean(axis=(1, 2))
+                np.save(self.mean_movie_path,m_mean)
 
     def read_custom_start_end(self):
         start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'Start_End.txt')
@@ -624,12 +629,17 @@ class BidiShiftManager:
             if not os.path.isfile(self.bidiphase_file_path):
                 with open(self.bidiphase_file_path, "wb") as fp:   #Pickling
                     pickle.dump(self.bidiphases, fp)
+                    
+                    
+
                
     def save_shifted_movie(self):
    
         if self.shifted_movie.any() and self.shifted_movie_path:
             if not os.path.isfile(self.shifted_movie_path):
                 self.shifted_movie.save(self.shifted_movie_path ,to32=False)  
+
+        self.save_mean_raw_movie_array()
 
     def unload_shifted_movie(self):     
         module_logger.info('unloading bidishifted movies')

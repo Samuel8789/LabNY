@@ -11,7 +11,7 @@ from pathlib import Path
 from skimage.measure import block_reduce
 import numpy as np
 
-acqdir=r'D:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Interneuron_Imaging\VRC\SLF\Ai65\SPRB\imaging\20230321\test aquisitions\230321_SPRB_3MinTest_25x_920_51020_63075_with-001\planes\Plane1\Green'
+acqdir=r'K:\Projects\LabNY\Full_Mice_Pre_Processed_Data\Mice_Projects\Chandelier_Imaging\VRC\SLF\Ai65\SPRN\imaging\20230709\data aquisitions\FOV_2\230709_SPRN_FOV2_1z_20rep_470_LED_25x_920_51020_63075_with-000\planes\Plane1\Green'
 # mmapfilepath=Path(glob.glob(acqdir+'\**ACID**.mmap')[0])
 mmapfilepath=Path(glob.glob(acqdir+'\**.mmap')[0])
 

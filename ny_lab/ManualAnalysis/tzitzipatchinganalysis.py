@@ -18,6 +18,12 @@ import matplotlib.animation as animation
 from statsmodels.nonparametric.smoothers_lowess import lowess
 from scipy import signal
 import caiman as cm
+import matplotlib.pyplot as plt
+import mat73
+from matplotlib.backends.backend_pdf import PdfPages
+from matplotlib.collections import LineCollection
+from scipy.spatial.distance import cosine
+
 
 def loadmat(filename):
     '''
@@ -58,7 +64,7 @@ def smooth_trace( trace,window):
     filtered = lowess(trace, np.arange(framenumber), frac=frac)
     return filtered[:,1]  
 
-def do_trial_analysis(times_seconds, mat, calcium, calcium_shuffled=np.array([])):
+def do_trial_analysis(times_seconds, mat, calcium, calcium_shuffled=np.array([]),prespiketime=5, postspiketime=5):
     
     timestamps_video=mat['time_transients']
     imagingrate=1/mat['frame_period']
@@ -66,8 +72,8 @@ def do_trial_analysis(times_seconds, mat, calcium, calcium_shuffled=np.array([])
     if calcium_shuffled.any():
         calcium=  calcium_shuffled[10,:,:]
 
-    prespiketime=5
-    postspiketime=5
+    prespiketime=prespiketime
+    postspiketime=postspiketime
     videostimpreframes=int(prespiketime*imagingrate)
     videostimpostframes=int(postspiketime*imagingrate)
     perispikerange=np.linspace(-prespiketime,postspiketime,videostimpreframes+videostimpostframes )
@@ -135,12 +141,39 @@ def scale_signal(signal,method='ZeroOne'):
 #do caiman of video
 
 
+def save_pdf(filename):
+    pp = PdfPages(filename)
+    fig_nums = plt.get_fignums()
+    figs = [plt.figure(n) for n in fig_nums]
+    for fig in figs:
+       fig.savefig(pp, format='pdf')
+    pp.close()
+    plt.close('all')
 
 
 
+#%% Load on acid and movie data
 
+# cnm = cnmf.online_cnmf.OnACID(path=hdf5_file_path)
+data = mat73.loadmat(r'C:\Users\sp3660\Desktop\Chandelier_ Calcium&Volatage\Chandelie_AS-003_20230610-102153_sort.mat')
+accepted_list_sorter=data['proc']['comp_accepted'].astype(int)
+accepted_list_sorter_core=data['proc']['comp_accepted_core'].astype(int)
+# substract 1 from matlab indexes
+accepted_indexes_sorter=data['proc']['idx_components'].astype(int)-1
+rejected_indexes_sorter=data['proc']['idx_components_bad'].astype(int)
+accepted_indexes_sorter_manual=data['proc']['idx_manual'].astype(int)
+rejected_indexes_sorter_manual=data['proc']['idx_manual_bad'].astype(int)
+accepted_indexes_caiman=data['est']['idx_components']
+rejected_indexes_caiman=data['est']['idx_components_bad']    
+accepted_cells_number=len( accepted_indexes_sorter)
+final_accepted_cells_matlabcorrected_indexes= accepted_indexes_sorter
 
-
+C_matrix=data['est']['C'][accepted_indexes_sorter,:]
+YrA_matrix=data['est']['YrA'][accepted_indexes_sorter,:]
+raw=C_matrix + YrA_matrix
+plt.figure()
+chandelier=3
+plt.plot(raw[chandelier,1:])
 
 #%%       compute  
 #loading data and variables
@@ -155,6 +188,11 @@ mov=cm.load(moviepath)
 noisecellsname='noise_data.csv'
 noisdatapath=os.path.join(dirpath,noisecellsname)
 
+noisedata=pd.read_csv(noisdatapath)
+
+noiserois=noisedata.values.T
+
+
 voltagedata=pd.read_csv(os.path.join(dirpath,voltagedat))
 calcium=mat['CaTransients']
 timestamps_voltage=mat['time_voltage']
@@ -164,6 +202,8 @@ chand_record=mat['recording_method']
 binarizedspikes=mat['Aps_in_frames_bins']
 imagingrate=1/mat['frame_period']
 spiketimes_seconds=mat['spike_time']/mat['FPS_V']
+
+calcium=np.concatenate([calcium, noiserois,np.expand_dims(raw[chandelier,1:],axis=0)])
 
 
 
@@ -175,6 +215,7 @@ thr_isi=0.2
 bursts=np.argwhere(isi>thr_isi)+1
 bursts=np.insert(bursts,0,0)
 bursts_times_seconds=spiketimes_seconds[bursts]
+
 
 
 # convolving spikes with gaussian
@@ -192,6 +233,17 @@ gx = np.arange(-3*sigma, 3*sigma, thr_isi)
 gaussian = np.exp(-(gx/sigma)**2/2)
 gaussiankernelfiringrate = np.convolve(bined_acti, gaussian, mode='same')
 
+# thresholding firing rate
+
+thr=300
+ttt=np.argwhere(gaussiankernelfiringrate<thr)
+thresholdedfr=gaussiankernelfiringrate-thr
+thresholdedfr[ttt]=0
+diffthre=2
+burstsfr=np.where(np.diff(thresholdedfr)>diffthre)[0]
+burstsfr=np.insert(burstsfr,0,0)
+firing_rate_bursts=burstsfr[np.where(np.diff(burstsfr)>1)[0]+1]
+burstsfr_times_seconds=timestamps_video[firing_rate_bursts]
 
 #shuffling calcium activity
 n=10000
@@ -204,21 +256,28 @@ for n in range(n):
 
 calcium_shuffled=shuffled
 
-
+prespiketime=5
+postspiketime=5
 #disect activity by trail
-burst_data=do_trial_analysis(bursts_times_seconds,mat,calcium) 
-burst_data_shuffled=do_trial_analysis(bursts_times_seconds,mat,calcium,calcium_shuffled) 
-spike_data=do_trial_analysis(spiketimes_seconds,mat,calcium) 
-spike_data_shuffled=do_trial_analysis(spiketimes_seconds,mat,calcium,calcium_shuffled) 
-alldata=[spike_data,spike_data_shuffled,burst_data,burst_data_shuffled]
+burst_data=do_trial_analysis(bursts_times_seconds,mat,calcium,prespiketime=prespiketime, postspiketime=postspiketime) 
+burst_data_shuffled=do_trial_analysis(bursts_times_seconds,mat,calcium,calcium_shuffled,prespiketime=prespiketime, postspiketime=postspiketime) 
+burstfr_data=do_trial_analysis(burstsfr_times_seconds,mat,calcium,prespiketime=prespiketime, postspiketime=postspiketime) 
+burstfr_data_shuffled=do_trial_analysis(burstsfr_times_seconds,mat,calcium,calcium_shuffled,prespiketime=prespiketime, postspiketime=postspiketime) 
+spike_data=do_trial_analysis(spiketimes_seconds,mat,calcium,prespiketime=prespiketime, postspiketime=postspiketime) 
+spike_data_shuffled=do_trial_analysis(spiketimes_seconds,mat,calcium,calcium_shuffled,prespiketime=prespiketime, postspiketime=postspiketime) 
+alldata=[spike_data,spike_data_shuffled,burst_data,burst_data_shuffled,burstfr_data,burstfr_data_shuffled]
 
-
+#%% SELECT BUS AND ZSCORE
 #determine activity to plot
 bursts_flag=False
+burstsfr_flag=True
 scored_flag=True
 window=10
 
-if bursts_flag:
+if burstsfr_flag:
+    data=[4,5]
+    times_seconds=burstsfr_times_seconds
+elif bursts_flag:
     data=[2,3]
     times_seconds=bursts_times_seconds
 else:
@@ -256,24 +315,98 @@ sortedvoltagecoors=sortedcorr[0,1:]
 alignedrate=gaussiankernelfiringrate[:lag]
 alignedclac=calcium[:,np.abs(lag):]
 alignedcorrelations=np.corrcoef(alignedrate, alignedclac )
+alignedcorrelationsvolt=alignedcorrelations[0,1:]
+
+
+matforcosines=np.concatenate((np.expand_dims(zscore(alignedrate),axis=0), zscore(alignedclac)))
+cosines=np.zeros((matforcosines.shape[0],matforcosines.shape[0]))
+for i in range(matforcosines.shape[0]):
+    for j in range(matforcosines.shape[0]):
+        cosines[i,j]=1-cosine(zscore(matforcosines[i,:]),zscore(matforcosines[j,:]))
+        
+        
 sorted_by_alignedcorrelation=np.flip(np.argsort(alignedcorrelations[0,1:]))
+sorted_by_alignedcosines=np.flip(np.argsort(cosines[0,1:]))
+
+
+
+matforcosines=np.concatenate((np.expand_dims(zscore(alignedrate),axis=0), zscore(alignedclac[sorted_by_alignedcosines,:])))
+sortedcosines=np.zeros((matforcosines.shape[0],matforcosines.shape[0]))
+for i in range(matforcosines.shape[0]):
+    for j in range(matforcosines.shape[0]):
+        sortedcosines[i,j]=1-cosine(zscore(matforcosines[i,:]),zscore(matforcosines[j,:]))
+
+
+
 
 
 alignedcorr = signal.correlate(alignedrate-np.mean(alignedrate), alignedclac[0,:] - np.mean(alignedclac[0,:]), mode="full")
 alignedlags = signal.correlation_lags(len(alignedrate), len(alignedclac[0,:]))
 alignedlag = alignedlags[np.argmax(alignedcorr)]
-#%%
+
 alignedcorrelationssorted=np.corrcoef(alignedrate, alignedclac[sorted_by_alignedcorrelation,:])
 alignedcorrelationssortedvolt=alignedcorrelationssorted[0,1:]
+
+
+meancellactivity=activity[:,:,:].mean(0)
+meancellactivity_shuffled=shuffledactivity[:,:,:].mean(0)
+
+
+
+allres=[]
+for cell in range(35):
+    res=linregress(zscore(gaussiankernelfiringrate), y=zscore(calcium[cell,:]))
+    allres.append(res.rvalue**2)
+#%% PLOTTING 1
+plt.plot(np.diff(thresholdedfr))
+plt.plot(thresholdedfr)
+plt.plot(gaussiankernelfiringrate)
+plt.plot(firing_rate_bursts,thresholdedfr[firing_rate_bursts],'o')
+
+
 f,ax=plt.subplots()
-ax.plot(corr)
-ax.plot(alignedcorr)
+ax.plot(spiketimes_seconds,np.ones_like(spiketimes_seconds),'o')
+bursts_times_seconds=timestamps_video[firing_rate_bursts]
+ax.vlines(bursts_times_seconds,ymin=0.98,ymax=1.02)
+
+
+
+#%% plotting 2
+
+
+mm=np.zeros([36,294])+perispikerange
+mmm=np.stack([mm,meancellactivity[:36,:]],axis=2)
+ttt=mmm.tolist()
+
+x = alignedcorrelationsvolt
+colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+line_segments = LineCollection(ttt,array=x)
+
+fig, ax = plt.subplots()
+ax.set_xlim(perispikerange[0], perispikerange[-1])
+ax.set_ylim(-1, 1)
+axcb = fig.colorbar(line_segments)
+ax.add_collection(line_segments)
+plt.show()
+
+
+
+
+
+f,ax=plt.subplots()
+ax.plot(corr / np.max(corr))
 
 f,ax=plt.subplots(2,figsize=(20,12),sharex=True)
-ax[0].plot(timestamps_video,zscore(gaussiankernelfiringrate))
+ax[0].plot(contimestamps,zscore(gaussiankernelfiringrate))
 ax[0].plot(timestamps_video,zscore(smooth_trace(calcium[0,:],10)))
-ax[1].plot(timestamps_video[:lag],zscore(gaussiankernelfiringrate[:lag]))
+ax[1].plot(contimestamps[:lag],zscore(gaussiankernelfiringrate[:lag]))
 ax[1].plot(timestamps_video[:lag],zscore(smooth_trace(calcium[0,np.abs(lag):],10)))
+
+#plot caiman chandlier
+f,ax=plt.subplots(2,figsize=(20,12),sharex=True)
+ax[0].plot(timestamps_video,zscore(calcium[0,:]))
+ax[1].plot(timestamps_video,zscore(smooth_trace(calcium[-1,:],10)))
+
 
 
 
@@ -286,14 +419,13 @@ ax[1].imshow(alignedclac[sorted_by_alignedcorrelation,:],aspect='auto')
 
 f,ax=plt.subplots(figsize=(20,12))
 pos=ax.imshow(alignedcorrelations)
-f.colorbar(pos, ax=ax,shrink=0.4)
+f.colorbar(pos, ax=ax,shrink=0.6)
 
 f,ax=plt.subplots(figsize=(20,12))
 pos=ax.imshow(alignedcorrelationssorted)
-f.colorbar(pos, ax=ax,shrink=0.4)
+f.colorbar(pos, ax=ax,shrink=0.6)
 # linear regression
 
-res=linregress(zscore(alignedrate), y=zscore(alignedclac[cell,:]))
 
 
 
@@ -341,40 +473,45 @@ ax[4].plot(bursts_times_seconds,np.ones_like(bursts_times_seconds),'o')
 
 
 sorted_cell=0
-chandsortedcell=np.argwhere(sorted_by_alignedcorrelation==0)[0][0]
+cell=np.argwhere(sorted_by_alignedcorrelation==sorted_cell)[0][0]
+
 plt.close('all')
-#%%
-for sorted_cell in range(len(sorted_by_alignedcorrelation)):
-    cell=sorted_by_alignedcorrelation[sorted_cell]
+#%% LOOPING FULL PLOT SUMMARY (SLOW)
+
+ # ax.set_xlabel('Time(s)')
+ # ax.set_ylabel('Activity(a.u.)')
+
+for sorted_cell, cell in enumerate(sorted_by_alignedcorrelation):
     f,ax=plt.subplots(4,2,figsize=(20,12))
+    f.suptitle(f'PeriSpike Analysis Cell{cell+1}', fontsize=16)
+
     
     ax[0,0].sharex(ax[1,0])
     ax[0,0].plot(contimestamps,zscore(gaussiankernelfiringrate),'r')
     ax[0,0].plot(timestamps_video,zscore(smooth_trace(calcium[0,:],10)),'b')
     ax[0,0].plot(times_seconds,np.ones_like(times_seconds)-4,'ro')
     ax[0,0].plot(timestamps_voltage,chand_record+5,'r')
+    ax[0,0].set_xlabel('Time(s)')
     
-    
-    ax[1,0].plot(timestamps_video, zscore(calcium[cell,:]),'b')
+    ax[1,0].plot(timestamps_video, zscore(smooth_trace(calcium[cell,:],10)),'b')
     ax[1,0].plot(contimestamps,zscore(gaussiankernelfiringrate),'r')
-    # for a in ax:
-    #     a.margins(0)
-    
     ax[1,0].text(0.95, 0.95, f'pearson correlation={np.round(alignedcorrelationssortedvolt[sorted_cell],3)}',
             horizontalalignment='right',
             verticalalignment='top',
             transform=ax[1,0].transAxes)
-    
-    res=linregress(zscore(alignedrate), y=zscore(alignedclac[cell,:]))
+    ax[1,0].set_xlabel('Time(s)')
 
     
+    
+    res=linregress(zscore(gaussiankernelfiringrate), y=zscore(calcium[cell,:]))
     ax[2,0].scatter(zscore(gaussiankernelfiringrate),zscore(calcium[cell,:]))
     ax[2,0].plot(zscore(gaussiankernelfiringrate), res.intercept + res.slope*zscore(gaussiankernelfiringrate), 'r', label='fitted line')
     ax[2,0].text(0.95, 0.95, f"R-squared: {res.rvalue**2:.6f}",
             horizontalalignment='right',
             verticalalignment='top',
             transform=ax[2,0].transAxes)
-    
+    ax[2,0].set_xlabel('Zscore')
+
     
     
     
@@ -384,31 +521,280 @@ for sorted_cell in range(len(sorted_by_alignedcorrelation)):
     # corr /= np.max(corr)
     ax[3,0].plot(lags,corr)
     ax[3,0].set_ylim([-1500000,2000000])
+    ax[3,0].set_xlabel('Lags (ms)')
+
     
-    
-    
-    meancellactivity=activity[:,cell,:].mean(0)
-    meancellactivity_shuffled=shuffledactivity[:,cell,:].mean(0)
-    meanshuffledactivity=shuffledactivity[:,cell,:].mean(0)
-    
+
     
     ax[0,1].plot(perispikerange,meancellactivitychand,'k')
     ax[1,1].plot(perispikerangevoltage,meanspike,'k')
-    ax[2,1].plot(perispikerange,meancellactivity,'k')
-    ax[3,1].plot(perispikerange,meancellactivity_shuffled,'k')
+    ax[2,1].plot(perispikerange,meancellactivity[cell,:],'k')
+    ax[3,1].plot(perispikerange,meancellactivity_shuffled[cell,:],'k')
     ax[0,1].sharex(ax[1,1])
     ax[1,1].sharex(ax[2,1])
     ax[2,1].sharex(ax[3,1])
     
+    ax[1,1].set_xlabel('Time(s)')
+    for x in [0,2,3]:
+        ax[x,1].set_ylim([-3,3])
+        ax[x,1].set_xlabel('Time(s)')
     
-    # for x in [0,2,3]:
-    #     ax[x,1].set_ylim(bottom=20)
     
-    for spike, spike_time in enumerate(times_seconds[len(times_seconds)//40:2*len(times_seconds)//40]):
-        ax[0,1].plot(perispikerange,smooth_trace(activity[spike,0,:],window),'c',alpha=0.1)
-        # ax[1].plot(perispikerangevoltage,voltage[spike,:],'y',alpha=0.05)
-        ax[2,1].plot(perispikerange,smooth_trace(activity[spike,cell,:],window),'c',alpha=0.1)
-        ax[3,1].plot(perispikerange,smooth_trace(shuffledactivity[spike,cell,:],window),'c',alpha=0.1)
+        
+    
+    allchand=activity[:,0,:]
+    alltestcell=activity[:,cell,:]
+    allshuffled=shuffledactivity[:,0,:]
+    xarray=np.zeros(alltestcell.shape)+perispikerange
+    
+    chandarray=np.stack([xarray,allchand],axis=2).tolist()
+    testcellarray=np.stack([xarray,alltestcell],axis=2).tolist()
+    shuffledarray=np.stack([xarray,allshuffled],axis=2).tolist()
+    
+    line_segmentschand = LineCollection(chandarray,alpha=0.1)
+    line_segmentstest = LineCollection(testcellarray,alpha=0.1)
+    line_segmentsshuffled = LineCollection(shuffledarray,alpha=0.1)
+    
+    # ax[0,1].set_xlim(perispikerange[0], perispikerange[-1])
+    # ax[0,1].set_ylim(-5, 5)
+    ax[0,1].add_collection(line_segmentschand)
+    ax[2,1].add_collection(line_segmentstest)
+    ax[3,1].add_collection(line_segmentsshuffled)
     
     plt.show()
+    
+#%% Chandelier summary
+
+f,ax=plt.subplots(3,sharex=True)
+plt.subplots_adjust(hspace=.0)
+f.tight_layout()
+ax[0].plot(timestamps_video,calcium[0,:],'k')
+ax[0].set_ylabel('Fluorescence (a.u.)',fontsize=16)
+chandflulimits=ax[0].get_ylim()
+
+ax[1].plot(contimestamps,gaussiankernelfiringrate/5,'k')
+ax[1].set_ylabel('Firing Rate (hz)',  fontsize=18)
+ax[1].get_xaxis().set_visible(False)
+
+
+ax[2].plot(timestamps_voltage,chand_record+5,'k')
+ax[2].plot(times_seconds,np.zeros_like(times_seconds)-3,'ko')
+ax[2].set_ylabel('Voltage (mV)',fontsize=16)
+
+ax[2].set_xlabel('Time (s)',fontsize=16)
+
+for x in ax:
+    x.margins(x=0)
+    
+    
+#%%chandelier spike average only
+    
+f,ax=plt.subplots()
+f.tight_layout()
+ax.plot(perispikerangevoltage,meanspike,'k')
+for i in range(voltage.shape[0]):
+    ax.plot(perispikerangevoltage,voltage[i,:],alpha=0.01,color='grey')
+ax.set_ylabel('Voltage (mV)',fontsize=16)
+ax.set_xlabel('Time (s)',fontsize=16)
+
+
+#%% chandelier spike triggered summary
+allchand=activity[:,0,:]
+allvolt=voltage
+xarray=np.zeros(allchand.shape)+perispikerange
+chandarray=np.stack([xarray,allchand],axis=2).tolist()
+chandshuffled=shuffledactivity[:,0,:]
+chandarrayshuffled=np.stack([xarray,chandshuffled],axis=2).tolist()
+
+f,ax=plt.subplots(3,sharex=True)
+plt.subplots_adjust(hspace=.0)
+f.tight_layout()
+ax[0].plot(perispikerange,meancellactivitychand,'k')
+ax[0].set_ylim(chandflulimits)
+ax[0].set_ylim([-2,2])
+
+ax[1].plot(perispikerangevoltage,meanspike,'k')
+ax[2].plot(perispikerange,meancellactivity_shuffled[0,:],'k')
+ax[2].set_ylim(chandflulimits)
+ax[2].set_ylim([-2,2])
+
+ax[0].set_ylabel('Fluorescence (a.u.)',fontsize=16)
+ax[1].set_ylabel('Voltage (mV)',fontsize=16)
+ax[2].set_ylabel('Fluorescence (a.u.)',fontsize=16)
+ax[-1].set_xlabel('Time (s)',fontsize=16)
+
+
+line_segmentschand = LineCollection(chandarray,alpha=0.1,color='grey')
+line_segmentschandshuffled = LineCollection(chandarrayshuffled,alpha=0.1,color='grey')
+
+# ax[0,1].set_xlim(perispikerange[0], perispikerange[-1])
+# ax[0,1].set_ylim(-5, 5)
+ax[0].add_collection(line_segmentschand)
+ax[2].add_collection(line_segmentschandshuffled)
+for x in ax:
+    x.margins(x=0)
+
+
+#%% correlation summaries
+sorted_by_alignedcorrelation
+cell=0
+f,ax=plt.subplots(3)
+ax[0].plot(timestamps_video, zscore(smooth_trace(calcium[cell,:],10)),'r',label='Raw Calcium Non-Chan')
+#set cell to 0 and comment previous line for chandelier only figure
+f.tight_layout()
+
+
+ax[0].plot(timestamps_video, zscore(smooth_trace(calcium[0,:],10)),'k',label='Raw Calcium Chan')
+ax[0].plot(contimestamps,zscore(gaussiankernelfiringrate)-3,'b',label='Firing Rate')
+ax[0].text(0.95, 0.95, f'Pearson correlation={np.round(alignedcorrelationsvolt[cell],3)}',
+        horizontalalignment='right',
+        verticalalignment='top',
+        transform=ax[0].transAxes,fontsize=16)
+ax[0].set_xlabel('Time(s)',fontsize=16)
+ax[0].set_ylabel('Z-Score',fontsize=16)
+ax[0].legend(loc='upper left',fontsize=16)
+
+
+res=linregress(zscore(gaussiankernelfiringrate), y=zscore(calcium[cell,:]))
+ax[1].scatter(zscore(gaussiankernelfiringrate),zscore(calcium[cell,:]),color='k')
+ax[1].plot(zscore(gaussiankernelfiringrate), res.intercept + res.slope*zscore(gaussiankernelfiringrate), 'r', label='fitted line')
+ax[1].text(0.95, 0.95, f"R-squared: {res.rvalue**2:.6f}",
+        horizontalalignment='right',
+        verticalalignment='top',
+        transform=ax[1].transAxes,fontsize=16)
+ax[1].set_xlabel('Firing Rate Z-Score',fontsize=16)
+ax[1].set_ylabel('Calcium Z-Score',fontsize=16)
+
+
+corr = signal.correlate(gaussiankernelfiringrate-np.mean(gaussiankernelfiringrate), calcium[cell,:] - np.mean(calcium[cell,:]), mode="full")
+lags = signal.correlation_lags(len(gaussiankernelfiringrate), len(calcium[cell,:]))
+lag = lags[np.argmax(corr)]
+corr /= np.max(corr)
+ax[2].plot(lags,corr,'k')
+ax[2].set_xlabel('Lags (frames)',fontsize=16)
+ax[2].set_ylabel('Crosscorrelation',fontsize=16)
+
+for x in ax:
+    x.margins(x=0)
+
+#%% global correlations heatmaps
+
         
+cellmax=28+9
+f,ax=plt.subplots(1,2)
+f.tight_layout()
+pos=ax[0].imshow(alignedcorrelations[:cellmax,:cellmax])
+f.colorbar(pos, ax=ax[0],shrink=0.6)
+ax[0].set_title("Pearson Correlations",fontsize=20)
+
+pos2=ax[1].imshow(alignedcorrelationssorted[:cellmax,:cellmax])
+f.colorbar(pos2, ax=ax[1],shrink=0.6)
+ax[1].set_title("Pearson Correlations (Sorted by Correlation)",fontsize=20)
+
+
+# pos3=ax[1,0].imshow(cosines[:28,:28])
+# f.colorbar(pos3, ax=ax[1,0],shrink=0.6)
+# ax[1,0].set_title("Cosine Similarity")
+
+# pos4=ax[1,1].imshow(cosinessorted[:28,:28])
+# f.colorbar(pos4, ax=ax[1,1],shrink=0.6)
+# ax[1,1].set_title("Cosine Similarity (Sorted by Correlation)")
+
+
+for x in ax:
+    x.set_xlabel('Cell',fontsize=16)
+    x.set_ylabel('Cell',fontsize=16)
+    x.set_yticks(np.insert(np.arange(-1,cellmax,5)[1:],0,0))
+    x.set_yticklabels(np.insert(np.arange(-1,cellmax,5)[1:],0,0)+1)
+    x.set_xticks(np.insert(np.arange(-1,cellmax,5)[1:],0,0))
+    x.set_xticklabels(np.insert(np.arange(-1,cellmax,5)[1:],0,0)+1)
+
+#%% ALL STAs
+cellmax=28+8
+mm=np.zeros([cellmax,294])+perispikerange
+mmm=np.stack([mm,meancellactivity[:cellmax,:]],axis=2)
+ttt=mmm.tolist()
+x = alignedcorrelationsvolt
+colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+line_segments = LineCollection(ttt,array=x)
+fig, ax = plt.subplots()
+ax.set_xlim(perispikerange[0], perispikerange[-1])
+ax.set_ylim(-1, 2)
+axcb = fig.colorbar(line_segments)
+ax.add_collection(line_segments)
+ax.set_xlabel('Time(s)',fontsize=16)
+ax.set_ylabel('Z-Score',fontsize=16)
+
+#%% zscore tirggereaverage of cell with chandelier
+cell=-1
+allchand=activity[:,0,:]
+allvolt=voltage
+xarray=np.zeros(allchand.shape)+perispikerange
+chandarray=np.stack([xarray,allchand],axis=2).tolist()
+chandshuffled=shuffledactivity[:,0,:]
+chandarrayshuffled=np.stack([xarray,chandshuffled],axis=2).tolist()
+cellarray=np.stack([xarray,activity[:,cell,:]],axis=2).tolist()
+
+
+f,ax=plt.subplots(4,sharex=True)
+plt.subplots_adjust(hspace=.0)
+f.tight_layout()
+ax[0].plot(perispikerange,meancellactivitychand,'k')
+ax[0].set_ylim([-2,2])
+
+ax[1].plot(perispikerangevoltage,meanspike,'k')
+ax[2].plot(perispikerange,meancellactivity[cell,:],'k')
+ax[2].set_ylim([-2,2])
+ax[3].plot(perispikerange,meancellactivity_shuffled[cell,:],'k')
+ax[3].set_ylim([-2,2])
+
+ax[0].set_ylabel('ZScore (a.u.)',fontsize=16)
+ax[1].set_ylabel('Voltage (mV)',fontsize=16)
+ax[2].set_ylabel('ZScore',fontsize=16)
+ax[3].set_ylabel('ZScore',fontsize=16)
+ax[-1].set_xlabel('Time (s)',fontsize=16)
+
+ax[1].set_ylim([-5,1])
+for i in range(voltage.shape[0]):
+    ax[1].plot(perispikerangevoltage,voltage[i,:],alpha=0.01,color='grey')
+
+    
+
+
+line_segmentschand = LineCollection(chandarray,alpha=0.01,color='grey')
+line_segmentschandshuffled = LineCollection(chandarrayshuffled,alpha=0.01,color='grey')
+line_segmentscell = LineCollection(cellarray,alpha=0.01,color='grey')
+
+# ax[0,1].set_xlim(perispikerange[0], perispikerange[-1])
+# ax[0,1].set_ylim(-5, 5)
+ax[0].add_collection(line_segmentschand)
+ax[2].add_collection(line_segmentscell)
+ax[3].add_collection(line_segmentschandshuffled)
+for x in ax:
+    x.margins(x=0)
+    
+    
+    
+    
+ #%% Bursts definitions
+ 
+bursts_times_seconds=spiketimes_seconds[bursts]
+burstsfr_times_seconds=timestamps_video[firing_rate_bursts]
+
+ 
+# plt.plot(thresholdedfr/5)
+f,ax=plt.subplots(2,sharex=True)
+ax[0].plot(contimestamps,gaussiankernelfiringrate/5)
+ax[0].plot(burstsfr_times_seconds,gaussiankernelfiringrate[firing_rate_bursts]/5,'o')
+ax[-1].set_xlabel('Time (s)',fontsize=16)
+ax[0].set_ylabel('Firing Rate (hz)',  fontsize=18)
+ax[1].plot(spiketimes_seconds,np.ones_like(spiketimes_seconds),'o')
+ax[1].vlines(burstsfr_times_seconds,ymin=0.98,ymax=1.02)
+
+
+f,ax=plt.subplots(2,sharex=True)
+ax[0].plot(spiketimes_seconds,np.ones_like(spiketimes_seconds),'o')
+ax[0].vlines(bursts_times_seconds,ymin=0.98,ymax=1.02)
+ax[1].plot(spiketimes_seconds,np.ones_like(spiketimes_seconds),'o')
+ax[1].vlines(burstsfr_times_seconds,ymin=0.98,ymax=1.02)
+ax[-1].set_xlabel('Time (s)',fontsize=16)

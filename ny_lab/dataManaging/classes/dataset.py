@@ -90,12 +90,12 @@ class ImageSequenceDataset:
         try :
             open_directory(self.selected_dataset_mmap_path)
             if self.associated_aquisiton.subaq_object=='TestAquisition':
-                self.do_bidishift()
+                self.do_bidishift(force=True)
                 self.do_summary_images(self.shifted_movie_path)
 
 
             elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
-                self.do_bidishift()
+                self.do_bidishift(force=True)
 
                 self.do_summary_images(self.shifted_movie_path)
 
@@ -111,18 +111,18 @@ class ImageSequenceDataset:
             elif self.associated_aquisiton.FOV_object:   
                 
                 if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
                     self.do_summary_images(self.shifted_movie_path)
                     module_logger.info('SHort file doing summary images directly')
 
 
                 elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
                     module_logger.info('High Res Stack')
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
                     self.do_summary_images(self.shifted_movie_path)
             
                 else:
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
                     self.do_summary_images(self.shifted_movie_path)
                     
             # self.unload_dataset()        
@@ -142,7 +142,7 @@ class ImageSequenceDataset:
     def full_process_raw_dataset(self):
         try :
             if self.associated_aquisiton.subaq_object=='TestAquisition':
-                self.do_bidishift()
+                self.do_bidishift(force=True)
 
                 if  self.dataset_frame_number>100:
                     if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
@@ -163,7 +163,7 @@ class ImageSequenceDataset:
                     module_logger.info('File Problem')
 
             elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
-                self.do_bidishift()
+                self.do_bidishift(force=True)
 
                 self.do_summary_images(self.shifted_movie_path)
 
@@ -179,7 +179,7 @@ class ImageSequenceDataset:
             elif self.associated_aquisiton.FOV_object:   
                 
                 if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
 
                     if  self.dataset_frame_number>100:
                         if 'Red' in  self.selected_dataset_raw_path and self.associated_channel_dataset_object:
@@ -201,11 +201,11 @@ class ImageSequenceDataset:
 
                 elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
                     module_logger.info('High Res Stack')
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
                     self.do_summary_images(self.shifted_movie_path)
             
                 else:
-                    self.do_bidishift()
+                    self.do_bidishift(force=True)
 
                     self.do_summary_images(self.shifted_movie_path)
                     

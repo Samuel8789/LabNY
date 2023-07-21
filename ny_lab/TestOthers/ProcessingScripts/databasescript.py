@@ -96,8 +96,8 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 
 query_mice_cage_update="""
                 UPDATE VisualStimulations_table
-                SET VisualStimulationProtocolID=1
-                WHERE ID=45
+                SET VisualStimulationProtocolID=4
+                WHERE ID=43
             """        
 params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)

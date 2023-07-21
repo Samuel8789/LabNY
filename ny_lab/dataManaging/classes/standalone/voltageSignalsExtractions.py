@@ -47,8 +47,6 @@ class VoltageSignalsExtractions():
         self.all_signals=None
 
 
-
-
         if just_copy and self.voltage_excel_path:
             self.check_csv_in_folder()
             shutil.copy(self.voltage_excel_path, self.temporary_path)
@@ -97,6 +95,7 @@ class VoltageSignalsExtractions():
                 }
             
             self.update_frame_rates_with_metadata(1000,1000)
+            self.check_if_LED_to_align()
 
             
             
@@ -109,7 +108,7 @@ class VoltageSignalsExtractions():
                 
                 
                 self.load_full_processed_signals()
-                if not self.all_final_signals:
+                if not self.all_final_signals and self.correct_voltages:
                     self.align_daq_prairie_signals()
 
                     
@@ -128,7 +127,7 @@ class VoltageSignalsExtractions():
                     self.clip_all_signal_to_LED()
                     self.save_full_processed_signals()
                 self.process_locomotion() # to change kept to not break result analysis
-                # self.process_visstim_signal()
+                self.process_visstim_signal()
 
 
                 
@@ -147,7 +146,31 @@ class VoltageSignalsExtractions():
                 # self.process_optopokels()
                 # self.process_startend()
                 
-            
+    def check_if_LED_to_align(self):
+        
+        self.correct_voltages=True
+
+        f,ax=plt.subplots(2,sharex=True)
+       
+        for sig in self.all_signals['Prairie'].keys():
+            if 'Time' not in sig:
+                ax[0].plot(self.all_signals['Prairie'][sig],label=sig)
+                ax[0].legend()
+                
+        for sig in self.all_signals['Daq'].keys():
+            if 'Time' not in sig:
+                ax[1].plot(self.all_signals['Daq'][sig],label=sig)
+                ax[1].legend()
+                
+        plt.show()
+        
+        raw_fluorescence_threshold = int(input('Shall I correct Voltages?: Yes:1, No:0 \n'))
+        if raw_fluorescence_threshold==0:
+            self.correct_voltages=False
+
+
+        
+  
             
     def path_managing(self):
         
@@ -237,18 +260,27 @@ class VoltageSignalsExtractions():
             daq_sig=sg.medfilt(np.squeeze(self.all_signals['Daq'][sig]), kernel_size=1)
             prairie_sig=sg.medfilt(np.squeeze(self.all_signals['Prairie'][sig]), kernel_size=1)
 
+
+          
+
             if sig!='Locomotion':
                 
                 transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
                 transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
-    
-                scaling_factor = (transy[1]-transy[0])/(transx[1]-transx[0])
-                shift = np.round(transy[0] - (transx[0]*scaling_factor))
-                print(scaling_factor, shift)
+                if transx.any() and transy.any():
+                    scaling_factor = (transy[1]-transy[0])/(transx[1]-transx[0])
+                    shift = np.round(transy[0] - (transx[0]*scaling_factor))
+                    print(scaling_factor, shift)
+                    volt_delay= int(abs(shift))
+                    corrected_daq_signals[sig]=self.all_signals['Daq'][sig][volt_delay:].reset_index(drop=True)
 
-                volt_delay= int(abs(shift))
+                else:
+                    scaling_factor=None
+                    shift=None
+                    volt_delay=None
+                       
+
                 alldelays[sig]=[volt_delay,scaling_factor]
-                corrected_daq_signals[sig]=self.all_signals['Daq'][sig][volt_delay:].reset_index(drop=True)
                
             else:
             
@@ -1073,12 +1105,12 @@ class VoltageSignalsExtractions():
                     self.transitions_dictionary['natural_movie_one_set_last']= self.transitions_dictionary['first_movie_set_last']
                     self.transitions_dictionary.pop('first_movie_set_last', None)
                     
-                if 'natural_movie_one_set_first' not in self.transitions_dictionary.keys():
+                if 'natural_movie_two_set_first' not in self.transitions_dictionary.keys():
                     
                     self.transitions_dictionary['natural_movie_two_set_first']= self.transitions_dictionary['second_movie_set_first']
                     self.transitions_dictionary.pop('second_movie_set_first', None)
                     
-                if 'natural_movie_one_set_last' not in self.transitions_dictionary.keys():
+                if 'natural_movie_two_set_last' not in self.transitions_dictionary.keys():
                     
                     self.transitions_dictionary['natural_movie_two_set_last']= self.transitions_dictionary['second_movie_set_last']
                     self.transitions_dictionary.pop('second_movie_set_last', None)

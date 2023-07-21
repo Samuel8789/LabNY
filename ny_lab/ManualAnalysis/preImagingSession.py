@@ -316,7 +316,7 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20230517'
+    sessiondate='20230417'
     mice=['Test',
         #   'SPPP',
         #   'SPPQ',
@@ -325,14 +325,14 @@ if __name__ == "__main__":
         # 'SPPY',
         # 'SPPZ',
         # 'SPQB',
-        'SPQC',
-        'SPQD',
-        'SPQE',
-        'SPQF',
-        'SPQG',
-        'SPQH',
-        'SPQI',
-        'SPQJ',
+        # 'SPQC',
+        # 'SPQD',
+        # 'SPQE',
+        # 'SPQF',
+        # 'SPQG',
+        # 'SPQH',
+        # 'SPQI',
+        # 'SPQJ',
         # 'SPQL',
         # 'SPQM',
         # 'SPQU',
@@ -344,6 +344,8 @@ if __name__ == "__main__":
         # 'SPRB',
         # 'SPRD',
         # 'SPRE',
+        'SPRM',
+        'SPRN',
         
  
         ]
@@ -355,4 +357,3 @@ sshpath = Path(r"G:\Projects\TemPrairieSSH")
 sessionsshpath=sshpath / sessiondate
 
 recursively_eliminate_empty_folders(sessionsshpath)
-    
