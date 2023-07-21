@@ -11,7 +11,7 @@
 *.svg
 *.hdf5
 *.avi
-
+*.json
 # OSX / *nix default autosave extension
 *.m~
 
