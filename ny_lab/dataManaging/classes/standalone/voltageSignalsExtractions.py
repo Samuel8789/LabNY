@@ -149,24 +149,27 @@ class VoltageSignalsExtractions():
     def check_if_LED_to_align(self):
         
         self.correct_voltages=True
+        # plt.rcParams['axes.prop_cycle'] = plt.rcParamsDefault['axes.prop_cycle']
 
-        f,ax=plt.subplots(2,sharex=True)
+        # f,ax=plt.subplots(2,sharex=True)
+
+        # for sig in self.all_signals['Prairie'].keys():
+        #     if 'Time' not in sig:
+        #         ax[0].plot(self.all_signals['Prairie'][sig],label=sig)
+        #         ax[0].legend()
+                
+        # for sig in self.all_signals['Daq'].keys():
+        #     if 'Time' not in sig:
+        #         ax[1].plot(self.all_signals['Daq'][sig],label=sig)
+        #         ax[1].legend()
+                
+        # plt.show(block = False)
+        # plt.pause(1)
        
-        for sig in self.all_signals['Prairie'].keys():
-            if 'Time' not in sig:
-                ax[0].plot(self.all_signals['Prairie'][sig],label=sig)
-                ax[0].legend()
-                
-        for sig in self.all_signals['Daq'].keys():
-            if 'Time' not in sig:
-                ax[1].plot(self.all_signals['Daq'][sig],label=sig)
-                ax[1].legend()
-                
-        plt.show()
+        # raw_fluorescence_threshold = int(input('Shall I correct Voltages?: Yes:1, No:0 \n'))
         
-        raw_fluorescence_threshold = int(input('Shall I correct Voltages?: Yes:1, No:0 \n'))
-        if raw_fluorescence_threshold==0:
-            self.correct_voltages=False
+        # if raw_fluorescence_threshold==0:
+        #     self.correct_voltages=False
 
 
         
@@ -257,13 +260,22 @@ class VoltageSignalsExtractions():
         corrected_daq_signals={}
 
         for sig in reversed(list(self.all_signals['Prairie'].keys())[:-1]): 
+            
+            
+            self.all_signals['Daq'][sig]= self.all_signals['Daq'][sig].astype('float32')
+            self.all_signals['Prairie'][sig]= self.all_signals['Prairie'][sig].astype('float32')
+            
             daq_sig=sg.medfilt(np.squeeze(self.all_signals['Daq'][sig]), kernel_size=1)
             prairie_sig=sg.medfilt(np.squeeze(self.all_signals['Prairie'][sig]), kernel_size=1)
 
-
+            f,ax=plt.subplots(2)
+            ax[0].plot(daq_sig,'r',label='daq')
+            ax[0].plot(prairie_sig,'c',label='prairie')
+            ax[0].legend()
+           
           
 
-            if sig!='Locomotion':
+            if sig!='Locomotion' and sig!='PhotoTrig':
                 
                 transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
                 transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
@@ -275,20 +287,52 @@ class VoltageSignalsExtractions():
                     corrected_daq_signals[sig]=self.all_signals['Daq'][sig][volt_delay:].reset_index(drop=True)
 
                 else:
-                    scaling_factor=None
-                    shift=None
-                    volt_delay=None
+                    scaling_factor=np.nan
+                    shift=np.nan
+                    volt_delay=np.nan
                        
 
                 alldelays[sig]=[volt_delay,scaling_factor]
                
-            else:
+            elif sig=='Locomotion':
             
-                mode_delay=mode(np.array(list(zip(*list(alldelays.values())))[0]))[0][0]   
+                mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] ) 
+                alldelays[sig]=[mode_delay,1]
                 corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
+                print(scaling_factor, shift, 'locomotion')
 
-            self.all_signals['Corrected_daq']= corrected_daq_signals
-            self.all_signals['Corrected_daq_shifts']=alldelays
+
+                
+             #daq phototrigg sometimes oesnt record ghood sigbnal, have an optio to check that here, at the moment hjust use the mode delay   
+            elif sig=='PhotoTrig':
+                # transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
+                # transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
+                # if transx.any() and transy.any():
+                #     scaling_factor = (transy[1]-transy[0])/(transx[1]-transx[0])
+                #     shift = np.round(transy[0] - (transx[0]*scaling_factor))
+                #     print(scaling_factor, shift)
+                #     volt_delay= int(abs(shift))
+                #     corrected_daq_signals[sig]=self.all_signals['Daq'][sig][volt_delay:].reset_index(drop=True)
+
+                # else:
+                #     scaling_factor=np.nan
+                #     shift=np.nan
+                #     volt_delay=np.nan
+                mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] )  
+                corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
+                       
+                print(scaling_factor, shift, 'PhotoTrig')
+
+                alldelays[sig]=[volt_delay,scaling_factor]
+                
+                
+            ax[1].plot(corrected_daq_signals[sig],'r',label='daq')
+            ax[1].plot(prairie_sig,'c',label='prairie')
+            ax[1].legend()
+            plt.show()
+
+        self.all_signals['Corrected_daq']= corrected_daq_signals
+        self.all_signals['Corrected_daq_shifts']=alldelays
 
     def clip_voltages_to_movie_length(self):
  
@@ -402,11 +446,17 @@ class VoltageSignalsExtractions():
                 else:
                     tr='up'
                     transitions[tracenames[i]][tr]=np.argwhere(np.diff(trace,prepend=mov[0])>thr).flatten()
-                    
         transitions['movies_timestamps']={}
         for k,v in transitions['movie'].items():
-            
             transitions['movies_timestamps'][k]=np.array([timestamps_video_milisecond[v][0], timestamps_video_milisecond[v][1] ])
+            
+        f,ax=plt.subplots() 
+        ax.plot(timestamps_video_milisecond,split_corrected_movie)
+        ax.plot(self.all_signals['Prairie_movie_length_clipped']['Time'],split_corrected_led)
+
+            
+            
+            
    
         result = {}
         for k1, subdict in transitions.items():
@@ -706,12 +756,16 @@ class VoltageSignalsExtractions():
     def proces_opto_signals(self,aligned=False, led_clipped=False):
         for signal_name in ['PhotoTrig', 'PhotoStim']:
             self.extract_transitions_from_signal(signal_name,aligned=aligned, led_clipped=led_clipped)
+            # this i have to make general enough to detect all up and down transition, should work fine as it is but review
+            
+            
             
     def proces_spont_visual_signals(self,aligned=False, led_clipped=False):
         
         if self.vis_stim_protocol==None:
             for signal_name in ['VisStim']:
                 self.extract_transitions_from_signal(signal_name,aligned=aligned, led_clipped=led_clipped)
+                #here i nedd t o create a switcher for differnet vis stim paradigm
 
 
         
@@ -733,6 +787,11 @@ class VoltageSignalsExtractions():
    
         sig_prairie=(sig_prairie-np.min(sig_prairie))/(np.max(sig_prairie)-np.min(sig_prairie))
         sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
+        
+        f,ax=plt.subplots()
+        ax.plot(sig_prairie,'r')
+        ax.plot(sig_daq,'c')
+
 
         
         signal_prairie_filtered_rounded_corrected,\
@@ -753,6 +812,10 @@ class VoltageSignalsExtractions():
 
 
         self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
+        
+        
+        
+        
         
         
     def process_LED(self):
@@ -858,6 +921,40 @@ class VoltageSignalsExtractions():
             self.time_scale=self.minutes_scale
             
             
+#%% chandelier opto drifting gratings
+
+    def process_simple_drift_opto(self):
+        pass
+        # sig_prairie=(sig_prairie-np.min(sig_prairie))/(np.max(sig_prairie)-np.min(sig_prairie))
+        # sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
+        
+        # f,ax=plt.subplots()
+        # ax.plot(sig_prairie,'r')
+        # ax.plot(sig_daq,'c')
+
+
+        
+        # signal_prairie_filtered_rounded_corrected,\
+        # signal_prairie_diff_filtered_rounded_corrected,\
+        # signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+        # signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sig_prairie,kernel_size=1)
+        
+        # signal_daq_filtered_rounded_corrected,\
+        # signal_daq_diff_filtered_rounded_corrected,\
+        # signal_daq_diff_filtered_rounded_corrected_rerounded,\
+        # signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
+
+        
+        # sigup_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)>0.8).flatten()                
+        # sigup_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)>0.8).flatten()
+        # sigdown_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)<-0.8).flatten()              
+        # sigdown_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)<-0.8).flatten()
+
+
+        # self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
+
+
+
 
 #%% Allen
 

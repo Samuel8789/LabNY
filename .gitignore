@@ -4,6 +4,7 @@
 
 ### MATLAB ###
 # Windows default autosave extension
+*.mmap
 *.asv
 *.pdf
 *.mat

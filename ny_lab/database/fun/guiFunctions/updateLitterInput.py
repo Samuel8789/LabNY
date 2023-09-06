@@ -10,6 +10,8 @@ from tkinter import *
 import pandas as pd
 import tkinter as tk
 import numpy as np
+from tkinter import ttk
+
 
 class UpdateLitterInput(tk.Toplevel):
     def __init__(self, app, mousedat=False, litter_number=False):       

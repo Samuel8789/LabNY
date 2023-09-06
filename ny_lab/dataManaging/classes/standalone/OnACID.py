@@ -131,6 +131,8 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     #%%
     duration = time.time() - start_t
     module_logger.info(duration/60)
+    module_logger.info('caiman finished')
+
     return cnm
 #%%
 # This is to mask the differences between running this demo in Spyder

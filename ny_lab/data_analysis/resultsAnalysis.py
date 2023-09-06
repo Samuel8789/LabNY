@@ -78,7 +78,7 @@ from scipy import signal
 from scipy import interpolate
 
 try:
-    from .allenAnalysis import AllenAnalysis
+    # from .allenAnalysis import AllenAnalysis
     from .ensemblesYuriy import EnsemblesYuriy
     from .jesusEnsemblesResults import JesusEnsemblesResults
     from .sVDEnsemblesResults import SVDEnsemblesResults
@@ -86,7 +86,7 @@ try:
     from .selectFullData import SelectFullData
     
 except:
-    from allenAnalysis import AllenAnalysis
+    # from allenAnalysis import AllenAnalysis
     from ensemblesYuriy import EnsemblesYuriy
     from jesusEnsemblesResults import JesusEnsemblesResults
     from sVDEnsemblesResults import SVDEnsemblesResults
@@ -96,7 +96,7 @@ except:
         
 import time
 from pprint import pprint
-from allensdk.brain_observatory.dff import calculate_dff
+# from allensdk.brain_observatory.dff import calculate_dff
 from sklearn.datasets import load_digits
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -1482,10 +1482,11 @@ class ResultsAnalysis():
         down=self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['down']
         zz=self.acquisition_object.visstimdict
         
-        ref_image=Image.fromarray(self.acquisition_object.reference_image_dic[[i for i in self.acquisition_object.reference_image_dic.keys() if 'Red-8bit' in i][0]])
+        ref_image=Image.fromarray(self.acquisition_object.reference_image_dic[[i for i in self.acquisition_object.reference_image_dic.keys() if ('Red-8bit' in i) or ('Red-Green-8bit' in i)][0]])
         total_opt_number=len(self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['up'])
+#%%
 
-        trial_delay=self.acquisition_object.visstimdict['opto']['intertrialtime']
+        # trial_delay=self.acquisition_object.visstimdict['opto']['intertrialtime']
         nTrials=self.acquisition_object.metadata_object.mark_points_experiment['Iterations']
         cell_number=len(self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries'])
         repetitions=int(self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries']['PhotostimExperiment_1']['sequence']['Repetitions'])
@@ -1618,7 +1619,9 @@ class ResultsAnalysis():
         poststimspeed=int(posttime*1000)  
         
         self.trialspeedtimevector=np.linspace(-pretime,posttime,prestimspeed+poststimspeed)
-        interoptoframes=mode(np.diff(transition_array[0,0,:,0]))[0][0]
+        interoptoframes=mode(np.diff(transition_array[0,0,:,0]))[0]
+        # interoptoframes=mode(np.diff(transition_array[0,0,:,0]))[0][0]
+
 
         print('Creating stim arrays')
 
@@ -1675,7 +1678,7 @@ class ResultsAnalysis():
         print('plotting')
         #plot all chandelier traces and first opt
         # plt.close('all')
-        fig,ax=plt.subplots(self.optotraces.shape[0],sharex=True)
+        fig,ax=plt.subplots(self.optotraces.shape[0]+1,sharex=True)
         fig.tight_layout()
         for i in range(self.optotraces.shape[0]):
             trace=self.optotraces[i,:]
@@ -3305,7 +3308,8 @@ class ResultsAnalysis():
   
 #%% allen
     def load_allen_analysis(self):
-        self.allen_analysis=AllenAnalysis(self)
+        # self.allen_analysis=AllenAnalysis(self)
+        pass
         
         
     def analyze_movie_one(self):

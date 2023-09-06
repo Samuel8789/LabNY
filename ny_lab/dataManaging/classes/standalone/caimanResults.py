@@ -94,17 +94,19 @@ class CaimanResults():
 
 
     def check_if_mat_file(self):
+        self.mat_results_paths=None
         # matlab doesn save full path so change to glob mat files finsihed with sort
-        self.dataset_dir=os.path.split(self.hdf5_file_path)[0]
-        # self.mat_results_path=os.path.splitext(self.hdf5_file_path)[0] + '_sort.mat'
-
-        # if os.path.isfile(self.mat_results_path):
-        #     self.mat_results_path=self.mat_results_path
-        # else:
-        #     self.mat_results_path=[]
-
-
-        self.mat_results_paths=glob.glob(self.dataset_dir+'\\**_sort.mat')
+        if self.hdf5_file_path: 
+            self.dataset_dir=os.path.split(self.hdf5_file_path)[0]
+            # self.mat_results_path=os.path.splitext(self.hdf5_file_path)[0] + '_sort.mat'
+    
+            # if os.path.isfile(self.mat_results_path):
+            #     self.mat_results_path=self.mat_results_path
+            # else:
+            #     self.mat_results_path=[]
+    
+    
+            self.mat_results_paths=glob.glob(self.dataset_dir+'\\**_sort.mat')
         if self.mat_results_paths:
             self.mat_results_path=self.mat_results_paths[0]
         else:
@@ -230,10 +232,10 @@ class CaimanResults():
         # substract 1 from matlab indexes
         self.accepted_indexes_sorter=self.data['proc']['idx_components'].astype(int)-1
         self.rejected_indexes_sorter=self.data['proc']['idx_components_bad'].astype(int)
-        self.accepted_indexes_sorter_manual=self.data['proc']['idx_manual'].astype(int)
-        self.rejected_indexes_sorter_manual=self.data['proc']['idx_manual_bad'].astype(int)
-        self.accepted_indexes_caiman=self.data['est']['idx_components']
-        self.rejected_indexes_caiman=self.data['est']['idx_components_bad']    
+        # if self.data['proc']['idx_manual'].any():self.accepted_indexes_sorter_manual=self.data['proc']['idx_manual'].astype(int)
+        # if self.data['proc']['idx_manual_bad'].any():self.rejected_indexes_sorter_manual=self.data['proc']['idx_manual_bad'].astype(int)
+        # if self.data['est']['idx_components'].any():self.accepted_indexes_caiman=self.data['est']['idx_components']
+        # if self.data['est']['idx_components_bad'].any():self.rejected_indexes_caiman=self.data['est']['idx_components_bad']    
         self.accepted_cells_number=len( self.accepted_indexes_sorter)
         self.final_accepted_cells_matlabcorrected_indexes= self.accepted_indexes_sorter
        

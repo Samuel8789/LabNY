@@ -83,6 +83,19 @@ class DataProcessingTab(tk.Frame):
         self.frame1.labels_names=['Unprocessed Sessions']
         for i in range(len( self.frame1.labels_names)):
             self.frame1.labels[ self.frame1.labels_names[i]]=ttk.Label(self.frame1, text=self.frame1.labels_names[i], width=30)
+            
+        self.v = tk.IntVar()
+        self.force_selection_button1 = ttk.Radiobutton ( self.frame1, text='Yes', 
+               variable=self.v, 
+               value=1)
+        self.force_selection_button2 = ttk.Radiobutton ( self.frame1, text='No' ,
+               variable=self.v, 
+               value=0 )
+        self.force_selection_button_label=ttk.Label(self.frame1, text='Force?', width=40)
+        
+        self.force_selection_button1.grid(column=0,row=11)
+        self.force_selection_button2.grid(column=0,row=12)
+        self.force_selection_button_label.grid(column=0,row=10)
 
 
         self.frame1.labels[self.frame1.labels_names[0]].grid(column=0, row=1)       
@@ -218,6 +231,8 @@ class DataProcessingTab(tk.Frame):
              
         
     def process_session_datasets(self):
+        
+        
         session_name=self.session_to_process.get()
         prairie_session= self.gui_ref.lab.datamanaging.all_existing_sessions_not_database_objects[session_name]
         #%%
@@ -230,7 +245,7 @@ class DataProcessingTab(tk.Frame):
                 session_object=mouse_object.raw_imaging_sessions_objects[session_name]
                 mouse_object.get_all_mouse_raw_acquisitions_datasets(mouse_object.raw_imaging_sessions_objects)
                 for dataset in mouse_object.all_raw_mouse_acquisitions_datasets.values():
-                    dataset.process_raw_dataset()
+                    dataset.process_raw_dataset(forcing=self.v.get())
         
         
         

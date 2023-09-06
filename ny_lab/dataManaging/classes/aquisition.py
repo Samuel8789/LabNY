@@ -890,6 +890,8 @@ class Aquisition:
                 
                 if 'opto' in visstim.keys():
                     opto=visstim['opto']
+                elif 'optoop' in visstim.keys():
+                    opto=visstim['optoop']
                 else:
                     opto='Not Saved'
                 
@@ -902,13 +904,11 @@ class Aquisition:
                              'full_info':'',  
                     }
     
-    
-    
-    
+
                 if 'full_info' in visstim.keys():
                     self.visstiminfofull=[]
     
-                    for l,paradigm in enumerate(            visstim['full_info'][1:,0].tolist()):
+                    for l,paradigm in enumerate(visstim['full_info'][1:,0].tolist()):
                         self.visstiminfofull.append({paradigm: {k:'' for k in visstim['full_info'][0,1:].tolist()}})
                         for k,columns1 in enumerate(self.visstiminfofull[l][paradigm].keys()):
                             if columns1!='Trials':
@@ -995,14 +995,14 @@ class Aquisition:
                                     fr['FrameTime']=fr['FrameEnd'][0]-fr['FrameStart'][0]
         
                
-                    visstimdict['full_info']=self.visstiminfofull
+                    self.visstimdict['full_info']=self.visstiminfofull
                 
                 
                
                 else:
                     print("Old version no info available")
                     self.visstiminfofull='Old version no info available'
-                    visstimdict['full_info']=self.visstiminfofull
+                    self.visstimdict['full_info']=self.visstiminfofull
                     # sequence=visstim['ops']['paradigm_sequence'].tolist()
     
                     # titles0=['Paradigms', 'StartParadigmTime','EndParadigmTime','ParadigmDuration','Trials']

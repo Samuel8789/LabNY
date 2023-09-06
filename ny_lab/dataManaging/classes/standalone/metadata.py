@@ -65,6 +65,7 @@ class Metadata():
         self.video_params=[]
         self.timestamps={}
         self.params=[]
+        self.timestamps_path=None
 
         self.check_metadata_in_folder()
         self.check_if_scainmage_tif()
@@ -179,7 +180,7 @@ class Metadata():
     
     def get_timestamps(self):
 
-        if os.path.isfile(self.timestamps_path):
+        if self.timestamps_path and os.path.isfile(self.timestamps_path):
             if not self.timestamps:
                 with open(self.timestamps_path, 'rb') as fout:
                     self.timestamps=json.load(fout) 
@@ -190,7 +191,7 @@ class Metadata():
             elif isinstance(self.video_params['relativeTimes'][0], float):
                 self.timestamps={'Plane1':self.video_params['relativeTimes']}
 
-        if not os.path.isfile(self.timestamps_path):
+        if self.timestamps_path and not os.path.isfile(self.timestamps_path):
             if self.timestamps:
                 with open(self.timestamps_path, 'w') as fout:
                     json.dump(self.timestamps , fout)

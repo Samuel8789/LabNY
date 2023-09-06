@@ -316,7 +316,7 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20230417'
+    sessiondate='20230820'
     mice=['Test',
         #   'SPPP',
         #   'SPPQ',

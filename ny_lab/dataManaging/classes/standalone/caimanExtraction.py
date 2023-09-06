@@ -83,6 +83,8 @@ class CaimanExtraction():
                 self.dataset_caiman_parameters['epochs']=1
                 self.dataset_caiman_parameters['motion_correct']=True
                 self.save_mot_correct=True
+                # self.dataset_caiman_parameters['motion_correct']=False
+                # self.save_mot_correct=False
                 self.dataset_caiman_parameters['use_cnn']=False
                 
             if not galois:
@@ -110,8 +112,11 @@ class CaimanExtraction():
     def temp_file_to_fast_disk(self):
         if not self.movie_slice.any():
             self.original_path= self.dataset_caiman_parameters['fnames']
-            shutil.copyfile(self.dataset_caiman_parameters['fnames'],os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1]))
-            self.dataset_caiman_parameters['fnames']=os.path.join(self.temp_path,os.path.split(self.dataset_caiman_parameters['fnames'])[1])
+            if not os.path.isfile(os.path.join(self.temp_path,os.path.split( self.original_path)[1])):
+                shutil.copyfile( self.original_path,os.path.join(self.temp_path,os.path.split( self.original_path)[1]))
+            self.dataset_caiman_parameters['fnames']=os.path.join(self.temp_path,os.path.split( self.original_path)[1])
+
+                
         else:
             mov=cm.load(self.dataset_caiman_parameters['fnames'])
             self.original_path= self.dataset_caiman_parameters['fnames']
@@ -133,10 +138,13 @@ class CaimanExtraction():
             shutil.copyfile(shiftsfile[0],os.path.join(os.path.split(self.original_path)[0],os.path.split(shiftsfile[0])[1]))
 
 
-        
-        filelist = glob.glob(os.path.join(self.temp_path, "*"))
-        for f in filelist:
-            os.remove(f)
+        try:
+            filelist = glob.glob(os.path.join(self.temp_path, "*"))
+            for f in filelist:
+                os.remove(f)
+        except:
+            print('pcant deelete all files')
+                    
 
     def eliminate_caiman_extra_from_mmap(self) :   
         caiman_filename=None
@@ -228,9 +236,9 @@ class CaimanExtraction():
         rval_thr = 0.8  # soace correlation threshold for candidate components
         # set up some additional supporting parameters needed for the algorithm
         # (these are default values but can change depending on dataset properties)
-        init_batch = 500 # number of frames for initialization (presumably from the first file)
+        init_batch = 700 # number of frames for initialization (presumably from the first file)
         K = 1  # initial number of components
-        epochs = 3 # number of passes over the data
+        epochs = 2 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8
         use_cnn = True  # use the CNN classifier
@@ -264,7 +272,8 @@ class CaimanExtraction():
                                            'use_cnn': use_cnn,
                                            'min_cnn_thr': min_cnn_thr,
                                            'cnn_lowest': cnn_lowest,
-                                           'fudge_factor':fudge_factor
+                                           'fudge_factor':fudge_factor,
+                                           'splits_els':100
                                             }
         
     def apply_caiman(self): 
@@ -304,6 +313,7 @@ class CaimanExtraction():
         #this is the initial extraction with motion correction            
         else:  
             try:
+                module_logger.exception('Initial mot correct on acid ' + self.bidishifted_movie_path )
                 self.temp_file_to_fast_disk()
                 self.cnm_object=run_on_acid(self, self.dataset_caiman_parameters, mot_corretc=self.save_mot_correct, save_mot_correct=self.save_mot_correct, initial_shallow=True)
                 self.copy_fast_results_remove_all()

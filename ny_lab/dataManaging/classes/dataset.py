@@ -15,6 +15,8 @@ import glob
 import tifffile
 import logging 
 from ScanImageTiffReader import ScanImageTiffReader
+import scipy.signal as sg
+import scipy.stats as st
 
 module_logger = logging.getLogger(__name__)
 
@@ -86,16 +88,16 @@ class ImageSequenceDataset:
             self.raw_dataset_object=RawAcquisitionManager(dataset_object=self)
             self.bidishift_object=BidiShiftManager( raw_dataset_object= self.raw_dataset_object, custom_start_end=True)
             
-    def process_raw_dataset(self):
+    def process_raw_dataset(self,forcing=False):
         try :
             open_directory(self.selected_dataset_mmap_path)
             if self.associated_aquisiton.subaq_object=='TestAquisition':
-                self.do_bidishift(force=True)
+                self.do_bidishift(force=forcing)
                 self.do_summary_images(self.shifted_movie_path)
 
 
             elif self.associated_aquisiton.subaq_object=='Coordinate0Aquisition':
-                self.do_bidishift(force=True)
+                self.do_bidishift(force=forcing)
 
                 self.do_summary_images(self.shifted_movie_path)
 
@@ -111,18 +113,18 @@ class ImageSequenceDataset:
             elif self.associated_aquisiton.FOV_object:   
                 
                 if  self.associated_aquisiton.subaq_object==None or  self.associated_aquisiton.subaq_object=='OtherAcqAquisition':
-                    self.do_bidishift(force=True)
+                    self.do_bidishift(force=forcing)
                     self.do_summary_images(self.shifted_movie_path)
                     module_logger.info('SHort file doing summary images directly')
 
 
                 elif self.associated_aquisiton.subaq_object=='TomatoHighResStack1050Acquisition' or self.associated_aquisiton.subaq_object=='HighResStackGreenAcquisition':
                     module_logger.info('High Res Stack')
-                    self.do_bidishift(force=True)
+                    self.do_bidishift(force=forcing)
                     self.do_summary_images(self.shifted_movie_path)
             
                 else:
-                    self.do_bidishift(force=True)
+                    self.do_bidishift(force=forcing)
                     self.do_summary_images(self.shifted_movie_path)
                     
             # self.unload_dataset()        
@@ -512,14 +514,162 @@ class ImageSequenceDataset:
         
             
     def galois_caiman(self, new_parameters: dict=None):
+        mmaptoproces=self.most_updated_caiman.mc_onacid_path
+        mmaptoproces=self.shifted_movie_path
         
-        self.deep_caiman=CaimanExtraction(self.most_updated_caiman.mc_onacid_path, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, new_parameters=new_parameters, galois=True)
+        self.deep_caiman=CaimanExtraction(mmaptoproces, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, new_parameters=new_parameters, galois=True)
         
     def open_dataset_directory(self):
         os.startfile(self.selected_dataset_mmap_path)
 
     def open_raw_video_on_imagej(self):
         pass
+    
+    
+  #%% IN PROGRESS  
+    def manually_detect_led_optoartifacts(self):
+        
+        if (not self.preoptoframes.any()) or (not self.postoptoframes.any()):
+            self.bidishift_object.create_output_names_if_dont_exist()     
+            self.mean_movie_path =self.bidishift_object.mean_movie_path
+            m_mean=np.load(self.mean_movie_path)
+        
+            
+            
+            scored=st.zscore(m_mean)
+            dif=np.diff(scored)
+            median=sg.medfilt(dif, kernel_size=1)
+            rounded=np.round(median,decimals=2)
+      
+            
+            f,axs=plt.subplots(2)
+            axs[0].plot(m_mean,'k')
+            axs[1].plot(scored,'r')
+            axs[1].plot(median,'b')
+            axs[1].plot(abs(rounded),'k')
+            # mngr = plt.get_current_fig_manager()
+            # mngr.window.setGeometry(50,100,2000, 1000)
+            plt.show(block = False)
+            plt.pause(0.01)
+            
+      
+            
+            raw_fluorescence_threshold_low = int(input('Integer low raw opto florescence threshold\n'))
+            raw_fluorescence_threshold_low=800
+            plt.close(f)
+        
+            
+            optoled_on_frames=np.where(m_mean>raw_fluorescence_threshold_low )[0]
+            
+      
+            trials=self.optotrials
+            
+            optoends=np.argwhere(np.diff(optoled_on_frames)>1).flatten()
+            optostarts=optoends+1
+      
+            optostarts=np.insert(optostarts,0,0)
+            optoends=np.append(optoends,len(optoled_on_frames)-1)
+      
+            preoptoframe=optoled_on_frames[optostarts]-1
+            preoptoframe[np.where(m_mean[preoptoframe]>450)[0]]=preoptoframe[np.where(m_mean[preoptoframe]>450)[0]]-1
+      
+            postoptoframe=optoled_on_frames[optoends]+1
+            postoptoframe[np.where(m_mean[postoptoframe]>450)[0]]=postoptoframe[np.where(m_mean[postoptoframe]>450)[0]]+1
+      
+      
+            f,axs=plt.subplots()
+            axs.plot(m_mean,'k')
+            axs.plot(preoptoframe, m_mean[preoptoframe],'ro')
+            axs.plot(postoptoframe, m_mean[postoptoframe],'go')
+            
+            assert trials==len(preoptoframe)
+            assert len(postoptoframe)==len(preoptoframe)
+      
+            pad=5
+            plt.close('all')
+            for i in range(trials):
+                pass
+                # movie_range=np.arange(preoptoframe[i]-pad,postoptoframe[i]+pad)
+                # prepadrange=np.arange(preoptoframe[i]-pad,preoptoframe[i]+1)
+                # postpadrange=np.arange(postoptoframe[i],postoptoframe[i]+pad)
+      
+                # preoptoframe[i]
+                # postoptoframe[i]
+                # f,axs=plt.subplots()
+                # axs.plot(movie_range,m_mean[preoptoframe[i]-pad: postoptoframe[i]+pad],'k')
+                # axs.plot(preoptoframe[i],m_mean[preoptoframe[i]],'yo')
+                # axs.plot(postoptoframe[i],m_mean[postoptoframe[i]],'ro')
+                # axs.plot(prepadrange,m_mean[prepadrange],'y')
+                # axs.plot(postpadrange,m_mean[postpadrange],'r')
+                # axs.set_xticks(movie_range)
+                # axs.tick_params(direction='in' ,length=2,width=2)
+                # axs.set_xticklabels(axs.get_xticks(), rotation = 90)
+                # plt.show(block = False)
+                # plt.pause(0.01)
+                
+                # correction = int(input('1 if it needs more correction\n') or '0')
+                # if correction:
+                #     new_opto_start=int(input(f'Integer correct optoled trial_{i+1} start\n'))
+                #     new_opto_end=int(input(f'Integer correct optoled trial_{i+1} end\n'))
+                #     preoptoframe[i]=new_opto_start
+                #     postoptoframe[i]=new_opto_end
+                # plt.close(f)
+      
+            optoledremoved_movie_range=np.arange(len(m_mean))
+            for i in np.arange(trials-1,-1,-1):
+                optoledremoved_movie_range=np.delete(optoledremoved_movie_range,np.s_[preoptoframe[i]:postoptoframe[i]])
+      
+      
+            
+            f,axs=plt.subplots(1)
+            axs.plot(m_mean,'k')
+            axs.plot(optoledremoved_movie_range,m_mean[optoledremoved_movie_range],'r')
+            axs.set_xticklabels(axs.get_xticks(), rotation = 90)
+            # mngr = plt.get_current_fig_manager()
+            # mngr.window.setGeometry(50,100,2000, 1000)
+            plt.show(block = False)
+            plt.pause(0.01)
+            
+            
+            self.preoptoframes=preoptoframe
+            self.postoptoframes=postoptoframe
+      
+            
+            if not os.path.isfile(self.optoled_prepostframes_file):
+                np.savetxt(self.optoled_prepostframes_file, list(zip(self.preoptoframes,  self.postoptoframes)),fmt='%.0f', delimiter=',', header="Pre,Post", comments="")
+               
+            plt.close('all')
+          
+    def load_optoLED_prepost(self):
+               
+        if os.path.isfile(self.optoled_prepostframes_file):
+            self.optoled_flag=True
+            
+            test=np.loadtxt(self.optoled_prepostframes_file,dtype='int',delimiter=',',skiprows=1)
+          
+            self.preoptoframes= np.array(list(zip(*test))[0])
+            self.postoptoframes=np.array(list(zip(*test))[1])
+            
+        return  self.preoptoframes, self.postoptoframes
+    
+    def remove_LED_artifacts(self):
+        self.optoled_prepostframes_file=os.path.join(os.path.split(os.path.split(self.selected_dataset_mmap_path)[0])[0],'optoLED_prepostframes.txt')
+        self.optoled_flag=None
+        self.preoptoframes= np.empty(0)
+        self.postoptoframes=np.empty(0)
+        self.led_opto=None
+
+        
+        self.associated_aquisiton.load_vis_stim_info()
+
+        if 'opto' in self.associated_aquisiton.visstimdict and self.associated_aquisiton.visstimdict['opto']:
+            self.optotrials=self.associated_aquisiton.visstimdict['opto']['iterations']
+            self.load_optoLED_prepost()
+            self.manually_detect_led_optoartifacts()
+            self.load_optoLED_prepost()
+
+    
+    
     
 if __name__ == "__main__":
     

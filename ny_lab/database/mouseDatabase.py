@@ -140,11 +140,11 @@ class MouseDatabase():
         figs=[]
         for i, df in enumerate(all_dfs):
             if i in [0,4]:
-                df.fillna(False, inplace=True)
+                df.fillna(0, inplace=True)
                 df['Notes'] = pd.Series(dtype='int')
-                df.fillna('', inplace=True)
+                df.fillna(0, inplace=True)
             else:
-                df.fillna(False, inplace=True)
+                df.fillna(0, inplace=True)
                 
             fig, ax =plt.subplots(figsize=(12,4))
             ax.axis('tight')

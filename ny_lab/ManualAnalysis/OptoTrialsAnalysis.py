@@ -8,10 +8,11 @@ Created on Mon Jun  5 08:09:45 2023
 #optoanalysis
     
 
-analysis=selected_analysis[2]['analysis']
-full_data=selected_analysis[2]['full_data']
+analysis=selected_analysis[0]['analysis']
+full_data=selected_analysis[0]['full_data']
 
 %matplotlib qt
+#%%
 analysis.photostim_stim_table_and_optanalysisrafatemp()
 
 #fullltraces
