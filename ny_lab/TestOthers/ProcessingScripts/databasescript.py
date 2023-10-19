@@ -96,8 +96,8 @@ zz=MouseDat.arbitrary_query_to_df(query_brains)
 
 query_mice_cage_update="""
                 UPDATE VisualStimulations_table
-                SET VisualStimulationProtocolID=4
-                WHERE ID=43
+                SET VisualStimulationProtocolID=7
+                WHERE ID IN (132,133,134,135)
             """        
 params=()   
 MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
@@ -168,7 +168,9 @@ VALUES(?,?,?,?)
 params=(53, 'W + X', 24,25)
 
 MouseDat.arbitrary_inserting_record(query_add_actions, params, commit=True)
-    
+
+
+
 #%% removals
 query_remove="""
 DELETE FROM ImagingSessions_table
@@ -198,13 +200,14 @@ WHERE  ID BETWEEN 266 AND 271
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+
 query_remove="""
 DELETE FROM VisualStimulations_table
-WHERE  ID BETWEEN 78 AND 79
-
+WHERE  ID BETWEEN 136 AND 136
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
+
 query_remove="""
 DELETE FROM FaceCamera_table
 WHERE  ID BETWEEN 129 AND 130

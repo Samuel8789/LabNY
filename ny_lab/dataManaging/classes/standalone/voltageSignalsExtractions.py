@@ -201,18 +201,17 @@ class VoltageSignalsExtractions():
          '_movie_three_frame_indexes.pkl', 
          '_movie_three_frame_sliced_indexes.pkl',
          '_all_aligned_signals.pkl',
-         '_voltage_signals_transitions.pkl'
-         
-         
-         
+         '_voltage_signals_transitions.pkl',
+         '_optodrift_info.pkl'
+       
          ]
         indexes_full_file_names=[self.acquisition_name+i for i in filenames_suffixes]
         self.indexes_full_file_paths_to_save=[os.path.join(self.vis_stim_slow_storage_path,i) for i in indexes_full_file_names]
         
-        
-        
         self.all_final_signals_datapath=os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['planes'],indexes_full_file_names[23]) 
         self.all_final_signals_transitions_datapath=os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['planes'],indexes_full_file_names[24]) 
+        self.optodrift_info_datapath=os.path.join(self.voltage_signals_object.acquisition_object.slow_storage_all_paths['planes'],indexes_full_file_names[25]) 
+
         
 
 
@@ -613,7 +612,11 @@ class VoltageSignalsExtractions():
         if os.path.isfile(self.all_final_signals_transitions_datapath):
             with open(self.all_final_signals_transitions_datapath, 'rb') as fp:
                 self.signal_transitions = pickle.load(fp)
-
+                
+                
+        self.load_optodrift_info()
+                
+   
 
     def save_full_processed_signals(self):
         #to save correcetd aligne and trans
@@ -766,8 +769,13 @@ class VoltageSignalsExtractions():
             for signal_name in ['VisStim']:
                 self.extract_transitions_from_signal(signal_name,aligned=aligned, led_clipped=led_clipped)
                 #here i nedd t o create a switcher for differnet vis stim paradigm
+        elif self.vis_stim_protocol=='OptoDrift':
+                self.extract_transitions_optodrift(signal_name,aligned=aligned, led_clipped=led_clipped)
 
-
+        
+        
+    
+                
         
     def extract_transitions_from_signal(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False):
         
@@ -883,6 +891,8 @@ class VoltageSignalsExtractions():
                 elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='Allen Session C Version A':
                     self.vis_stim_protocol='AllenC'
                     self.vis_stim_protocol_version='Version A'
+                elif self.database_VisStimInfo['VisStimProtocol_name'][0]=='OptoDrift20':
+                    self.vis_stim_protocol='OptoDrift'
 
         else:
             self.vis_stim_protocol=None
@@ -923,36 +933,225 @@ class VoltageSignalsExtractions():
             
 #%% chandelier opto drifting gratings
 
-    def process_simple_drift_opto(self):
-        pass
-        # sig_prairie=(sig_prairie-np.min(sig_prairie))/(np.max(sig_prairie)-np.min(sig_prairie))
-        # sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
+    def downsample_optodrift_onsets(self,signal_rate=1000 ):
+        self.load_acquisition_info()
+        timestamps_full_video_milisecond=np.array(self.all_planes_timestamps['Plane1'])*signal_rate
+        
+        for stim in range(1,9):
+            downsampledarray=np.zeros_like(self.optodrift_info[f'Grat_{stim}']['ArrayFinal'])
+            for trial in range(20):
+                for rep in range(2):
+                    self.optodrift_info[f'Grat_{stim}']['ArrayFinal'][trial,rep]
+                    downsampledarray[trial,rep]=np.abs( np.array(timestamps_full_video_milisecond - self.optodrift_info[f'Grat_{stim}']['ArrayFinal'][trial,rep])).argmin()
+        
+        
+            self.optodrift_info[f'Grat_{stim}']['ArrayFinal_downsampled_LED_clipped']=downsampledarray
+            
+            
+        self.save_optodrift_info()           
+
+    def load_optodrift_info(self):
+        
+        if os.path.isfile(self.optodrift_info_datapath):
+            with open(self.optodrift_info_datapath, 'rb') as fp:
+                self.optodrift_info = pickle.load(fp)
+                
+                
+    def save_optodrift_info(self):
+         
+        if not os.path.isfile(self.optodrift_info_datapath):
+            with open(self.optodrift_info_datapath, 'wb') as fp:
+                pickle.dump(self.optodrift_info, fp)
+                
+
+    def extract_transitions_optodrift(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False):
+        plt.close('all')
+        optoinfo=self.voltage_signals_object.acquisition_object.visstimdict['opto']
+        optoinfo['allrandperm']
+        optoinfo['all_grating_indexes']
+        stimnum=8
+        oris=np.linspace(0,360,stimnum+1)[:-1]
+        trials=optoinfo['allrandperm'].shape[0]
+        trial_voltage=10
+        blank_volt=9.5
+        blank_volt_a=blank_volt-2
+        blank_volt_b=blank_volt-1
+        orient_volt=np.round(np.linspace(4.6,9,stimnum),1)
+        orient_volt_a=orient_volt-2
+        orient_volt_b=orient_volt-1
+        
+        self.optodrift_info={}
+        for num in range(stimnum):
+            self.optodrift_info[f'Grat_{num+1}']={'Ori':oris[num],
+                                           'Stimnum':num+1,
+                                            'StimCodes':np.array((num+1,num+1+stimnum)),
+                                            'FulltrialStart':np.zeros([trials]).astype(int),
+                                            'FulltrialEnd':np.zeros([trials]).astype(int),
+                                            'ReplStart':np.zeros([trials,2]).astype(int),
+                                            'ReplEnd':np.zeros([trials,2]).astype(int),
+                                            'ArrayInRep':np.zeros([trials,2]).astype(int),
+                                            'ArrayInTrial':np.zeros([trials,2]).astype(int),
+                                            'ArrayFinal':np.zeros([trials,2]).astype(int),
+                                                 }
+            self.optodrift_info['Blank']={'Stimnum':0,
+                                   'StimCodes':np.arange(0+2*stimnum+1,4+2*stimnum+1).astype(int),
+                                   'FulltrialStart':np.zeros([trials]).astype(int),
+                                   'FulltrialEnd':np.zeros([trials]).astype(int),
+                                   'ReplStart':np.zeros([trials,4]).astype(int),
+                                   'ReplEnd':np.zeros([trials,4]).astype(int)
+                                      }
+        
+        if aligned:
+            sig_daq=self.all_final_signals['daq']['LED_aligned']['traces'][signal_name].values.flatten()
+            sig_prairie=self.all_final_signals['Prairie']['LED_aligned']['traces'][signal_name].values.flatten()
+            
+        elif led_clipped:
+            sig_daq=self.all_final_signals['daq']['LED_clipped']['traces'][signal_name].values.flatten()
+            sig_prairie=self.all_final_signals['Prairie']['LED_clipped']['traces'][signal_name].values.flatten()
+            
+            
+        else:
+            sig_daq=self.all_final_signals['daq']['Movie_length_clipped']['traces'][signal_name].values.flatten()
+            sig_prairie=self.all_final_signals['Prairie']['Movie_length_clipped']['traces'][signal_name].values.flatten()
+            
+ 
+        
+        
+        signal_prairie_filtered_rounded_corrected,\
+        signal_prairie_diff_filtered_rounded_corrected,\
+        signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+        signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sig_prairie,kernel_size=1)
+        
+        signal_daq_filtered_rounded_corrected,\
+        signal_daq_diff_filtered_rounded_corrected,\
+        signal_daq_diff_filtered_rounded_corrected_rerounded,\
+        signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
+ 
+  
+        # f,ax=plt.subplots(2)
+        # ax[0].plot(sig_prairie,'r')
+        # ax[0].plot(sig_daq,'c')
+        # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+        # ax[1].plot(signal_daq_diff_filtered_rounded_corrected,'c')
+        
+ 
+ 
+        
+        sigup_pra=np.argwhere(signal_prairie_diff_filtered_rounded_corrected==trial_voltage).flatten()               
+        sigup_daq=np.argwhere(signal_daq_diff_filtered_rounded_corrected==trial_voltage).flatten() 
+        sigdown_pra=np.argwhere(signal_prairie_diff_filtered_rounded_corrected==-trial_voltage).flatten()             
+        sigdown_daq=np.argwhere(signal_daq_diff_filtered_rounded_corrected==-trial_voltage).flatten() 
+        
         
         # f,ax=plt.subplots()
-        # ax.plot(sig_prairie,'r')
-        # ax.plot(sig_daq,'c')
-
-
+        # ax.plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+        # ax.plot(signal_daq_diff_filtered_rounded_corrected,'k',alpha=0.5)
+        # ax.plot(sigup_pra,signal_prairie_diff_filtered_rounded_corrected[sigup_pra],'ro')
+        # ax.plot(sigup_daq,signal_daq_diff_filtered_rounded_corrected[sigup_daq],'ko',alpha=0.5)
+        # ax.plot(sigdown_pra,signal_prairie_diff_filtered_rounded_corrected[sigdown_pra],'ro')
+        # ax.plot(sigdown_daq,signal_daq_diff_filtered_rounded_corrected[sigdown_daq],'ko',alpha=0.5)
         
-        # signal_prairie_filtered_rounded_corrected,\
-        # signal_prairie_diff_filtered_rounded_corrected,\
-        # signal_prairie_diff_filtered_rounded_corrected_rerounded,\
-        # signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sig_prairie,kernel_size=1)
+        #extract trialfragemnts
+        trialfragments=[]
+       
+        trans=list(zip(sigup_pra-1,sigdown_pra+1))
+ 
         
-        # signal_daq_filtered_rounded_corrected,\
-        # signal_daq_diff_filtered_rounded_corrected,\
-        # signal_daq_diff_filtered_rounded_corrected_rerounded,\
-        # signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
-
+        for tri in range(20):
+            trialfragments.append(sig_prairie[trans[tri][1]:trans[tri+1][0]])
+ 
+            signal_prairie_filtered_rounded_corrected,\
+            signal_prairie_diff_filtered_rounded_corrected,\
+            signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+            signal_prairie_errors_pairs = self.correct_voltage_split_transitions(trialfragments[tri],kernel_size=3)
+            
+         
+ 
+            # f,ax=plt.subplots(2)
+            # ax[0].plot(trialfragments[tri])
+            # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected_rerounded,'r')
+            
+ 
+            blank_sigup_pra=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==blank_volt_a ,
+                                                                    signal_prairie_diff_filtered_rounded_corrected==blank_volt_b),
+                                                                    signal_prairie_diff_filtered_rounded_corrected==blank_volt)).flatten()   
+                                        
+            blank_sigdown_pra=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==-blank_volt_a ,
+                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt_b),
+                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt)).flatten()   
+            
+            blank_reps=list(zip(blank_sigup_pra+1,blank_sigdown_pra+1))
+            
+            grat_reps=[]
+            
+            for i in range(len(orient_volt)):
+                
+                up=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==orient_volt_a[i] ,
+                                                                signal_prairie_diff_filtered_rounded_corrected==orient_volt_b[i]),
+                                                                signal_prairie_diff_filtered_rounded_corrected==orient_volt[i])).flatten()      
+                down=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==-orient_volt_a[i] , signal_prairie_diff_filtered_rounded_corrected==-orient_volt_b[i])).flatten()
+ 
+                grat_reps.append(list(zip(up+1,down+1)))
+                
+            all_reps=sorted(blank_reps+[a for i in grat_reps for a in  i])
+            
+            for i in range(len(orient_volt)):
+                self.optodrift_info[f'Grat_{i+1}']['FulltrialStart'][tri]=trans[tri][1]
+                self.optodrift_info[f'Grat_{i+1}']['FulltrialEnd'][tri]=trans[tri+1][0]
+                stimonsets=np.zeros(2).astype(int)  
+                for j in range(2):
+                    start=grat_reps[i][j][1]
+                    if all_reps.index(grat_reps[i][j])+1!=20:
+                        fin=all_reps[all_reps.index(grat_reps[i][j])+1][0]
+                    else:
+                        fin=trans[tri+1][0]
+                        
+                        
+                    self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]=start
+                        
+                    sing_trial=trialfragments[tri][start:fin]
+                
+                
+                        
+                    signal_prairie_filtered_rounded_corrected,\
+                    signal_prairie_diff_filtered_rounded_corrected,\
+                    signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+                    signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sing_trial,kernel_size=3)
+                
+           
         
-        # sigup_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)>0.8).flatten()                
-        # sigup_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)>0.8).flatten()
-        # sigdown_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)<-0.8).flatten()              
-        # sigdown_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)<-0.8).flatten()
-
-
-        # self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
-
+                    # f,ax=plt.subplots(2)
+                    # ax[0].plot(sing_trial,'r')
+                    # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+                    
+                    if all_reps.index(grat_reps[i][j])+1!=20:
+                        stimonsets[j]=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1 ,
+                                                     signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                        
+                        self.optodrift_info[f'Grat_{i+1}']['ReplEnd'][tri,j]=fin
+ 
+                        
+                    else:
+                        tr=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1 ,
+                                                     signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                        stimonsets[j]=tr[0]
+                        
+                        self.optodrift_info[f'Grat_{i+1}']['ReplEnd'][tri,j]=start+tr[1]
+                        
+                    self.optodrift_info[f'Grat_{i+1}']['ArrayFinal'][tri,j]=stimonsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]+self.optodrift_info[f'Grat_{i+1}']['FulltrialStart'][tri]
+                    self.optodrift_info[f'Grat_{i+1}']['ArrayInTrial'][tri,j]=stimonsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]
+ 
+                        
+                self.optodrift_info[f'Grat_{i+1}']['ArrayInRep'][tri,:]=stimonsets
+ 
+         
+        f,ax=plt.subplots()
+        ax.plot(sig_prairie,'r')
+        for stim in range(1,2):
+            grating=self.optodrift_info[f'Grat_{stim}']
+            ax.plot(grating['ArrayFinal'],sig_prairie[grating['ArrayFinal']],'o')
+            
+ 
 
 
 

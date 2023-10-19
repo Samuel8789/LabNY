@@ -11,7 +11,7 @@ Created on Mon Jun  5 08:09:45 2023
 analysis=selected_analysis[0]['analysis']
 full_data=selected_analysis[0]['full_data']
 
-%matplotlib qt
+%matplotlib inline
 #%%
 analysis.photostim_stim_table_and_optanalysisrafatemp()
 
@@ -21,7 +21,7 @@ deriv=lambda x:np.diff(x,prepend=x[0] )
 rectified=lambda x:np.absolute(x)
 #to do sacling and smoothing
 
-analysis.full_data['opto_analysis']
+# analysis.full_data['opto_analysis']
 
 
 final_voltage_timestamps=full_data['voltage_traces']['Full_signals']['Prairie']['LED_clipped']['traces']['Locomotion'].index.values
@@ -125,7 +125,6 @@ for cell in opto_cell_accpeted_indexes:
     '''
    
     
+    #%%
     
- 
-       
-    
+   
