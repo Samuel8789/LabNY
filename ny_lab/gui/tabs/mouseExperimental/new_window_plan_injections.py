@@ -63,7 +63,9 @@ class new_window_plan_injections(tk.Toplevel):
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==4) | 
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==10)| 
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==21)|
-                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==27)][['VirusCode', 'VirusName']].values.tolist()]
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==27)|
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==17)][['VirusCode', 'VirusName']].values.tolist()]
+        self.virus4_names=[virus_name[0]+': '+virus_name[1] for virus_name in self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==17)][['VirusCode', 'VirusName']].values.tolist()]
         
         
         
@@ -73,15 +75,23 @@ class new_window_plan_injections(tk.Toplevel):
         self.virus2_label.grid(column=0, row=6)
         self.virus3_label=ttk.Label(self, text='Virus 3', width=20)
         self.virus3_label.grid(column=0, row=7)
+        self.virus3_label=ttk.Label(self, text='Virus 4', width=20)
+        self.virus3_label.grid(column=0, row=8)
         self.vir1=tk.StringVar()     
         self.vir2=tk.StringVar() 
         self.vir3=tk.StringVar() 
+        self.vir4=tk.StringVar() 
         self.virus1_label_selection=ttk.Combobox(self, values=self.virus1_names, textvariable=self.vir1, width=50)   
         self.virus1_label_selection.grid(column=1, row=5)
-        self.virus1_label_selection=ttk.Combobox(self, values=self.virus2_names, textvariable=self.vir2, width=50)   
-        self.virus1_label_selection.grid(column=1, row=6)
-        self.virus1_label_selection=ttk.Combobox(self, values=self.virus3_names, textvariable=self.vir3, width=50)   
-        self.virus1_label_selection.grid(column=1, row=7)
+        self.virus2_label_selection=ttk.Combobox(self, values=self.virus2_names, textvariable=self.vir2, width=50)   
+        self.virus2_label_selection.grid(column=1, row=6)
+        self.virus3_label_selection=ttk.Combobox(self, values=self.virus3_names, textvariable=self.vir3, width=50)   
+        self.virus3_label_selection.grid(column=1, row=7)
+        self.virus4_label_selection=ttk.Combobox(self, values=self.virus4_names, textvariable=self.vir4, width=50)   
+        self.virus4_label_selection.grid(column=1, row=8)
+        
+        
+        
         
         self.virus1_dilution_label=ttk.Label(self, text='Dilution Virus 1', width=20)
         self.virus1_dilution_label.grid(column=2, row=5)
@@ -89,18 +99,29 @@ class new_window_plan_injections(tk.Toplevel):
         self.virus2_dilution_label.grid(column=2, row=6)
         self.virus3_dilution_label=ttk.Label(self, text='Dilution Virus 3', width=20)
         self.virus3_dilution_label.grid(column=2, row=7)
+        self.virus4_dilution_label=ttk.Label(self, text='Dilution Virus 4', width=20)
+        self.virus4_dilution_label.grid(column=2, row=8)
         self.virus1_dilution=DoubleVar()
         self.virus2_dilution=DoubleVar()
         self.virus3_dilution=DoubleVar()
+        self.virus4_dilution=DoubleVar()
+
         self.virus1_dilution_entry=ttk.Entry(self , textvariable=self.virus1_dilution, width=5)
         self.virus1_dilution_entry.grid(column=3, row=5)
         self.virus2_dilution_entry=ttk.Entry(self , textvariable=self.virus2_dilution, width=5)
         self.virus2_dilution_entry.grid(column=3, row=6)
         self.virus3_dilution_entry=ttk.Entry(self , textvariable=self.virus3_dilution, width=5)
         self.virus3_dilution_entry.grid(column=3, row=7)
+        self.virus4_dilution_entry=ttk.Entry(self , textvariable=self.virus4_dilution, width=5)
+        self.virus4_dilution_entry.grid(column=3, row=8)
+        
+        
+        
         self.virus1_dilution.set(0.5)
         self.virus2_dilution.set(0.5)
         self.virus3_dilution.set(0.2)
+        self.virus4_dilution.set(0.2)
+
         
         
         self.plan_injection_button_but= ttk.Button(self , text='Plan Injections', command=self.plan_injection_button)
@@ -114,12 +135,20 @@ class new_window_plan_injections(tk.Toplevel):
                 self.vir1code= [self.vir1code[-1]]
             self.vir2code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir2.get()[3:]]['VirusCode'].tolist()
             self.vir3code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir3.get()[3:]]['VirusCode'].tolist()
+            self.vir4code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir4.get()[3:]]['VirusCode'].tolist()
+
             self.vir1dil=self.virus1_dilution.get()
             self.vir2dil=self.virus2_dilution.get()
             self.vir3dil=self.virus3_dilution.get()
+            self.vir4dil=self.virus4_dilution.get()
+
             self.select()
-            self.VirusCombination=[self.vir1code,self.vir2code,self.vir3code]
-            self.Dilutions=[self.vir1dil,self.vir2dil,self.vir3dil]
+            # self.VirusCombination=[self.vir1code,self.vir2code,self.vir3code]
+            self.VirusCombination=[self.vir1code,self.vir2code,self.vir3code,self.vir4code]
+
+            # self.Dilutions=[self.vir1dil,self.vir2dil,self.vir3dil]
+            self.Dilutions=[self.vir1dil,self.vir2dil,self.vir3dil,self.vir4dil]
+
             self.virus_dilutions=[(vir[0], self.Dilutions[idx])  for idx, vir in  enumerate(self.VirusCombination)  if vir]
             
 

@@ -17,6 +17,8 @@ from pyometiff import OMETIFFReader
 import pathlib
 
 
+
+    
 def move_all_files_from_source_to_dest(source,dest):
     file_list = glob.glob(source+'\**')
     for fname in file_list:
@@ -281,8 +283,11 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     
     # here I have to add an option to detect the extra files when doing the multiplane
     if cleaneduplist:
-        if len(cleaneduplist)<4 and cleaneduplist[0][cleaneduplist[0].find('.ome')-1]=='4':
-            cleaneduplist=[]
+        if len(cleaneduplist)<4: 
+            if cleaneduplist[0][cleaneduplist[0].find('.ome')-1]=='4' and possible_planes==3:
+                cleaneduplist=[]
+            elif cleaneduplist[0][cleaneduplist[0].find('.ome')-1]=='3' and possible_planes==2:
+                cleaneduplist=[]
 
         
     if cleaneduplist:

@@ -22,7 +22,7 @@ def smooth_trace(trace,window):
     filtered = lowess(trace, np.arange(framenumber), frac=frac)
     
     return filtered[:,1]
-dtset=self.calcium_datasets[list(self.calcium_datasets.keys())[0]]
+dtset=analysis.calcium_datasets[list(analysis.calcium_datasets.keys())[0]]
 dtset.most_updated_caiman.CaimanResults_object.load_all()
 f,ax=plt.subplots(2)
 for i in range(2):
@@ -42,6 +42,8 @@ cnm.view_components()
 full_raw=cnm.C+cnm.YrA
 
 chandeliers=np.array([ 3, 12, 15, 18])
+chandeliers=np.array([ 0,])
+
 
 chandeliertraces=full_raw[chandeliers,:]
 
@@ -167,7 +169,7 @@ def detect_opto_trigg():
     colors=['k','b','r']
     fig,ax=plt.subplots(3,sharex=True)
     fig.tight_layout()
-    for i in range(3):
+    for i in range(len(chandeliers)):
         trace=chandeliertraces[i,:]
         ax[i].plot(fulltimevector,smooth_trace(trace,smoothwindows))
         ax[i].margins(x=0)
@@ -182,7 +184,7 @@ def detect_opto_trigg():
 
 
     smoothedtraces=np.zeros_like(chandeliertraces)        
-    for i in range(3):
+    for i in range(len(chandeliers)):
         smoothedtraces[i,:]=smooth_trace(chandeliertraces[i,:],smoothwindows)
     
     optotrialarraysmoothed=np.zeros((3,10,prestim+poststim))
@@ -190,12 +192,12 @@ def detect_opto_trigg():
     
     colors=['k','b','r']
     
-    for l in range(3):
+    for l in range(len(chandeliers)):
         stimulatecdcell=l
         
         # f,ax=plt.subplots(5,2)
         for i,opto  in enumerate(estimatedoptotimesallchands[stimulatecdcell]):
-            for j in range(3):
+            for j in range(len(chandeliers)):
         #         row = i // 2  # determine the row index based on the iteration index
         #         col = i % 2   # determine the column index based on the iteration index
                 optotrialarraysmoothed[j,i,:]=smoothedtraces[j,opto-prestim:opto+poststim]
@@ -211,7 +213,7 @@ def detect_opto_trigg():
        
         f,ax=plt.subplots(5,2)
         for i,opto  in enumerate(estimatedoptotimesallchands[stimulatecdcell]):
-            for j in range(3):
+            for j in range(len(chandeliers)):
                 row = i // 2  # determine the row index based on the iteration index
                 col = i % 2   # determine the column index based on the iteration index
                 ax[row, col].plot(trialtimevector,optotrialarraysmoothed[j,i,:])

@@ -237,7 +237,7 @@ class CaimanExtraction():
         # set up some additional supporting parameters needed for the algorithm
         # (these are default values but can change depending on dataset properties)
         init_batch = 700 # number of frames for initialization (presumably from the first file)
-        K = 1  # initial number of components
+        K = 20 # initial number of components
         epochs = 2 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8

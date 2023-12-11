@@ -569,7 +569,18 @@ class BidiShiftManager:
             module_logger.info('Caiman loaded for first metadta file, sometimes it is the only that works for red or when all file ar in same direcotyr')
             
             if 'Ch1Red' in image_sequence_paths[0]:
-                self.image_sequence= self.image_sequence[:,0,:,:]
+                if len(image_sequence_paths)!= len(self.image_sequence):
+                    try:
+                        self.image_sequence=cm.load(image_sequence_paths)
+                        module_logger.info('Caiman load sequence properly loaded')
+                    except:
+                        try:
+                            self.image_sequence=cm.load(image_sequence_paths[0])[:,0,:,:]
+                            module_logger.info('all files in single file')
+                        except:
+                            module_logger.exception('Check caiman loading, something wrong')
+                else:
+                    self.image_sequence= self.image_sequence[:,0,:,:]
             else:
                    
                 if len(image_sequence_paths)!= len(self.image_sequence)  or self.image_sequence.shape[1]==2:      

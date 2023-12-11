@@ -24,6 +24,8 @@ from ..functions.functionsDataOrganization import check_channels_and_planes, rec
 # from functionsDataOrganization import check_channels_and_planes, recursively_eliminate_empty_folders, move_files, recursively_copy_changed_files_and_directories_from_slow_to_fast, recursively_delete_back_directories
 
 from ..functions.select_face_camera import select_face_camera
+from ..functions.confirm_kept_fov import confirm_kept_fov
+
 # from select_face_camera import select_face_camera
 
 import shutil
@@ -230,46 +232,59 @@ class MouseImagingSession():
         
 
     def correctComplexacquisitonsNames(self, ComplexAcqname):
-        
-        # no detect fovs with fov number highr thant totAL NIMBER OF FOVS AND CHANGE IT        
-        all_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname+'**', recursive=False) 
-        unnumbered_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname, recursive=False) 
-
-        if unnumbered_compacqs:
-            named_compacqs_paths=[i for i in all_compacqs if i not in unnumbered_compacqs]
-        else:
-            named_compacqs_paths=all_compacqs
-        named_compacqs_names=[os.path.split(i)[1] for i in named_compacqs_paths]
-        # number_current_named_compacqs=len(named_compacqs_paths)
-        number_total_compacqs=len(all_compacqs)
-        
-        wanted_compacq_numbers=[i+1 for i in range(number_total_compacqs)]
-        # this is to detect fov numbers highr than the total fovs
-           
-            
-        if named_compacqs_paths:
-            named_compacq_number=[int(i[i.find('_')+1:]) for i in named_compacqs_names]
-            to_change=[i for i in named_compacq_number if i not in wanted_compacq_numbers ]
-            to_change_to=[i for i in wanted_compacq_numbers if i not in named_compacq_number ]
-            for compacq in named_compacqs_paths:
-                if to_change:
-                   if compacq.find(ComplexAcqname + str(to_change[0]))!=-1: 
-                       os.rename(compacq, compacq[:compacq.find(ComplexAcqname)+len(ComplexAcqname)]+str(to_change_to[0]))   
-                       to_change.remove(to_change[0])
-                       to_change_to.remove(to_change_to[0])
-           
-        for compacq in unnumbered_compacqs:
-            if not glob.glob( compacq+'\\**\\**.env', recursive=True) and not glob.glob( compacq+'\\**\\**.xy', recursive=True) :
-
-                recursively_eliminate_empty_folders(compacq) 
+        keep=None
+        if 'FOV_' in ComplexAcqname:
+            if not self.mouse_object.data_managing_object.LabProjectObject.gui:
+               self.guiref=tk.Tk()
             else:
-                if not named_compacqs_paths:
-                    to_change_to=[1]   
-                    os.rename(compacq, compacq+str(to_change_to[0]))    
+               self.guiref=self.mouse_object.data_managing_object.LabProjectObject.gui
+            
+            self.select_fov_name_window=confirm_kept_fov(self.guiref)
+            self.select_fov_name_window.wait_window()
+            keep= self.select_fov_name_window.keep
 
+        if not keep:
+          
+
+            # no detect fovs with fov number highr thant totAL NIMBER OF FOVS AND CHANGE IT        
+            all_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname+'**', recursive=False) 
+            unnumbered_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname, recursive=False) 
+    
+            if unnumbered_compacqs:
+                named_compacqs_paths=[i for i in all_compacqs if i not in unnumbered_compacqs]
+            else:
+                named_compacqs_paths=all_compacqs
+            named_compacqs_names=[os.path.split(i)[1] for i in named_compacqs_paths]
+            # number_current_named_compacqs=len(named_compacqs_paths)
+            number_total_compacqs=len(all_compacqs)
+            
+            wanted_compacq_numbers=[i+1 for i in range(number_total_compacqs)]
+            # this is to detect fov numbers highr than the total fovs
+               
+                
+            if named_compacqs_paths:
+                named_compacq_number=[int(i[i.find('_')+1:]) for i in named_compacqs_names]
+                to_change=[i for i in named_compacq_number if i not in wanted_compacq_numbers ]
+                to_change_to=[i for i in wanted_compacq_numbers if i not in named_compacq_number ]
+                for compacq in named_compacqs_paths:
+                    if to_change:
+                       if compacq.find(ComplexAcqname + str(to_change[0]))!=-1: 
+                           os.rename(compacq, compacq[:compacq.find(ComplexAcqname)+len(ComplexAcqname)]+str(to_change_to[0]))   
+                           to_change.remove(to_change[0])
+                           to_change_to.remove(to_change_to[0])
+               
+            for compacq in unnumbered_compacqs:
+                if not glob.glob( compacq+'\\**\\**.env', recursive=True) and not glob.glob( compacq+'\\**\\**.xy', recursive=True) :
+    
+                    recursively_eliminate_empty_folders(compacq) 
                 else:
-                #this will change empty fov to the minimum fov number avilabel  
-                    os.rename(compacq, compacq+str(to_change_to[0]))    
+                    if not named_compacqs_paths:
+                        to_change_to=[1]   
+                        os.rename(compacq, compacq+str(to_change_to[0]))    
+    
+                    else:
+                    #this will change empty fov to the minimum fov number avilabel  
+                        os.rename(compacq, compacq+str(to_change_to[0]))    
                                            
     
     def createAqFolders(self, generic_aq):
@@ -546,7 +561,12 @@ class MouseImagingSession():
                                     WHERE ImagedMouseID IN(%s)""" % ','.join('?' for i in imaged_mice_id) 
                                     
         params=tuple(imaged_mice_id)
-        self.database_acquisitions=self.mouse_object.Database_ref.arbitrary_query_to_df(quey_acquisitions_ID, params)      
+        self.database_acquisitions=self.mouse_object.Database_ref.arbitrary_query_to_df(quey_acquisitions_ID, params)     
+        
+    
+
+
+
                 
                 
         

@@ -36,6 +36,10 @@ def get_combination_from_virus(virus_tuple, database_object):
         query_viruscomb="SELECT ID FROM VirusCombinations_table WHERE Virus1=? AND Virus2=? AND Virus3=?"
         viruscomb = pd.read_sql_query(query_viruscomb, database_connection, params=(good_virus_codes[0],good_virus_codes[1],good_virus_codes[2])).values.tolist()
         
+    if len(good_virus_codes)==4:
+        query_viruscomb="SELECT ID FROM VirusCombinations_table WHERE Virus1=? AND Virus2=? AND Virus3=? AND Virus4=?"
+        viruscomb = pd.read_sql_query(query_viruscomb, database_connection, params=(good_virus_codes[0],good_virus_codes[1],good_virus_codes[2],good_virus_codes[3])).values.tolist()
+    
     if not viruscomb:
         print('Not visur combination found, add new one')
     else:

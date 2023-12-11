@@ -704,23 +704,27 @@ class ResultsAnalysis():
         for sig in reversed(self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'].columns[:-1]): 
             daq_sig=sg.medfilt(np.squeeze( self.full_data['voltage_traces']['Full_signals']['daq']['Raw']['traces'][sig].values), kernel_size=1)
             prairie_sig=sg.medfilt(np.squeeze(  self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'][sig].values), kernel_size=1)           
-            f,ax=plt.subplots()
-            ax.plot(daq_sig)
-            ax.plot(prairie_sig,'r')
-            f,ax=plt.subplots()
-            ax.plot( self.full_data['voltage_traces']['Full_signals']['daq']['Prairie_aligned']['traces'][sig].values)
-            ax.plot(self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'][sig].values,'r')
-        
+            f,ax=plt.subplots(2,1)
+            ax[0].plot(daq_sig,label='daq')
+            ax[0].plot(prairie_sig,'r',label='prairie')
+            ax[1].plot( self.full_data['voltage_traces']['Full_signals']['daq']['Prairie_aligned']['traces'][sig].values,label='daq')
+            ax[1].plot(self.full_data['voltage_traces']['Full_signals']['Prairie']['Raw']['traces'][sig].values,'r',label='prairie')
+            for a in ax:
+                a.legend()
+            f.suptitle(f'Daq-Prairie Alignment {sig}')
+            
+
 
         #plotting clipped signal to video length
         signals_to_plot=[  'LED',  'AcqTrig']
         for record_to_plot, process in self.full_data['voltage_traces']['Full_signals'].items():
             f,ax=plt.subplots()
             for sig in  signals_to_plot:
-                ax.plot(self.scale_signal(process['Raw']['traces'][sig].values),label=sig)
-                ax.plot(self.scale_signal(process['Movie_length_clipped']['traces'][sig].values),label=sig)   
+                ax.plot(self.scale_signal(process['Raw']['traces'][sig].values),label=sig+' Raw')
+                ax.plot(self.scale_signal(process['Movie_length_clipped']['traces'][sig].values),label=sig+' Movie_length_clipped')   
             ax.plot(self.mov_timestamps_miliseconds['raw'],mov,label='Video')
             ax.legend()
+            f.suptitle(f'{record_to_plot} Check Video Length Clipping, this just cuts from the back')
 
       
         
@@ -742,25 +746,32 @@ class ResultsAnalysis():
                 surroundup=np.array([[i-1,i,i+1] for i in upt_downsampled])
 
 
-                ax[k].plot(self.mov_timestamps_miliseconds['raw'], mov)
-                ax[k].plot(speedtimestamps, speed)
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'], mov,label='meanmov')
+                ax[k].plot(speedtimestamps, speed,label='speed')
                 ax[k].vlines(self.mov_timestamps_miliseconds['raw'][self.start_frame],0,1,linestyles='solid',alpha=1)
                 ax[k].vlines(self.mov_timestamps_miliseconds['raw'][self.end_frame],0,1,linestyles='solid',alpha=1)
                 ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
                 if surroundup.any():
                     ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surroundup], 0,1,linestyles='dashdot',alpha=0.2)
-                ax[k].plot( timestamps_voltage_signals,sig )
-                ax[k].plot( upt,sig[upt] ,'^')
-                ax[k].plot( downt,sig[downt] ,'v')
-                ax[k].plot(self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int),sig[ self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int)] ,'<')
-                ax[k].plot(self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int),sig[self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int)] ,'>')
+                ax[k].plot( timestamps_voltage_signals,sig ,label=f'{sigk}')
+                ax[k].plot( upt,sig[upt] ,'^',label=f'{sigk} up')
+                ax[k].plot( downt,sig[downt] ,'v',label=f'{sigk} down')
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int),sig[ self.mov_timestamps_miliseconds['raw'][upt_downsampled].astype(int)] ,'<',label=f'{sigk} up downsampled')
+                ax[k].plot(self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int),sig[self.mov_timestamps_miliseconds['raw'][downt_downsampled].astype(int)] ,'>',label=f'{sigk} down downsampled')
                 ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
                 if surroundup.any():
                     ax[k].vlines(self.mov_timestamps_miliseconds['raw'][surroundup], 0,1,linestyles='dashdot',alpha=0.2)
+                    
+                ax[k].set_title(f'{sigk}')
+                ax[k].legend()
+
             ax[-1].plot(self.mov_timestamps_miliseconds['raw'], mov)
             ax[-1].plot(speedtimestamps, speed,alpha=0.2) 
-            ax[-1].set_ylim(0,0.02)            
-              
+            ax[-1].set_ylim(0,0.02)       
+            ax[-1].set_title(f'Raw mean movie')
+
+            f.suptitle(f'{record_to_plot} Alignment of VIdeo and signals to LED ')
+
                     
         #plot led clipeed signals
         signals_to_plot=[ 'VisStim', 'PhotoStim',  'PhotoTrig', ]
@@ -779,7 +790,7 @@ class ResultsAnalysis():
                  
                 ax[k].plot(self.mov_timestamps_miliseconds['shifted'], mov_clipped)
                 ax[k].plot(speedtimestamps,sig )
-                ax[k].plot(speedtimestamps,speed )
+                # ax[k].plot(speedtimestamps,speed )
                 ax[k].plot(self.mov_timestamps_miliseconds['shifted'][upt].astype(int),sig[ self.mov_timestamps_miliseconds['shifted'][upt].astype(int)] ,'<')
                 ax[k].plot(self.mov_timestamps_miliseconds['shifted'][downt].astype(int),sig[self.mov_timestamps_miliseconds['shifted'][downt].astype(int)] ,'>')
                 ax[k].vlines(self.mov_timestamps_miliseconds['shifted'][surrounddown], 0,1,linestyles='dashed',alpha=0.2)
@@ -1471,7 +1482,9 @@ class ResultsAnalysis():
     def photostim_stim_table_and_optanalysisrafatemp(self):
         # plt.close('all')
         gratingcontrol=np.empty(0)
+        self.signals_object.downsample_optodrift_onsets()
         try:
+            # self.signals_object.downsample_optodrift_onsets()
             optograting=self.acquisition_object.visstimdict['opto']['randomoptograting']
             optogratinfo=self.signals_object.optodrift_info[f'Grat_{optograting}']
             gratingcontrol=optogratinfo['ArrayFinal_downsampled_LED_clipped'][:,1]
@@ -1502,7 +1515,6 @@ class ResultsAnalysis():
         ref_image=Image.fromarray(self.acquisition_object.reference_image_dic[[i for i in self.acquisition_object.reference_image_dic.keys() if ('Red-8bit' in i) or ('Red-Green-8bit' in i)][0]])
         total_opt_number=len(self.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['up'])
 #%%
-
         # trial_delay=self.acquisition_object.visstimdict['opto']['intertrialtime']
         nTrials=self.acquisition_object.metadata_object.mark_points_experiment['Iterations']
         cell_number=len(self.acquisition_object.metadata_object.mark_points_experiment['PhotoStimSeries'])
@@ -1761,131 +1773,131 @@ class ResultsAnalysis():
 
 
         print('plotting')
-        # #plot all chandelier traces and first opt
+        #plot all chandelier traces and first opt
         # plt.close('all')
-        # fig,ax=plt.subplots(self.optotraces.shape[0]+1,sharex=True)
-        # fig.tight_layout()
-        # for i in range(self.optotraces.shape[0]):
-        #     trace=self.optotraces[i,:]
-        #     ax[i].plot(self.mov_timestamps_miliseconds['shifted'],self.smooth_trace(trace,smoothwindows),'k')
-        #     ax[i].plot(speedtimestamps,self.scale_signal(speed),'r',alpha=0.5)
-        #     ax[i].margins(x=0)
-        #     for j in range(len(transition_array[i,:,0,0])):
-        #         ax[i].axvline(x=self.mov_timestamps_miliseconds['shifted'][transition_array[i,j,0,0]])  
-        #     ax[i].set_xlabel('Time(s)')
-        #     ax[i].set_ylabel('Activity(a.u.)')
-        #     fig.suptitle('Optogenetic Stimulation of Chandelier Cells', fontsize=16)
+        fig,ax=plt.subplots(self.optotraces.shape[0]+1,sharex=True)
+        fig.tight_layout()
+        for i in range(self.optotraces.shape[0]):
+            trace=self.optotraces[i,:]
+            ax[i].plot(self.mov_timestamps_miliseconds['shifted'],self.smooth_trace(trace,smoothwindows),'k')
+            ax[i].plot(speedtimestamps,self.scale_signal(speed),'r',alpha=0.5)
+            ax[i].margins(x=0)
+            for j in range(len(transition_array[i,:,0,0])):
+                ax[i].axvline(x=self.mov_timestamps_miliseconds['shifted'][transition_array[i,j,0,0]])  
+            ax[i].set_xlabel('Time(s)')
+            ax[i].set_ylabel('Activity(a.u.)')
+            fig.suptitle('Optogenetic Stimulation of Chandelier Cells', fontsize=16)
 
-        # # #lpot clean traces of all opt and some non oppto cells
-        # plt.rcParams["figure.figsize"] = [16, 5]
-        # plt.rcParams["figure.autolayout"] = True
-        # non_opto_toplot=10
-        # totalcells=self.optotraces.shape[0]+non_opto_toplot
-        # f,ax=plt.subplots(totalcells+1,sharex=True)    
-        # for i in range(self.optotraces.shape[0]):
-        #     trace=self.optotraces[i,:]
-        #     ax[i].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='y')
-        #     for j in range(len(transition_array[i,:,0,0])):
-        #         ax[i].axvline(x=self.mov_timestamps_seconds['shifted'][transition_array[i,j,0,0]])  
+        # #lpot clean traces of all opt and some non oppto cells
+        plt.rcParams["figure.figsize"] = [16, 5]
+        plt.rcParams["figure.autolayout"] = True
+        non_opto_toplot=10
+        totalcells=self.optotraces.shape[0]+non_opto_toplot
+        f,ax=plt.subplots(totalcells+1,sharex=True)    
+        for i in range(self.optotraces.shape[0]):
+            trace=self.optotraces[i,:]
+            ax[i].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='y')
+            for j in range(len(transition_array[i,:,0,0])):
+                ax[i].axvline(x=self.mov_timestamps_seconds['shifted'][transition_array[i,j,0,0]])  
             
-        # for i in range(non_opto_toplot):
-        #     # trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][self.non_opto_ids[i],:]
-        #     trace=  self.non_opto_traces[self.non_opto_ids[i],:]
+        for i in range(non_opto_toplot):
+            # trace=self.full_data['imaging_data']['Plane1']['Traces']['demixed'][self.non_opto_ids[i],:]
+            trace=  self.non_opto_traces[self.non_opto_ids[i],:]
 
-        #     ax[i+self.optotraces.shape[0]].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='g')
+            ax[i+self.optotraces.shape[0]].plot(self.mov_timestamps_seconds['shifted'],self.smooth_trace(trace,10),c='g')
             
-        # ax[-1].plot(speedtimestamps/1000,speed,'r')
-        # for i,a in enumerate(ax):
-        #     a.margins(x=0)
-        #     if i<len(ax)-1:
-        #         a.axis('off')
-        #     elif i==len(ax)-1:
-        #         a.spines['top'].set_visible(False)
-        #         a.spines['right'].set_visible(False)
-        #         a.spines['left'].set_visible(False)
-        #         a.get_yaxis().set_ticks([])
-        #         a.set_xlabel('Time(s)')
+        ax[-1].plot(speedtimestamps/1000,speed,'r')
+        for i,a in enumerate(ax):
+            a.margins(x=0)
+            if i<len(ax)-1:
+                a.axis('off')
+            elif i==len(ax)-1:
+                a.spines['top'].set_visible(False)
+                a.spines['right'].set_visible(False)
+                a.spines['left'].set_visible(False)
+                a.get_yaxis().set_ticks([])
+                a.set_xlabel('Time(s)')
                 
                 
-        # #plot single optotirals individually 
-        # for l in range(cell_number):
-        #     f,ax=plt.subplots(int(transition_array.shape[1]/2),2)
-        #     for i,opto  in enumerate(transition_array[l,:,0,0]):
-        #         row = i // 2  # determine the row index based on the iteration index
-        #         col = i % 2   # determine the column index based on the iteration index
-        #         # ax[row, col].plot(self.trialtimevector,self.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
-        #         ax[row, col].plot(self.trialtimevector,smoothedoptotraces[l,l,i,:]),'k'
+        #plot single optotirals individually 
+        for l in range(cell_number):
+            f,ax=plt.subplots(int(transition_array.shape[1]/2),2)
+            for i,opto  in enumerate(transition_array[l,:,0,0]):
+                row = i // 2  # determine the row index based on the iteration index
+                col = i % 2   # determine the column index based on the iteration index
+                # ax[row, col].plot(self.trialtimevector,self.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
+                ax[row, col].plot(self.trialtimevector,smoothedoptotraces[l,l,i,:]),'k'
 
-        #         # ax[row, col].plot(self.trialtimevector,smoothedoptotracessubstracetd[l,l,i,:],'b')
-        #         ax[row, col].plot(self.trialspeedtimevector,self.speedtrialrarray[l,i,:],'r')
-        #         ax[row, col].axvline(x=0)  
-        #         # ax[row, col].set_ylim(-3,8)
-        #         ax[row, col].margins(x=0)
-        #         for m in range(repetitions):               
-        #             ax[row, col].add_patch(Rectangle((self.trialtimevector[prestim+interoptoframes*m], 0.8), 0.01, 0.2,color='r'))
+                # ax[row, col].plot(self.trialtimevector,smoothedoptotracessubstracetd[l,l,i,:],'b')
+                ax[row, col].plot(self.trialspeedtimevector,self.speedtrialrarray[l,i,:],'r')
+                ax[row, col].axvline(x=0)  
+                # ax[row, col].set_ylim(-3,8)
+                ax[row, col].margins(x=0)
+                for m in range(repetitions):               
+                    ax[row, col].add_patch(Rectangle((self.trialtimevector[prestim+interoptoframes*m], 0.8), 0.01, 0.2,color='r'))
     
-        #         ax[row, col].set_xlabel('Time(s)')
-        #         ax[row, col].set_ylabel('Activity(a.u.)')
+                ax[row, col].set_xlabel('Time(s)')
+                ax[row, col].set_ylabel('Activity(a.u.)')
                 
-        #     f.suptitle(f'Single Trial Optogenetic Stimulation Cell{str(l+1)}', fontsize=16)
+            f.suptitle(f'Single Trial Optogenetic Stimulation Cell{str(l+1)}', fontsize=16)
             
-        # if gratingcontrol.any():
+        if gratingcontrol.any():
             
             
-        #     #plot single optotirals individually 
-        #     for l in range(cell_number):
-        #         f,ax=plt.subplots(int(gratingcontrol.shape[0]/2),2)
-        #         for i,opto  in enumerate(gratingcontrol):
-        #             row = i // 2  # determine the row index based on the iteration index
-        #             col = i % 2   # determine the column index based on the iteration index
-        #             # ax[row, col].plot(self.trialtimevector,self.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
-        #             ax[row, col].plot(self.trialtimevector,smoothedoptotraces_ctrl[l,l,i,:]),'k'
+            #plot single optotirals individually 
+            for l in range(cell_number):
+                f,ax=plt.subplots(int(gratingcontrol.shape[0]/2),2)
+                for i,opto  in enumerate(gratingcontrol):
+                    row = i // 2  # determine the row index based on the iteration index
+                    col = i % 2   # determine the column index based on the iteration index
+                    # ax[row, col].plot(self.trialtimevector,self.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
+                    ax[row, col].plot(self.trialtimevector,smoothedoptotraces_ctrl[l,l,i,:]),'k'
 
-        #             # ax[row, col].plot(self.trialtimevector,smoothedoptotracessubstracetd[l,l,i,:],'b')
-        #             ax[row, col].plot(self.trialspeedtimevector,self.speedtrialrarray[l,i,:],'r')
-        #             ax[row, col].axvline(x=0)  
-        #             # ax[row, col].set_ylim(-3,8)
-        #             ax[row, col].margins(x=0)
+                    # ax[row, col].plot(self.trialtimevector,smoothedoptotracessubstracetd[l,l,i,:],'b')
+                    ax[row, col].plot(self.trialspeedtimevector,self.speedtrialrarray[l,i,:],'r')
+                    ax[row, col].axvline(x=0)  
+                    # ax[row, col].set_ylim(-3,8)
+                    ax[row, col].margins(x=0)
                
-        #             ax[row, col].set_xlabel('Time(s)')
-        #             ax[row, col].set_ylabel('Activity(a.u.)')
+                    ax[row, col].set_xlabel('Time(s)')
+                    ax[row, col].set_ylabel('Activity(a.u.)')
                     
-        #         f.suptitle(f'Single Trial Grating Control Stimulation Cell{str(l+1)}', fontsize=16)
+                f.suptitle(f'Single Trial Grating Control Stimulation Cell{str(l+1)}', fontsize=16)
                   
            
         
-        #plot opto cells in tiled array with mean of all traces and then a individual figure for single trials
+        # plot opto cells in tiled array with mean of all traces and then a individual figure for single trials
         
-        # if cell_number>1:
-        #     axestodo=cell_number
-        # else:
-        #     axestodo=2
+        if cell_number>1:
+            axestodo=cell_number
+        else:
+            axestodo=2
 
-        # f,ax=plt.subplots(axestodo,axestodo,sharex=True, sharey=True)
-        # for stim_cell_trials in range(cell_number):
-        #     for cell_trace in range(cell_number):
-        #         if stim_cell_trials==cell_trace:
-        #             color='r'
-        #         else:
-        #             color='b'
+        f,ax=plt.subplots(axestodo,axestodo,sharex=True, sharey=True)
+        for stim_cell_trials in range(cell_number):
+            for cell_trace in range(cell_number):
+                if stim_cell_trials==cell_trace:
+                    color='r'
+                else:
+                    color='b'
     
-        #         ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedmeanoptotraces[cell_trace,stim_cell_trials,:],color)
-        #         ax[stim_cell_trials, cell_trace].axvline(x=0)  
-        #         ax[stim_cell_trials, cell_trace].axis('off')
+                ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedmeanoptotraces[cell_trace,stim_cell_trials,:],color)
+                ax[stim_cell_trials, cell_trace].axvline(x=0)  
+                ax[stim_cell_trials, cell_trace].axis('off')
   
-    # plt.close('all')
-        # for trial in range(nTrials):
-        #     f,ax=plt.subplots(axestodo,axestodo,sharex=True, sharey=True)
-        #     for stim_cell_trials in range(cell_number):
-        #         for cell_trace in range(cell_number):
-        #             if stim_cell_trials==cell_trace:
-        #                 color='r'
-        #             else:
-        #                 color='b'
+        plt.close('all')
+        for trial in range(nTrials):
+            f,ax=plt.subplots(axestodo,axestodo,sharex=True, sharey=True)
+            for stim_cell_trials in range(cell_number):
+                for cell_trace in range(cell_number):
+                    if stim_cell_trials==cell_trace:
+                        color='r'
+                    else:
+                        color='b'
            
-        #             ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedoptotraces[cell_trace,stim_cell_trials,trial,:],color)
-        #             ax[stim_cell_trials, cell_trace].axvline(x=0)  
-        #             ax[stim_cell_trials, cell_trace].axis('off')
+                    ax[stim_cell_trials, cell_trace].plot(self.trialtimevector,smoothedoptotraces[cell_trace,stim_cell_trials,trial,:],color)
+                    ax[stim_cell_trials, cell_trace].axvline(x=0)  
+                    ax[stim_cell_trials, cell_trace].axis('off')
                     
                         
                         

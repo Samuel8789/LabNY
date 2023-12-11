@@ -28,7 +28,7 @@ from operator import itemgetter
 import caiman as cm
 import copy 
 import json
-
+from cycler import cycler
 class VoltageSignalsExtractions():
     
     def __init__(self, voltage_excel_path=False, temporary_path=False, just_copy=False, acquisition_directory_raw=False, voltage_signals_object=None):
@@ -109,23 +109,45 @@ class VoltageSignalsExtractions():
                 
                 self.load_full_processed_signals()
                 if not self.all_final_signals and self.correct_voltages:
-                    self.align_daq_prairie_signals()
+                    self.align_daq_prairie_signals(plot=False)
 
                     
 
                     self.clip_voltages_to_movie_length()
-    
-                    self.proces_synch_signals()
+                    # this processes led and acq trigger in aligna daq and paririe voltages clipped to the end of thwe movie (missing the aqtrigger end)
+                    # seems to be stabe and easy
+                    module_logger.info('Detecting trsmisition in unaligne signals')
+
+                    self.proces_synch_signals() 
+                    # this processesthe opto tirgger(signal if LED) and pockels (if 2p) oin the movie clipped 
+                    # seems to be stabe and easy
                     self.proces_opto_signals()
+                    # this id pproblematis as the optodrift function uses final signals instead of signlas 
                     self.proces_spont_visual_signals()
                     self.load_acquisition_info()
+                    #this is to align the voltage signals with the movie based onthe lED artifcat and then redo the transitions
+                    module_logger.info('aligning voltages to movie')
+
                     self.align_signals_based_on_LED()
-                    self.proces_synch_signals(aligned=True)
+                    module_logger.info('Detecting trsmisition inLED aligned signals')
+
+                    # self.proces_synch_signals(aligned=True)
                     self.proces_opto_signals(aligned=True)
                     self.proces_spont_visual_signals(aligned=True)
+                    module_logger.info('This downsamples the alignes transition to movie')
+
                     self.downsample_transitions_times()
+                    module_logger.info('Clipping voltages to led')
+
                     self.clip_all_signal_to_LED()
+                    module_logger.info('Detecting trsmisition in LED clipped signals')
+
+                    # self.proces_synch_signals(led_clipped=True)
+                    self.proces_opto_signals(led_clipped=True)
+                    self.proces_spont_visual_signals(led_clipped=True)
                     self.save_full_processed_signals()
+                    module_logger.info('to check transition look at self.signal_transitions')
+
                 self.process_locomotion() # to change kept to not break result analysis
                 self.process_visstim_signal()
 
@@ -250,15 +272,20 @@ class VoltageSignalsExtractions():
         
         
         
-#%% common 
 #%% LED ALIGNMENT AND CLIPPING 
 
-    def align_daq_prairie_signals(self):
+    def align_daq_prairie_signals(self,plot=False):
+        module_logger.info('Aligning prairiw ad daq signals')
+
         plt.close('all')
         alldelays={}
         corrected_daq_signals={}
+        orderedsignals=['LED','AcqTrig','VisStim', 'PhotoTrig', 'PhotoStim', 'Locomotion']
+        if not set(['LED','AcqTrig','VisStim', 'PhotoTrig', 'PhotoStim', 'Locomotion'])==set(list(self.all_signals['Prairie'].keys())[:-1]):
+            orderedsignals=reversed(list(self.all_signals['Prairie'].keys())[:-1])
 
-        for sig in reversed(list(self.all_signals['Prairie'].keys())[:-1]): 
+
+        for sig in orderedsignals: 
             
             
             self.all_signals['Daq'][sig]= self.all_signals['Daq'][sig].astype('float32')
@@ -266,15 +293,14 @@ class VoltageSignalsExtractions():
             
             daq_sig=sg.medfilt(np.squeeze(self.all_signals['Daq'][sig]), kernel_size=1)
             prairie_sig=sg.medfilt(np.squeeze(self.all_signals['Prairie'][sig]), kernel_size=1)
+            if plot:
+                f,ax=plt.subplots(2)
+                ax[0].plot(daq_sig,'r',label='daq')
+                ax[0].plot(prairie_sig,'c',label='prairie')
+                ax[0].legend()
 
-            f,ax=plt.subplots(2)
-            ax[0].plot(daq_sig,'r',label='daq')
-            ax[0].plot(prairie_sig,'c',label='prairie')
-            ax[0].legend()
            
-          
-
-            if sig!='Locomotion' and sig!='PhotoTrig':
+            if sig!='Locomotion' and sig!='PhotoTrig' and sig!='PhotoStim':
                 
                 transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
                 transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
@@ -303,7 +329,7 @@ class VoltageSignalsExtractions():
 
                 
              #daq phototrigg sometimes oesnt record ghood sigbnal, have an optio to check that here, at the moment hjust use the mode delay   
-            elif sig=='PhotoTrig':
+            elif sig=='PhotoTrig' or sig=='PhotoStim':
                 # transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
                 # transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
                 # if transx.any() and transy.any():
@@ -320,20 +346,23 @@ class VoltageSignalsExtractions():
                 mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] )  
                 corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
                        
-                print(scaling_factor, shift, 'PhotoTrig')
+                print(scaling_factor, shift, sig)
 
                 alldelays[sig]=[volt_delay,scaling_factor]
                 
-                
-            ax[1].plot(corrected_daq_signals[sig],'r',label='daq')
-            ax[1].plot(prairie_sig,'c',label='prairie')
-            ax[1].legend()
-            plt.show()
+            if plot:
+
+                ax[1].plot(corrected_daq_signals[sig],'r',label='daq')
+                ax[1].plot(prairie_sig,'c',label='prairie')
+                ax[1].legend()
+                plt.show()
 
         self.all_signals['Corrected_daq']= corrected_daq_signals
         self.all_signals['Corrected_daq_shifts']=alldelays
 
-    def clip_voltages_to_movie_length(self):
+    def clip_voltages_to_movie_length(self): # this remove the extra voltage after acq trigger end by aligning timestamps of movie and volatge
+        module_logger.info('Clipping voltages to movie lengths')
+
  
         timestamps_video_milisecond=np.array(self.voltage_signals_object.acquisition_object.metadata_object.timestamps['Plane1'])*1000
         timestamps_prairie_milisecond=self.all_signals['Prairie']['LED'].index.values
@@ -375,7 +404,9 @@ class VoltageSignalsExtractions():
         else:
             self.all_planes_clipped_timestamps=self.all_planes_timestamps
             
-    def align_signals_based_on_LED(self):        
+    def align_signals_based_on_LED(self):    
+        module_logger.info('Aligning movie and voltages vased on LED')
+
         
         transitions, result, scaling_factors, shifts, inverted_shifts=self.get_shifts_from_LED_alignment()
         
@@ -384,11 +415,7 @@ class VoltageSignalsExtractions():
         shift_mean= np.round(np.mean(list(inverted_shifts['begining'].values())))
         shift=int(shift_mean)
         scaling_factor=np.mean(list(scaling_factors.values()))
-    
-        self.all_signals['Prairie_movie_length_clipped']
-        self.all_signals['Corrected_daq_movie_length_clipped']
-        
-        
+            
         self.all_signals['Prairie_movie_length_clipped_aligned']={}
         self.all_signals['Corrected_daq_movie_length_clipped_aligned']={}
         for signal,df in self.all_signals['Prairie_movie_length_clipped'].items():
@@ -422,21 +449,38 @@ class VoltageSignalsExtractions():
                 self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal+'_corrections']=corrections    
 
     def get_shifts_from_LED_alignment(self, threshold=0.1):
-
+        # tthis is the fundamental function to align the LED voltage signal to the LED movie artifact
+        #the alignment loos for the led transition in both signalk with split transtiinm correction
+        
         led_prairie=self.all_signals['Prairie_movie_length_clipped']['LED'].values
         mean_mov=sg.medfilt(np.squeeze(self.meanmov), kernel_size=1)
         prairie_LED=sg.medfilt(np.squeeze(led_prairie), kernel_size=1)
         timestamps_video_milisecond=np.array(self.all_planes_timestamps['Plane1'])*1000
-        
+        if len(mean_mov)-len(timestamps_video_milisecond)==1:
+            mean_mov=mean_mov[:-1]
+        elif len(mean_mov)-len(timestamps_video_milisecond)>1:
+            module_logger.info('somthing worng with movi length')
+
+        else:
+            pass
+
+        #set the signlas betwen 0 and one
         mov=(mean_mov-np.min(mean_mov))/(np.max(mean_mov)-np.min(mean_mov))
         sig=(prairie_LED-np.min(prairie_LED))/(np.max(prairie_LED)-np.min(prairie_LED))
+        split_corrected_movie,a,aa,corrections_mov=self.correct_voltage_split_transitions(mov,kernel_size=1)
+        split_corrected_led,b,bb,corrections_vol=self.correct_voltage_split_transitions(sig,kernel_size=1)
         
-        split_corrected_movie,_,_,corrections=self.correct_voltage_split_transitions(mov,kernel_size=1)
-        split_corrected_led,_,_,corrections=self.correct_voltage_split_transitions(sig,kernel_size=1)
+        # self.check_split_transitions(mov,[split_corrected_movie,a,aa,corrections_mov])
+        # self.check_split_transitions(sig, [split_corrected_led,b,bb,corrections_vol])
+
+    
    
+    
         transitions={'movie':{'up':'','down':''},'led':{'up':'','down':''} }
         tracenames=['movie','led']
+        timestamps=[timestamps_video_milisecond,self.all_signals['Prairie_movie_length_clipped']['Time'].values.flatten()]
         
+       
         for i,trace in enumerate([split_corrected_movie,split_corrected_led]):
             for thr in np.array([-1,1])*threshold:
                 if thr==-threshold:
@@ -445,17 +489,26 @@ class VoltageSignalsExtractions():
                 else:
                     tr='up'
                     transitions[tracenames[i]][tr]=np.argwhere(np.diff(trace,prepend=mov[0])>thr).flatten()
+
+        
+        f,ax=plt.subplots(2,sharex=True) 
+        f.suptitle('THIS IS TO CHECK LED SIGNAL-MOVIE ALIGNMENT')
+        titles=['Raw','SplitCorrected']
+        for j,trac in enumerate([[mov,sig],[split_corrected_movie,split_corrected_led]]):
+            ax[j].plot(timestamps_video_milisecond,trac[0],label='movie')
+            ax[j].plot(self.all_signals['Prairie_movie_length_clipped']['Time'],trac[1],label='voltage')
+            ax[j].legend()
+            ax[j].set_title(titles[j])
+            for i,trace in enumerate(trac):
+                for tran in ['up','down']:
+                        ax[j].plot(timestamps[i][transitions[tracenames[i]][tran]],trace[transitions[tracenames[i]][tran]],'o')
+
         transitions['movies_timestamps']={}
         for k,v in transitions['movie'].items():
             transitions['movies_timestamps'][k]=np.array([timestamps_video_milisecond[v][0], timestamps_video_milisecond[v][1] ])
             
-        f,ax=plt.subplots() 
-        ax.plot(timestamps_video_milisecond,split_corrected_movie)
-        ax.plot(self.all_signals['Prairie_movie_length_clipped']['Time'],split_corrected_led)
 
-            
-            
-            
+      
    
         result = {}
         for k1, subdict in transitions.items():
@@ -481,8 +534,8 @@ class VoltageSignalsExtractions():
         shift_mean= np.round(np.mean(list(inverted_shifts['begining'].values())))
            
         plt.close('all')
-        
-        for shift in [shift_up,shift_end,shift_mean]:
+        sh=['shift_up','shift_end','shift_mean']
+        for i,shift in enumerate([shift_up,shift_end,shift_mean]):
             shift=int(shift)
             scaling_factor=np.mean(list(scaling_factors.values()))
              
@@ -490,17 +543,18 @@ class VoltageSignalsExtractions():
             
             shifted_scaled_trace,_,_,corrections=self.correct_voltage_split_transitions(shifted_scaled_trace)
     
-            # f,ax=plt.subplots(2,sharex=True)
-            # ax[0].plot( timestamps_video_milisecond,mov,label='Mov')
-            # ax[0].plot( timestamps_voltage_signals,sig,label='LED')
-            # ax[0].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
-            # ax[0].plot( timestamps_voltage_signals,split_corrected_led,label='Split_LED')
+            f,ax=plt.subplots(2,sharex=True)
+            ax[0].plot( timestamps_video_milisecond,mov,label='Mov')
+            ax[0].plot( self.all_signals['Prairie_movie_length_clipped']['Time'],sig,label='LED')
+            ax[0].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
+            ax[0].plot(  self.all_signals['Prairie_movie_length_clipped']['Time'],split_corrected_led,label='Split_LED')
     
             
-            # ax[1].plot( timestamps_video_milisecond,split_corrected_movie,label='Mov')
-            # ax[1].plot( shifted_voltage_timestamps,shifted_scaled_trace,label='LED')
-            # ax[0].legend()
-            # ax[1].legend()
+            ax[1].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
+            ax[1].plot( shifted_voltage_timestamps,shifted_scaled_trace,label='Shifted Scaled LED ')
+            ax[0].legend()
+            ax[1].legend()
+            f.suptitle(f'{sh[i]}')
    
         tracenames=['shifted_led']
         for i,trace in enumerate([shifted_scaled_trace]):
@@ -534,7 +588,7 @@ class VoltageSignalsExtractions():
             shifted_scaled_trace = scaled_trace[shift:]
         elif shift<0:
             pad_val = scaled_trace[0]
-            temp_padding = np.ones(shift)*pad_val
+            temp_padding = np.ones(abs(shift))*pad_val
             shifted_scaled_trace =np.concatenate([temp_padding,scaled_trace])
             
         shifted_voltage_timestamps=np.arange(len(shifted_scaled_trace))
@@ -764,13 +818,34 @@ class VoltageSignalsExtractions():
             
             
     def proces_spont_visual_signals(self,aligned=False, led_clipped=False):
+        '''
+        HERE IMPORTNAT I HAVE TO MANUALLY ADD THE VIS STIM PROTOCOL FTO THE SQL LITE DATABASE 
+        VisualStimulations_Table add 7 to column (GIve error)
+        havbe to do it through script 
+        TESTOTHERS/PROCESSINGSCRIP/DATABASESCRIPT
         
+        
+        query_mice_cage_update="""
+                        UPDATE VisualStimulations_table
+                        SET VisualStimulationProtocolID=7
+                        WHERE ID IN (137,138,139)
+                    """        
+        params=()   
+        self.voltage_signals_object.acquisition_object.mouse_object.Database_ref.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
+        self.voltage_signals_object.acquisition_object.get_all_database_info()
+        self.check_vis_stim_stimuli_in_database()
+
+        '''
+
+      
         if self.vis_stim_protocol==None:
             for signal_name in ['VisStim']:
                 self.extract_transitions_from_signal(signal_name,aligned=aligned, led_clipped=led_clipped)
                 #here i nedd t o create a switcher for differnet vis stim paradigm
         elif self.vis_stim_protocol=='OptoDrift':
-                self.extract_transitions_optodrift(signal_name,aligned=aligned, led_clipped=led_clipped)
+            for signal_name in ['VisStim']:
+
+                self.extract_transitions_optodrift(signal_name,aligned=aligned, led_clipped=led_clipped,plot=False)
 
         
         
@@ -779,17 +854,19 @@ class VoltageSignalsExtractions():
         
     def extract_transitions_from_signal(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False):
         
-        if aligned:
+        # if sig is acq trigger the ending should be clipped
+        
+        if aligned: # this is for LED aligned moves
             sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal_name].values.flatten()
             sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned'][signal_name].values.flatten()
             signal_name=signal_name+'_aligned'
             
-        elif led_clipped:
+        elif led_clipped: # this is for LED clipped moves
             sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
             sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
             signal_name=signal_name+'_aligned_LEDshifted'
             
-        else:
+        else: # this is for daq_prairie aligned and tail clipped
             sig_daq=self.all_signals['Corrected_daq_movie_length_clipped'][signal_name].values.flatten()
             sig_prairie=self.all_signals['Prairie_movie_length_clipped'][signal_name].values.flatten()
    
@@ -797,8 +874,11 @@ class VoltageSignalsExtractions():
         sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
         
         f,ax=plt.subplots()
-        ax.plot(sig_prairie,'r')
-        ax.plot(sig_daq,'c')
+        ax.plot(sig_prairie,'r',label='prairie')
+        ax.plot(sig_daq,'c',label='daq')
+        f.suptitle(f'{signal_name}')
+        ax.legend()
+        plt.show()
 
 
         
@@ -821,6 +901,11 @@ class VoltageSignalsExtractions():
 
         self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
         
+        # for acq trig there should be up and down for daq and only down for prairie(prairire doesnt record the upvioltage trigger)
+        # for LED there should 2 up and 2 down fro both signals and with a saml diffewrnece of 1 frame maybe)
+        # for Photortige and else signal there should 20 up and 20 down fro both signals and with a saml diffewrnece of 1 frame maybe (60 and 60 if blanmk sweep opto )))
+        # for Photostim and else signal there should 20*optoreps general 400 at 20hx for both up odown prairire and daq This have artound 5 ms misgalignemn t but is not relevant we dont use them and in movie time the are clumped in dame frames
+        # for visstim only applys if no stim whgere ther is onl;y 2 transitions ofr the paradigm if not I had to add the vis stim protocol
         
         
         
@@ -875,7 +960,6 @@ class VoltageSignalsExtractions():
         self.all_downsampled_signals={}
         for key, signal in self.voltage_signals:
             self.all_downsampled_signals[key]=self.resample( signal, factor=self.milisecondscale['Prairie'], kind='linear').squeeze()
-        
         
     def check_vis_stim_stimuli_in_database(self):
         if self.voltage_signals_object.acquisition_object.full_database_dictionary:
@@ -939,13 +1023,35 @@ class VoltageSignalsExtractions():
         
         for stim in range(1,9):
             downsampledarray=np.zeros_like(self.optodrift_info[f'Grat_{stim}']['ArrayFinal'])
+            downsampledarrayoff=np.zeros_like(self.optodrift_info[f'Grat_{stim}']['ArrayFinalOffset'])
+
             for trial in range(20):
                 for rep in range(2):
-                    self.optodrift_info[f'Grat_{stim}']['ArrayFinal'][trial,rep]
+                    # self.optodrift_info[f'Grat_{stim}']['ArrayFinal'][trial,rep]
                     downsampledarray[trial,rep]=np.abs( np.array(timestamps_full_video_milisecond - self.optodrift_info[f'Grat_{stim}']['ArrayFinal'][trial,rep])).argmin()
+                    downsampledarrayoff[trial,rep]=np.abs( np.array(timestamps_full_video_milisecond - self.optodrift_info[f'Grat_{stim}']['ArrayFinalOffset'][trial,rep])).argmin()
+
         
         
             self.optodrift_info[f'Grat_{stim}']['ArrayFinal_downsampled_LED_clipped']=downsampledarray
+            self.optodrift_info[f'Grat_{stim}']['ArrayFinalOffset_downsampled_LED_clipped']=downsampledarrayoff
+
+            
+            
+        downsampledarray=np.zeros_like(self.optodrift_info['Blank']['ArrayFinal'])
+        downsampledarrayoff=np.zeros_like(self.optodrift_info['Blank']['ArrayFinal'])
+
+        for sweep in range(4):
+            for trial in range(20):
+                self.optodrift_info['Blank']['ArrayFinal'][trial,sweep]
+                downsampledarray[trial,sweep]=np.abs( np.array(timestamps_full_video_milisecond - self.optodrift_info['Blank']['ArrayFinal'][trial,sweep])).argmin()
+                downsampledarrayoff[trial,sweep]=np.abs( np.array(timestamps_full_video_milisecond - self.optodrift_info['Blank']['ArrayFinalOffset'][trial,sweep])).argmin()
+
+        
+        
+            self.optodrift_info['Blank']['ArrayFinal_downsampled_LED_clipped']=downsampledarray
+            self.optodrift_info['Blank']['ArrayFinalOffset_downsampled_LED_clipped']=downsampledarrayoff
+
             
             
         self.save_optodrift_info()           
@@ -964,7 +1070,9 @@ class VoltageSignalsExtractions():
                 pickle.dump(self.optodrift_info, fp)
                 
 
-    def extract_transitions_optodrift(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False):
+    def extract_transitions_optodrift(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False, plot=True):
+        #this processes the vis stim optodrift protocl, it is run once on the unaligne signals and save prairie but because i will remove the preled frames is not guseful so it has to be run gaian after finsihnin  alsignklas
+        # only after led clipped should be saved
         plt.close('all')
         optoinfo=self.voltage_signals_object.acquisition_object.visstimdict['opto']
         optoinfo['allrandperm']
@@ -976,9 +1084,12 @@ class VoltageSignalsExtractions():
         blank_volt=9.5
         blank_volt_a=blank_volt-2
         blank_volt_b=blank_volt-1
+        blank_volt_c=blank_volt-3
         orient_volt=np.round(np.linspace(4.6,9,stimnum),1)
         orient_volt_a=orient_volt-2
         orient_volt_b=orient_volt-1
+        orient_volt_c=orient_volt-3
+
         
         self.optodrift_info={}
         for num in range(stimnum):
@@ -992,29 +1103,56 @@ class VoltageSignalsExtractions():
                                             'ArrayInRep':np.zeros([trials,2]).astype(int),
                                             'ArrayInTrial':np.zeros([trials,2]).astype(int),
                                             'ArrayFinal':np.zeros([trials,2]).astype(int),
+                                            'ArrayFinalOffset':np.zeros([trials,2]).astype(int),
+                                            'ArrayInRepOffset':np.zeros([trials,2]).astype(int),
+                                            'ArrayInTrialOffset':np.zeros([trials,2]).astype(int),
                                                  }
             self.optodrift_info['Blank']={'Stimnum':0,
                                    'StimCodes':np.arange(0+2*stimnum+1,4+2*stimnum+1).astype(int),
                                    'FulltrialStart':np.zeros([trials]).astype(int),
                                    'FulltrialEnd':np.zeros([trials]).astype(int),
                                    'ReplStart':np.zeros([trials,4]).astype(int),
-                                   'ReplEnd':np.zeros([trials,4]).astype(int)
+                                   'ReplEnd':np.zeros([trials,4]).astype(int),
+                                   'ArrayInRep':np.zeros([trials,4]).astype(int),
+                                   'ArrayInTrial':np.zeros([trials,4]).astype(int),
+                                   'ArrayFinal':np.zeros([trials,4]).astype(int),
+                                   'ArrayFinalOffset':np.zeros([trials,4]).astype(int),
+                                   'ArrayInRepOffset':np.zeros([trials,4]).astype(int),
+                                   'ArrayInTrialOffset':np.zeros([trials,4]).astype(int),
                                       }
         
-        if aligned:
-            sig_daq=self.all_final_signals['daq']['LED_aligned']['traces'][signal_name].values.flatten()
-            sig_prairie=self.all_final_signals['Prairie']['LED_aligned']['traces'][signal_name].values.flatten()
-            
-        elif led_clipped:
-            sig_daq=self.all_final_signals['daq']['LED_clipped']['traces'][signal_name].values.flatten()
-            sig_prairie=self.all_final_signals['Prairie']['LED_clipped']['traces'][signal_name].values.flatten()
-            
+        if self.all_final_signals:
+            if aligned:
+                sig_daq=self.all_final_signals['daq']['LED_aligned']['traces'][signal_name].values.flatten()
+                sig_prairie=self.all_final_signals['Prairie']['LED_aligned']['traces'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned'
+            elif led_clipped:
+                sig_daq=self.all_final_signals['daq']['LED_clipped']['traces'][signal_name].values.flatten()
+                sig_prairie=self.all_final_signals['Prairie']['LED_clipped']['traces'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned_LEDshifted'
+
+                
+            else:
+                sig_daq=self.all_final_signals['daq']['Movie_length_clipped']['traces'][signal_name].values.flatten()
+                sig_prairie=self.all_final_signals['Prairie']['Movie_length_clipped']['traces'][signal_name].values.flatten()
             
         else:
-            sig_daq=self.all_final_signals['daq']['Movie_length_clipped']['traces'][signal_name].values.flatten()
-            sig_prairie=self.all_final_signals['Prairie']['Movie_length_clipped']['traces'][signal_name].values.flatten()
-            
- 
+            if aligned: # this is for LED aligned moves
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned'
+            elif led_clipped: # this is for LED clipped moves
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned_LEDshifted'
+
+                
+            else: # this is for daq_prairie aligned and tail clipped
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped'][signal_name].values.flatten()
+        
+        
+        
         
         
         signal_prairie_filtered_rounded_corrected,\
@@ -1027,78 +1165,115 @@ class VoltageSignalsExtractions():
         signal_daq_diff_filtered_rounded_corrected_rerounded,\
         signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
  
-  
-        # f,ax=plt.subplots(2)
-        # ax[0].plot(sig_prairie,'r')
-        # ax[0].plot(sig_daq,'c')
-        # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
-        # ax[1].plot(signal_daq_diff_filtered_rounded_corrected,'c')
+        if plot:
+            f,ax=plt.subplots(2)
+            ax[0].plot(sig_prairie,'r')
+            ax[0].plot(sig_daq,'c')
+            ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+            ax[1].plot(signal_daq_diff_filtered_rounded_corrected,'c')
         
+
  
- 
         
-        sigup_pra=np.argwhere(signal_prairie_diff_filtered_rounded_corrected==trial_voltage).flatten()               
-        sigup_daq=np.argwhere(signal_daq_diff_filtered_rounded_corrected==trial_voltage).flatten() 
-        sigdown_pra=np.argwhere(signal_prairie_diff_filtered_rounded_corrected==-trial_voltage).flatten()             
-        sigdown_daq=np.argwhere(signal_daq_diff_filtered_rounded_corrected==-trial_voltage).flatten() 
+        sigup_pra=np.argwhere( abs(signal_prairie_diff_filtered_rounded_corrected-trial_voltage)<=0.6).flatten()               
+        sigup_daq=np.argwhere( abs(signal_daq_diff_filtered_rounded_corrected-trial_voltage)<=0.6).flatten() 
+        sigdown_pra=np.argwhere( abs(signal_prairie_diff_filtered_rounded_corrected+trial_voltage)<=0.6).flatten()             
+        sigdown_daq=np.argwhere( abs(signal_daq_diff_filtered_rounded_corrected+trial_voltage)<=0.6 ).flatten() 
+        
+        sigup_pra_corrected=np.array([tran for tran in sigup_pra if abs(signal_prairie_filtered_rounded_corrected[tran+1]-trial_voltage)<=0.1])
+        sigup_daq_corrected=np.array([tran for tran in sigup_daq if abs(signal_prairie_filtered_rounded_corrected[tran+1]-trial_voltage)<=0.1])
+        sigdown_pra_corrected=np.array([tran for tran in sigdown_pra if abs(signal_prairie_filtered_rounded_corrected[tran-1]-trial_voltage)<=0.1])
+        sigdown_daq_corrected=np.array([tran for tran in sigdown_daq if abs(signal_prairie_filtered_rounded_corrected[tran-1]-trial_voltage)<=0.1])
+
+
         
         
-        # f,ax=plt.subplots()
-        # ax.plot(signal_prairie_diff_filtered_rounded_corrected,'r')
-        # ax.plot(signal_daq_diff_filtered_rounded_corrected,'k',alpha=0.5)
-        # ax.plot(sigup_pra,signal_prairie_diff_filtered_rounded_corrected[sigup_pra],'ro')
-        # ax.plot(sigup_daq,signal_daq_diff_filtered_rounded_corrected[sigup_daq],'ko',alpha=0.5)
-        # ax.plot(sigdown_pra,signal_prairie_diff_filtered_rounded_corrected[sigdown_pra],'ro')
-        # ax.plot(sigdown_daq,signal_daq_diff_filtered_rounded_corrected[sigdown_daq],'ko',alpha=0.5)
-        
+        if plot:
+    
+            f,ax=plt.subplots()
+            ax.plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+            ax.plot(signal_daq_diff_filtered_rounded_corrected,'k',alpha=0.5)
+            ax.plot(sigup_pra_corrected,signal_prairie_diff_filtered_rounded_corrected[sigup_pra_corrected],'ro')
+            ax.plot(sigup_daq_corrected,signal_daq_diff_filtered_rounded_corrected[sigup_daq_corrected],'ko',alpha=0.5)
+            ax.plot(sigdown_pra_corrected,signal_prairie_diff_filtered_rounded_corrected[sigdown_pra_corrected],'ro')
+            ax.plot(sigdown_daq_corrected,signal_daq_diff_filtered_rounded_corrected[sigdown_daq_corrected],'ko',alpha=0.5)
+            
         #extract trialfragemnts
         trialfragments=[]
        
-        trans=list(zip(sigup_pra-1,sigdown_pra+1))
+        trans=list(zip(sigup_pra_corrected-1,sigdown_pra_corrected+1))
  
         
         for tri in range(20):
             trialfragments.append(sig_prairie[trans[tri][1]:trans[tri+1][0]])
- 
             signal_prairie_filtered_rounded_corrected,\
             signal_prairie_diff_filtered_rounded_corrected,\
             signal_prairie_diff_filtered_rounded_corrected_rerounded,\
             signal_prairie_errors_pairs = self.correct_voltage_split_transitions(trialfragments[tri],kernel_size=3)
             
          
- 
-            # f,ax=plt.subplots(2)
-            # ax[0].plot(trialfragments[tri])
-            # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected_rerounded,'r')
+            if plot:
+
+                f,ax=plt.subplots(2,sharex=True)
+                ax[0].plot(trialfragments[tri])
+                ax[1].plot(signal_prairie_diff_filtered_rounded_corrected_rerounded,'r')
             
  
-            blank_sigup_pra=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==blank_volt_a ,
+         
+
+ 
+            blank_sigup_pra=np.argwhere(np.logical_or(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==blank_volt_a ,
                                                                     signal_prairie_diff_filtered_rounded_corrected==blank_volt_b),
-                                                                    signal_prairie_diff_filtered_rounded_corrected==blank_volt)).flatten()   
-                                        
-            blank_sigdown_pra=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==-blank_volt_a ,
-                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt_b),
-                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt)).flatten()   
+                                                                    signal_prairie_diff_filtered_rounded_corrected==blank_volt),
+                                                                   signal_prairie_diff_filtered_rounded_corrected==blank_volt_c)).flatten()   
             
-            blank_reps=list(zip(blank_sigup_pra+1,blank_sigdown_pra+1))
+            blank_sigup_pra_corrected=np.array([tran for tran in blank_sigup_pra if np.round(signal_prairie_filtered_rounded_corrected,1)[tran+1]==blank_volt])
+
+                                        
+            blank_sigdown_pra=np.argwhere(np.logical_or(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==-blank_volt_a ,
+                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt_b),
+                                                                    signal_prairie_diff_filtered_rounded_corrected==-blank_volt),
+                                                                   signal_prairie_diff_filtered_rounded_corrected==-blank_volt_c)).flatten()   
+            
+               
+            blank_sigdown_pra_corrected=np.array([tran for tran in blank_sigdown_pra if np.round(signal_prairie_filtered_rounded_corrected,1)[tran-1]==blank_volt])
+
+            
+            blank_reps=list(zip(blank_sigup_pra_corrected+1,blank_sigdown_pra_corrected+1))
             
             grat_reps=[]
             
             for i in range(len(orient_volt)):
                 
-                up=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==orient_volt_a[i] ,
-                                                                signal_prairie_diff_filtered_rounded_corrected==orient_volt_b[i]),
-                                                                signal_prairie_diff_filtered_rounded_corrected==orient_volt[i])).flatten()      
-                down=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==-orient_volt_a[i] , signal_prairie_diff_filtered_rounded_corrected==-orient_volt_b[i])).flatten()
+                up=np.argwhere(np.logical_or(np.logical_or(np.logical_or( abs(signal_prairie_diff_filtered_rounded_corrected-orient_volt[i])<=0.1 ,
+                                                                 abs(signal_prairie_diff_filtered_rounded_corrected-orient_volt_a[i])<=0.1),
+                                                               abs(signal_prairie_diff_filtered_rounded_corrected-orient_volt_b[i])<=0.1),
+                                                              abs(signal_prairie_diff_filtered_rounded_corrected-orient_volt_c[i])<=0.1)).flatten() 
+                
+                up_corrected=np.array([tran for tran in up if abs(signal_prairie_filtered_rounded_corrected[tran+1]-orient_volt[i])<=0.1])
+
+                
+                
+                
+                down=np.argwhere(np.logical_or( abs(signal_prairie_diff_filtered_rounded_corrected+orient_volt_a[i])<=0.1 ,  abs(signal_prairie_diff_filtered_rounded_corrected+orient_volt_b[i])<=0.1)).flatten()
+                down_corrected=np.array([tran for tran in down if abs(signal_prairie_filtered_rounded_corrected[tran-1]-orient_volt[i])<=0.1])
+
+
  
-                grat_reps.append(list(zip(up+1,down+1)))
+                grat_reps.append(list(zip(up_corrected+1,down_corrected+1)))
                 
             all_reps=sorted(blank_reps+[a for i in grat_reps for a in  i])
             
+            #process blamnnk trials 
+           
+                
+                
+            #get vis stim starting index    
             for i in range(len(orient_volt)):
                 self.optodrift_info[f'Grat_{i+1}']['FulltrialStart'][tri]=trans[tri][1]
                 self.optodrift_info[f'Grat_{i+1}']['FulltrialEnd'][tri]=trans[tri+1][0]
-                stimonsets=np.zeros(2).astype(int)  
+                stimonsets=np.zeros(2).astype(int)
+                stimoffsets=np.zeros(2).astype(int)
                 for j in range(2):
                     start=grat_reps[i][j][1]
                     if all_reps.index(grat_reps[i][j])+1!=20:
@@ -1110,49 +1285,119 @@ class VoltageSignalsExtractions():
                     self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]=start
                         
                     sing_trial=trialfragments[tri][start:fin]
-                
+                    stimoffsets[j]=len(sing_trial)
                 
                         
                     signal_prairie_filtered_rounded_corrected,\
                     signal_prairie_diff_filtered_rounded_corrected,\
                     signal_prairie_diff_filtered_rounded_corrected_rerounded,\
                     signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sing_trial,kernel_size=3)
-                
-           
-        
-                    # f,ax=plt.subplots(2)
-                    # ax[0].plot(sing_trial,'r')
-                    # ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+
+                    if plot:
+                        f,ax=plt.subplots(2)
+                        ax[0].plot(sing_trial,'r')
+                        ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+                        plt.show()
                     
                     if all_reps.index(grat_reps[i][j])+1!=20:
-                        stimonsets[j]=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1 ,
-                                                     signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                        buggy=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1, signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                        stimonsets[j]=buggy[0]
                         
                         self.optodrift_info[f'Grat_{i+1}']['ReplEnd'][tri,j]=fin
  
                         
                     else:
-                        tr=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1 ,
-                                                     signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                        tr=np.argwhere(np.logical_or(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1 ,
+                                                     signal_prairie_diff_filtered_rounded_corrected==-1),
+                                                     signal_prairie_diff_filtered_rounded_corrected==-3)).flatten()
                         stimonsets[j]=tr[0]
                         
                         self.optodrift_info[f'Grat_{i+1}']['ReplEnd'][tri,j]=start+tr[1]
-                        
+               
                     self.optodrift_info[f'Grat_{i+1}']['ArrayFinal'][tri,j]=stimonsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]+self.optodrift_info[f'Grat_{i+1}']['FulltrialStart'][tri]
                     self.optodrift_info[f'Grat_{i+1}']['ArrayInTrial'][tri,j]=stimonsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]
  
-                        
-                self.optodrift_info[f'Grat_{i+1}']['ArrayInRep'][tri,:]=stimonsets
- 
-         
-        f,ax=plt.subplots()
-        ax.plot(sig_prairie,'r')
-        for stim in range(1,2):
-            grating=self.optodrift_info[f'Grat_{stim}']
-            ax.plot(grating['ArrayFinal'],sig_prairie[grating['ArrayFinal']],'o')
-            
+    
+                    self.optodrift_info[f'Grat_{i+1}']['ArrayFinalOffset'][tri,j]=stimoffsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]+self.optodrift_info[f'Grat_{i+1}']['FulltrialStart'][tri]
+                    self.optodrift_info[f'Grat_{i+1}']['ArrayInTrialOffset'][tri,j]=stimoffsets[j]+self.optodrift_info[f'Grat_{i+1}']['ReplStart'][tri,j]
  
 
+                        
+                self.optodrift_info[f'Grat_{i+1}']['ArrayInRep'][tri,:]=stimonsets
+                self.optodrift_info[f'Grat_{i+1}']['ArrayInRepOffset'][tri,:]=stimoffsets
+
+                
+            optostimonsets=np.zeros(2).astype(int)
+            blankstimoffsets=np.zeros(4).astype(int)
+            for k in range(4):
+                self.optodrift_info['Blank']['FulltrialStart'][tri]=trans[tri][1]
+                self.optodrift_info['Blank']['FulltrialEnd'][tri]=trans[tri+1][0]
+                
+                
+                start=blank_reps[k][1]
+                if all_reps.index(blank_reps[k])+1!=20:
+                    fin=all_reps[all_reps.index(blank_reps[k])+1][0]
+                else:
+                    fin=trans[tri+1][0]
+                    
+                       
+                self.optodrift_info['Blank']['ReplStart'][tri,k]=start
+                    
+                sing_trial=trialfragments[tri][start:fin]
+                blankstimoffsets[k]=len(sing_trial)            
+                    
+                signal_prairie_filtered_rounded_corrected,\
+                signal_prairie_diff_filtered_rounded_corrected,\
+                signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+                signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sing_trial,kernel_size=3)
+                if plot:
+                    f,ax=plt.subplots(2)
+                    ax[0].plot(sing_trial,'r')
+                    ax[1].plot(signal_prairie_diff_filtered_rounded_corrected,'r')
+                    plt.show()
+                
+
+                if k<2:
+                    buggy=np.argwhere(np.logical_or(signal_prairie_diff_filtered_rounded_corrected==1, signal_prairie_diff_filtered_rounded_corrected==-1)).flatten()
+                    if buggy.any():
+                        optostimonsets[k]=buggy[0]
+                        print('There are opto blank sweeps')
+                    else:
+                        print('There are not opto blank sweeps, using first grating onset')
+                        optostimonsets[k]= self.optodrift_info['Grat_1']['ArrayInRep'][tri,0]
+
+                    self.optodrift_info['Blank']['ReplEnd'][tri,k]=fin
+                    self.optodrift_info['Blank']['ArrayFinal'][tri,k]=optostimonsets[k]+self.optodrift_info['Blank']['ReplStart'][tri,k]+self.optodrift_info['Blank']['FulltrialStart'][tri]
+                    self.optodrift_info['Blank']['ArrayInTrial'][tri,k]=optostimonsets[k]+self.optodrift_info['Blank']['ReplStart'][tri,k]
+                    self.optodrift_info['Blank']['ArrayInRep'][tri,:2]=optostimonsets
+                    
+                else: 
+                       
+                    self.optodrift_info['Blank']['ArrayFinal'][tri,k]=self.optodrift_info['Blank']['ArrayInRep'][tri,0]+self.optodrift_info['Blank']['ReplStart'][tri,k]+self.optodrift_info['Blank']['FulltrialStart'][tri]
+                    self.optodrift_info['Blank']['ArrayInTrial'][tri,k]=self.optodrift_info['Blank']['ArrayInRep'][tri,0]+self.optodrift_info['Blank']['ReplStart'][tri,k]
+                    self.optodrift_info['Blank']['ArrayInRep'][tri,2:5]=self.optodrift_info['Blank']['ArrayInRep'][tri,:2]
+                    
+                    
+                self.optodrift_info['Blank']['ArrayFinalOffset'][tri,k]=blankstimoffsets[k]+self.optodrift_info['Blank']['ReplStart'][tri,k]+self.optodrift_info['Blank']['FulltrialStart'][tri]
+                self.optodrift_info['Blank']['ArrayInTrialOffset'][tri,k]=blankstimoffsets[k]+self.optodrift_info['Blank']['ReplStart'][tri,k]
+                self.optodrift_info['Blank']['ArrayInRepOffset'][tri,k]=blankstimoffsets[k]
+
+              
+                    
+
+         
+        f,ax=plt.subplots()
+        ax.plot(sig_prairie,'k')
+        colors= ['tab:blue', 'tab:orange', 'tab:green', 'tab:red','tab:purple', 'tab:brown', 'tab:pink', 'tab:olive']
+        for stim in range(1,9):
+            grating=self.optodrift_info[f'Grat_{stim}']
+            ax.plot(grating['ArrayFinal'],sig_prairie[grating['ArrayFinal']],'o', color=colors[stim-1])
+        for sweep in range(4):
+            blank=self.optodrift_info['Blank']
+            ax.plot(blank['ArrayFinal'],sig_prairie[blank['ArrayFinal']],'o', color=colors[sweep+2])
+
+
+            
 
 
 #%% Allen
@@ -1901,8 +2146,12 @@ class VoltageSignalsExtractions():
                 
         diff_voltage_slice_filtered_rounded_corrected = np.diff(voltage_slice_filtered_rounded_corrected)
         diff_voltage_slice_filtered_rounded_corrected_rerounded =np.around(diff_voltage_slice_filtered_rounded_corrected, 1)    
-        
-        return voltage_slice, diff_voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected_rerounded, errors_pairs
+        transitions_list=[voltage_slice_filtered_rounded,diff_voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected_rerounded, errors_pairs]
+        # self.check_split_transitions(voltage_slice,transitions_list)
+        return  voltage_slice_filtered_rounded_corrected,\
+                diff_voltage_slice_filtered_rounded_corrected,\
+                diff_voltage_slice_filtered_rounded_corrected_rerounded, \
+                errors_pairs
 
         
     def check_split_transitions(self,voltage_slice,transitions_list): 
@@ -1913,7 +2162,7 @@ class VoltageSignalsExtractions():
         diff_voltage_slice_filtered_rounded= np.diff(voltage_slice_filtered_rounded)
         diff_voltage_slice_filtered_rounded_rerounded =np.around(diff_voltage_slice_filtered_rounded, 1)
         
-        f,ax=plt.subplots(2)
+        f,ax=plt.subplots(2,sharex=True)
         ax[0].plot(voltage_slice,label='Raw')
         ax[0].plot(voltage_slice_filtered_rounded,label='Filtered rounded')
         ax[0].plot(voltage_slice_filtered_rounded_corrected,label='Filtered rounded Corrected')
@@ -1929,14 +2178,14 @@ class VoltageSignalsExtractions():
             if n==figures-1:
                 indexes=np.arange(n*maxplots,len(errors_pairs),1, 'int')
             fig,axa=plt.subplots(len(indexes), sharex=True)
-            if not isinstance(axa,list):
+            if not isinstance(axa,np.ndarray):
                 axa=[axa]
             for i in  range(len(indexes)) :  
                 l1=axa[i].plot(diff_voltage_slice_filtered_rounded_rerounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
                 l2=axa[i].plot(diff_voltage_slice_filtered_rounded_corrected_rerounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])
     
             fig,axo=plt.subplots(len(indexes), sharex=True)
-            if not isinstance(axo,list):
+            if not isinstance(axa,np.ndarray):
                 axo=[axo]
             for i  in range(len(indexes)) :  
                 axo[i].plot(voltage_slice_filtered_rounded[errors_pairs[indexes[i]][0]-10:errors_pairs[indexes[i]][0]+10])

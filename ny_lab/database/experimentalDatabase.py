@@ -589,6 +589,7 @@ class ExperimentalDatabase():
                      DilutionSensor1,
                      DilutionSensor2,
                      DilutionOpto,
+                     DilutionMarker,
                      CorticalArea,
                      InjectionSites,
                      InjectionSite1Coordinates,
@@ -602,10 +603,10 @@ class ExperimentalDatabase():
                      InjectionSite2pretime,
                      InjectionSite2posttime                     
                    )
-                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) 
+                 VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) 
                """           
 
-        params=((selected_mouse_exp_ID, all_inject_params[1],viruscomb[0][0])+ tuple( (all_inject_params[5:15])+(all_inject_params[17:22])  ))
+        params=((selected_mouse_exp_ID, all_inject_params[1],viruscomb[0][0])+ tuple( (all_inject_params[6:17])+(all_inject_params[19:24])  ))
         self.databse_ref.arbitrary_inserting_record(query_add_injections, params)
         
         return this_injection_id
@@ -665,6 +666,7 @@ class ExperimentalDatabase():
                      DilutionSensor1=?,
                      DilutionSensor2=?,
                      DilutionOpto=?,
+                     DilutionMarker=?,
                      CorticalArea=?,
                      InjectionSites=?,
                      InjectionSite1Coordinates=?,

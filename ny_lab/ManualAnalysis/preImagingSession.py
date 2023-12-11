@@ -134,6 +134,11 @@ class PreImagingSession():
         print(f'cd {self.eyecam_dir_WS2} && dir')
         print(f'cd {self.stimdaq_dir_WS2} && dir')
 
+        print( 'for /d %i in (Mark*) do rmdir /s "%i"\n'
+         'for /d %i in (Single*) do rmdir /s "%i"\n'
+         'for /d %i in (Unintended*) do rmdir /s "%i"\n'
+         'for /d %i in (Tseries*) do rmdir /s "%i"\n'
+         'for /d %i in (Test*) do rmdir /s "%i"\n')
  
 
 
@@ -176,6 +181,7 @@ class PreImagingSession():
 
         for tr in flat_list:
             print(tr)
+        print('echo')
             
     def transfer_sessions(self):
         all_ips=[self.Prairie_IP, self.WS1_IP, self.WS2_IP]
@@ -316,38 +322,9 @@ class PreImagingSession():
 # '''
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20230820'
+    sessiondate='20231201'
     mice=['Test',
-        #   'SPPP',
-        #   'SPPQ',
-        #   'SPPR',
-        #   'SPPT',
-        # 'SPPY',
-        # 'SPPZ',
-        # 'SPQB',
-        # 'SPQC',
-        # 'SPQD',
-        # 'SPQE',
-        # 'SPQF',
-        # 'SPQG',
-        # 'SPQH',
-        # 'SPQI',
-        # 'SPQJ',
-        # 'SPQL',
-        # 'SPQM',
-        # 'SPQU',
-        # 'SPQV',        
-        # 'SPQW',
-        # 'SPQX',
-        # 'SPQZ',
-        # 'SPRA',
-        # 'SPRB',
-        # 'SPRD',
-        # 'SPRE',
-        'SPRM',
-        'SPRN',
-        
- 
+        'SPRZ',
         ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()

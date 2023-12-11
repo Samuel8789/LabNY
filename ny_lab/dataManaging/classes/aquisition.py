@@ -16,6 +16,8 @@ import time
 import itertools
 import scipy.io as spio
 from pathlib import Path
+# import matlab.engine
+import keyboard
 
 from ...AllFunctions.create_dir_structure import create_dir_structure
 from .dataset import ImageSequenceDataset
@@ -829,8 +831,22 @@ class Aquisition:
         self.all_vis_stim_mat_files=glob.glob(self.slow_storage_all_paths['visual stim']+'\\**.mat', recursive=False)
         
     def load_vis_stim_info(self):
+        
+        
         try:
             if self.all_vis_stim_mat_files and self.all_vis_stim_mat_files[0]:
+                # if 'matlab.engine' in sys.modules:        
+                #     eng = matlab.engine.start_matlab()
+                #     eng.addpath(r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\dataManaging\functions',nargout=0)
+                # #testing new versions
+                # #         eng.addpath(r'C:\Users\sp3660\Downloads\caiman_sorter-master',nargout=0)
+
+                #     eng.resave_vis_stim_file(self.all_vis_stim_mat_files[0],nargout=0)
+                   
+                # else:
+                #     print('Cant connect to matlab')
+                    
+                    
                 self.mat = loadmat(self.all_vis_stim_mat_files[0])
                 if 'full_info' in self.mat.keys():
                 

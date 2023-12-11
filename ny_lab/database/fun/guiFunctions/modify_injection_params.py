@@ -38,9 +38,11 @@ class modify_injection_params(tk.Toplevel):
                           'Virus1':'',
                           'Virus2':'',
                           'Virus3':'',
+                          'Virus4':'',
                           'Dilution1':'',
                           'Dilution2':'',
                           'Dilution3':'',
+                          'Dilution4':'',
                           'CorticalArea':1,
                           'InjectionSites':injection_sites,
                           'Injection1Coordinates':4,
@@ -68,10 +70,22 @@ class modify_injection_params(tk.Toplevel):
             if len(virus_dilutions)==3:
                 injection_params['Virus2']=virus_dilutions[1][0]
                 injection_params['Dilution2']=virus_dilutions[1][1]
+            elif len(virus_dilutions)==4:
+                injection_params['Virus2']=virus_dilutions[1][0]
+                injection_params['Dilution2']=virus_dilutions[1][1]
+                injection_params['Virus4']=virus_dilutions[2][0]
+                injection_params['Dilution4']=virus_dilutions[2][1]
+        
         elif len(virus_dilutions)==2:
             injection_params['Virus2']=virus_dilutions[1][0]
             injection_params['Dilution2']=virus_dilutions[1][1]
-        
+        elif len(virus_dilutions)==3:
+            injection_params['Virus2']=virus_dilutions[1][0]
+            injection_params['Dilution2']=virus_dilutions[1][1]
+            injection_params['Virus3']=virus_dilutions[2][0]
+            injection_params['Dilution3']=virus_dilutions[2][1]
+    
+    
         
         self.values=list()
         self.b = list()
@@ -92,16 +106,16 @@ class modify_injection_params(tk.Toplevel):
                 if j==1:
                     self.b[i].append(Entry(self, text="", width=10)) # b[i][j]
                     
-                elif j==8:     
+                elif j==10:     
                     self.b[i].append(ttk.Combobox( self, values=self.good_brain_areas, width=15) ) # b[i][j]
                     self.b[i][j].current(0)
-                elif j in [10,17]:
+                elif j in [12,19]:
                     self.b[i].append(ttk.Combobox( self, values=self.good_coordinates,  width=30) ) # b[i][j]
-                    if j==10:
+                    if j==12:
                         self.b[i][j].current(3)
                     else:
                         self.b[i][j].current(4)
-                elif j in [16,23,24]:        
+                elif j in [18,25,26]:        
                     self.b[i].append(Text(self, height=3, width=25, wrap=WORD))
                 else:
                     self.b[i].append(Entry(self, text="", width=5)) # b[i][j]
@@ -112,11 +126,11 @@ class modify_injection_params(tk.Toplevel):
                 if j==0:
                     self.b[i][j].insert(0, mice_codes[i-1])
                     
-                elif j>0 and j not in [8,10,17,16,23,24]:
+                elif j>0 and j not in [10,12,19,18,25,26]:
                     self.b[i][j].insert(0, row_defaults[j])
                     
                     
-                if j in [16,23,24]:
+                if j in [18,25,26]:
                     self.values[i].append(self.b[i][j].get("1.0",END))
                 else :             
                     self.values[i].append(self.b[i][j].get())   
@@ -128,15 +142,15 @@ class modify_injection_params(tk.Toplevel):
     def retrieve_input(self):
         for i in range(1,self.total_rows+1): #Rows
             for j in range(len(self.col_labels)): #Columns            
-                if j in [16,23,24]:
+                if j in [18,25,26]:
                     self.values[i][j]=self.b[i][j].get("1.0",END)
                 else :             
                     self.values[i][j]=self.b[i][j].get()      
                 
         for i in range(1,len( self.values)):
-            self.values[i][8]= self.good_brain_areas.index(self.values[i][8])+1
-            self.values[i][10]= self.good_coordinates.index(self.values[i][10])+1
-            self.values[i][17]= self.good_coordinates.index(self.values[i][17])+1
+            self.values[i][10]= self.good_brain_areas.index(self.values[i][10])+1
+            self.values[i][12]= self.good_coordinates.index(self.values[i][12])+1
+            self.values[i][19]= self.good_coordinates.index(self.values[i][19])+1
 
         self.destroy()
         self.update()

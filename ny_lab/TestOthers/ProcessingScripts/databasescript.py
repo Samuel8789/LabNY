@@ -225,20 +225,27 @@ MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
 #%% removals
 query_remove="""
 DELETE FROM ExperimentalAnimals_table
-WHERE  ID IN (392,393,394,395,396)
+WHERE  ID IN (487)
 
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
 
 query_remove="""
-DELETE FROM VirusCombinations_table
-WHERE  ID IS NULL
+DELETE FROM Injections_table
+WHERE  ID IS 366
 
 """
 params=()
 MouseDat.arbitrary_remove_record(query_remove, params, commit=True)
 
+query_mice_cage_update="""
+                UPDATE MICE_table
+                SET Experimental_Code=Null, Experimental_Status=1
+                WHERE Experimental_Code="487"
+            """        
+params=()   
+MouseDat.arbitrary_updating_record(query_mice_cage_update, params, commit=True)
 
 
 #%% adding ne columns

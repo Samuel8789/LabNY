@@ -205,7 +205,7 @@ class MouseDatabase():
     def database_backup(self):
         backuppath=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\DatabaseBackups'
         backuppath_dropbox=os.path.join(self.LabProjectObject.all_paths_for_this_system['Dropbox'],Path('LabNY/DatabaseBackups'))
-        backuppath_F=r'F:\Projects\LabNY\DatabaseBackups'
+        backuppath_F=r'J:\Projects\LabNY\DatabaseBackups'
         if self.LabProjectObject.platform=='win32':
             list_of_backups = glob.glob(backuppath_dropbox+'\\*') # * means all if need specific format then *.csv
         elif self.LabProjectObject.platform=='linux':

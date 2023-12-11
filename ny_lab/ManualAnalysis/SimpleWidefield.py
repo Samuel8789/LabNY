@@ -59,8 +59,8 @@ dirpath=r'C:\Users\sp3660\Documents\Projects\LabNY\Amsterdam\Data'
 opts_dict={}
 firstnondelay=''
 
-session='20230826'
-foldername='26-Aug-2023_1'
+session='20230831'
+foldername='31-Aug-2023_4'
 nosignal=['28-May-2023_6', '29-May-2023_3','29-May-2023_13']
 check_signal=False
 dataPath=os.path.join(dirpath,session,foldername)
@@ -102,7 +102,7 @@ if not opts_dict:
     opts_dict['stimLine']=1 #analog line that contains stimulus trigger.(RIght now this is not working)
     opts_dict['trigLine']=[2,3] #analog lines for blue and violet light triggers.
     opts_dict['preStim']=2 #pre-stimulus duration in seconds
-    opts_dict['postStim']=6 #post-stimulus duration in seconds
+    opts_dict['postStim']=13 #post-stimulus duration in seconds
     opts_dict['fRate']=30 #sampling rate in Hz
     opts_dict['sRate']=opts_dict['fRate']/2 #sampling rate in Hz
     opts_dict['preStimfr'] = int(np.ceil(opts_dict['preStim'] * opts_dict['sRate']))
@@ -169,8 +169,10 @@ if (not alldata.any()) or (not goodtrials.any()):
             
             #chek if stimon signal
             if check_signal:
-                plot(analog[1,:])
-                show()
+                f,ax=plt.subplots(analog.shape[0],sharex=True)
+                for i in range(analog.shape[0]):
+                   ax[i].plot(analog[i,:])
+
             
             
             
@@ -207,7 +209,7 @@ if (not alldata.any()) or (not goodtrials.any()):
 
         
             if opts_dict['stimONsignal']:
-                stimon=np.where(diff(zscore(analog[1,:]))>1)
+                stimon=np.where(diff(zscore(analog[1,:]))>2)
                 stimonframe=np.argmin(abs(ffrm-stimon))
                 # blueframes[np.argmin(abs(ffrm-stimon))]  
             else:
@@ -452,3 +454,20 @@ ax.set_title('Average change over selected area',fontsize = 40,weight='bold')
 ax.vlines(0,min(men),max(men),color='black',linestyles ='dashed')
 ax.set_xlabel('Time (s)',fontsize = 30)
 ax.set_ylabel('ΔF/F (%)',fontsize = 30)
+
+#%% mapping analysis
+initstimOn = int((opts_dict['preStim']*opts_dict['sRate'])) #frames before stimulus onset
+
+if opts_dict['Delay']:
+    stimOn=44
+    stimOn=31
+else:
+    stimOn=int((opts_dict['preStim']*opts_dict['sRate']))
+
+avgMap = alldata[:,:,stimOn+1:stimOn+10,goodtrials[2]].mean(axis=(2))
+
+f,ax=plt.subplots(1,2,figsize=(24,12))
+f.set_tight_layout(True)
+im=ax[0].imshow(avgMap,cmap='inferno')
+f.colorbar(im,ax=ax[0],shrink=0.5, orientation='horizontal',label='ΔF/F (%)')
+ax[0].set_title('Stimulus-triggered activity')
