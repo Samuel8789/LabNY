@@ -19,13 +19,13 @@ mmapfilepath=Path(glob.glob(acqdir+os.sep+'**.mmap')[0])
 tiffilename=mmapfilepath.stem + '_'+acqdir[acqdir.find('planes'+os.sep+'Plane')+14:-1]+'.tiff'
 
 
-acqdir=r'/home/sp3660/Desktop/CaimanTemp'
+acqdir=os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp')
 mmapfilepath=Path(glob.glob(acqdir+os.sep+'**ACID**.mmap')[0])
 tiffilename=mmapfilepath.stem + '_'+'green.tiff'
 
 
 # desktop=r'C:\Users\sp3660\Desktop\MoviesToCheck'
-desktop=r'/home/sp3660/Desktop/MoviesToCheck'
+desktop=os.path.join(os.path.expanduser('~'),r'Desktop/MoviesToCheck')
 
 
 denoisedname='240118_SPSM_FOV1_2z_ShortDrift_AllCell_617optoFulp_25x_920_51020_60745_with-000_plane1_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_20856_denoised.mmap'

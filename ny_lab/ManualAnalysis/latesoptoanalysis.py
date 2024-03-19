@@ -1177,7 +1177,7 @@ def plot_nono_opto_single_trials(transition_array,optocellindex_dict,activity_di
 all_analysis=selected_analysis
 selected=all_analysis[0]
 multiple_analysis=None
-tempprocessingpat= r'/home/sp3660/Desktop/TempPythonObjects'
+tempprocessingpat= os.path.join(os.path.expanduser('~'),r'Desktop/TempPythonObjects')
 experimentalmousename= selected['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name
 
 #check for mul.tiple mice

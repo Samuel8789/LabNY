@@ -12,7 +12,7 @@ from PIL import Image, ImageTk
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 from pathlib import Path
-
+import os
 class DataPanel(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
@@ -453,7 +453,7 @@ class BackgroundPanel(tk.Frame):
         self.weighted_components_button.config(relief="sunken")
         self.w_comp_bkg_button.config(relief="groove")
         # select image to plot
-        selected_image=plt.imread('/home/sp3660/Pictures/Spyder.png')
+        selected_image=plt.imread(os.path.join(os.path.expanduser('~'),'Pictures/Spyder.png'))
 
         # run method to plot image
         self.master.master.center_notebook_panel.tab1.update_images(selected_image)
@@ -464,7 +464,7 @@ class BackgroundPanel(tk.Frame):
         self.weighted_components_button.config(relief="groove")
         self.w_comp_bkg_button.config(relief="sunken")
         # select image to plot
-        selected_image=plt.imread('/home/sp3660/Pictures/Spyder.png')
+        selected_image=plt.imread(os.path.join(os.path.expanduser('~'),'Pictures/Spyder.png'))
 
         # run method to plot image
         self.master.master.center_notebook_panel.tab1.update_images(selected_image)

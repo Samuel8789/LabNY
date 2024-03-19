@@ -172,7 +172,7 @@ class BidiShiftManager:
 
         elif self.raw_dataset_object:
             # self.temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
-            self.temporary_path=r'/home/sp3660/Desktop//TemporaryProcessing'
+            self.temporary_path=os.path.join(os.path.expanduser('~'),r'Desktop//TemporaryProcessing')
 
             pass
 

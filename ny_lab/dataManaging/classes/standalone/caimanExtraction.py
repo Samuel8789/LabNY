@@ -53,8 +53,8 @@ class CaimanExtraction():
                  galois=False):
         
         module_logger.info('Instantiating ' +__name__)
-        self.temp_path=r'/home/sp3660/Desktop/CaimanTemp'
-        self.galoistempdir='/home/sp3660/Desktop/caiman_temp'
+        self.temp_path=os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp')
+        self.galoistempdir=os.path.join(os.path.expanduser('~'),r'Desktop/caiman_temp')
         self.cnm_object=None
         self.dataset_object=dataset_object
         self.deep=deep
@@ -503,7 +503,8 @@ class CaimanExtraction():
             processing_duration = time.time() - start_processing
             print('Processing Finsihed: {}'.format(processing_duration/60))
             
-            cmd="ls  '/home/sp3660/Desktop/caiman_temp' | grep \.hdf5" 
+            cmd=f"ls  {os.path.join(os.path.expanduser('~'),r'Desktop/caiman_temp')} | grep \.hdf5" 
+            
             stdin, stdout, stderr = ssh.exec_command(cmd)
             channel = stdout.channel
             status = channel.recv_exit_status()
@@ -518,7 +519,7 @@ class CaimanExtraction():
             self.cnm_object=cnmf.cnmf.load_CNMF(hdf5destination)
             
             
-            cmd="rm -rf '/home/sp3660/Desktop/caiman_temp/*' " 
+            cmd="rm -rf {os.path.join(os.path.expanduser('~'),r'Desktop/caiman_temp*)} " 
             stdin, stdout, stderr = ssh.exec_command(cmd)
             
             filelist = glob.glob(os.path.join(self.temp_path, "*"))

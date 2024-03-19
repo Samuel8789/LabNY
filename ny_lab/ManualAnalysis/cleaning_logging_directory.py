@@ -14,7 +14,7 @@ from datetime import date
 
 def clean_up_logging_dir():
     today = date.today()
-    path=r'/home/sp3660/Dropbox/Projects/LabNY/Logging'
+    path=os.path.join(os.path.expanduser('~'),r'Dropbox/Projects/LabNY/Logging')
     
 
 

@@ -7,17 +7,17 @@ Created on Sun May 23 10:17:25 2021
 """
 import logging 
 logger = logging.getLogger(__name__)
+import os
 
 import sys
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/MainClasses')
-sys.path.insert(0, r'/home/sp3660/Documents/Github/LabNY/AllFunctions')
-sys.path.insert(0, r'/home/sp3660/Documents/Github/LabNY/MainClasses')
+sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents/Github/LabNY/AllFunctions'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents/Github/LabNY/MainClasses'))
 # import tkinter as Tkinter
 import pandas as pd
 import numpy as np
 import datetime
-import os
 import glob
 
 from .fun.guiFunctions.addSessionInfo import AddSessionInfo
@@ -621,7 +621,7 @@ class ImagingDatabase():
         
         len(all_dfs[0])+3
         
-        with pd.ExcelWriter(os.path.join(r'/home/sp3660/Desktop/Temp_Excel_Files' ,'MouseInfo_{0}_cages({1}).xlsx'.format(datetime.date.today().strftime("%Y%m%d"), str(cage_list)  )),engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(os.path.join(os.path.join(os.path.expanduser('~'),r'Desktop/Temp_Excel_Files' ),'MouseInfo_{0}_cages({1}).xlsx'.format(datetime.date.today().strftime("%Y%m%d"), str(cage_list)  )),engine='xlsxwriter') as writer:
             for i, df in enumerate(all_dfs):
                 df.to_excel(writer,sheet_name='Imaging',startrow=i*(len(all_dfs[0])+3) , startcol=0)
                 

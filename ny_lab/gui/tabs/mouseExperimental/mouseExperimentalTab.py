@@ -246,7 +246,7 @@ class MouseExperimentalTab(tk.Frame):
 
             selectedinjections=self.gui_ref.MouseDat.Experimental_class.all_mouse_to_do_injection.loc[self.gui_ref.MouseDat.Experimental_class.all_mouse_to_do_injection['Code'].isin(selected_codes)]
             selectedinjectionsinfo=selectedinjections[['Code','Lab_Number','Sex','Cage','Age','Line_Short','Projects','Labels_types']]
-            selectedinjectionsinfo.to_excel(os.path.join(r'/home/sp3660/Desktop/Temp_Excel_Files' ,'InfoForInjectionTemplates_{0}.xlsx'.format(datetime.date.today().strftime("%Y%m%d") )))
+            selectedinjectionsinfo.to_excel(os.path.join(os.path.join(os.path.expanduser('~'),r'Desktop/Temp_Excel_Files') ,'InfoForInjectionTemplates_{0}.xlsx'.format(datetime.date.today().strftime("%Y%m%d") )))
             
             
             # Path()

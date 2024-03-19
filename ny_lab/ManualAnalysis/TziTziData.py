@@ -66,7 +66,7 @@ def loadmat(filename):
     return _check_keys(data)
 
 #%%
-stempth=Path(r'/home/sp3660/Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi/ChC_Data_Elec_Visual_Stim/')
+stempth=Path(os.path.join(os.path.expanduser('~'),r'Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi/ChC_Data_Elec_Visual_Stim/'))
 dtsets=['1_17Junio2023_chandelier,solo Estim, sin control','2_21Junio2023_Chandelier','4_21Agosto2023_chande','5_24Agosto2023_Chande','6_17Nov2013_Chande']
 treatlists=[['Estim'],['Control', 'Estim'],['Control', 'Estim', 'Vstim', 'Vtim_Estim']]
 
