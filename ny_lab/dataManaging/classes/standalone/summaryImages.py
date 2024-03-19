@@ -133,10 +133,10 @@ class SummaryImages:
         self.shifted_projections=[]
         self.mc_projections=[]
         
-        self.mc_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**Movie**OnACID**projection.tiff')
-        self.shifted_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**Movie**[^OnACID]**projection.tiff')
+        self.mc_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+os.sep+'**Movie**OnACID**projection.tiff')
+        self.shifted_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+os.sep+'**Movie**[!OnACID]**projection.tiff')
 
-        self.custom_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+'\\**custom**projection.tiff')
+        self.custom_projections=glob.glob( self.dataset_object.selected_dataset_mmap_path+os.sep+'**custom**projection.tiff')
         self.all_projections= self.mc_projections+self.shifted_projections
         if self.custom_projections:
             self.all_projections=self.custom_projections

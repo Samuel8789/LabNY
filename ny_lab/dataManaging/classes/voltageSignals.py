@@ -229,14 +229,14 @@ class VoltageSignals():
                             
 
     def check_for_csv_raw(self):
-            self.voltage_recording_raw_file_full_paths=[file for file in glob.glob(os.path.join(self.acquisition_object.aquisition_path, self.acquisition_object.aquisition_name)+'\\**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
+            self.voltage_recording_raw_file_full_paths=[file for file in glob.glob(os.path.join(self.acquisition_object.aquisition_path, self.acquisition_object.aquisition_name)+os.sep+'**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
             if  self.voltage_recording_raw_file_full_paths:
                 self.voltage_recording_raw_file_full_path= self.voltage_recording_raw_file_full_paths[0]
             else:
                 self.voltage_recording_raw_file_full_path=None
                 
     def check_for_daq_raw(self):
-            self.voltage_recording_extra_daq_full_paths= glob.glob(os.path.join(self.acquisition_object.aquisition_path, 'ExtraDaq')+'\\**.mat', recursive=False) 
+            self.voltage_recording_extra_daq_full_paths= glob.glob(os.path.join(self.acquisition_object.aquisition_path, 'ExtraDaq')+os.sep+'**.mat', recursive=False) 
             if  self.voltage_recording_extra_daq_full_paths:
                 self.voltage_recording_extra_daq_full_path= self.voltage_recording_extra_daq_full_paths[0]
             else:
@@ -245,7 +245,7 @@ class VoltageSignals():
     def check_for_csv_slow(self):
             
             self.voltage_recording_raw_file_slow_path=self.acquisition_object.slow_storage_all_paths['raw_volatge_csv']    
-            self.voltage_recording_raw_file_slow_full_file_paths=glob.glob(self.voltage_recording_raw_file_slow_path+'\\**.csv', recursive=False)           
+            self.voltage_recording_raw_file_slow_full_file_paths=glob.glob(self.voltage_recording_raw_file_slow_path+os.sep+'**.csv', recursive=False)           
             if  self.voltage_recording_raw_file_slow_full_file_paths:
                 self.voltage_recording_raw_file_slow_full_file_path= self.voltage_recording_raw_file_slow_full_file_paths[0]
             else:
@@ -254,7 +254,7 @@ class VoltageSignals():
     def check_for_daq_slow(self):
             
             self.voltage_recording_extra_daq_slow_path=self.acquisition_object.slow_storage_all_paths['voltage_signals_daq']   
-            self.voltage_recording_extra_daq_slow_full_file_paths=glob.glob( self.voltage_recording_extra_daq_slow_path+'\\**.mat', recursive=False) 
+            self.voltage_recording_extra_daq_slow_full_file_paths=glob.glob( self.voltage_recording_extra_daq_slow_path+os.sep+'**.mat', recursive=False) 
 
             if  self.voltage_recording_extra_daq_slow_full_file_paths:
                 self.voltage_recording_extra_daq_slow_full_file_path= self.voltage_recording_extra_daq_slow_full_file_paths[0]    

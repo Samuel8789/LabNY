@@ -32,6 +32,8 @@ class Mouse:
         self.raw_imaging_sessions_objects={}
 
         self.mouse_name=Mouse_Name
+        if Mouse_Name=='SPST':
+            print('stop')
         module_logger.info('Loading Mouse ' +self.mouse_name)
 
         self.LabNY_object=LabNY_object
@@ -42,10 +44,15 @@ class Mouse:
         self.all_mouse_inf=mouse_info
         #%% HERES IS WHEN CHANGING DISCS 
         if not cloud:
-            self.mouse_slow_subproject_path =self.all_mouse_inf.iloc[0]['SlowStoragePath']
-            # self.mouse_slow_subproject_path=self.mouse_slow_subproject_path.replace('\\?\D:\Projects', '\\?\F:\Projects')
+            self.mouse_slow_subproject_path_db =self.all_mouse_inf.iloc[0]['SlowStoragePath']
+            # # self.mouse_slow_subproject_path=self.mouse_slow_subproject_path.replace('\\?\D:\Projects', '\\?\F:\Projects')
+            self.mouse_working_subproject_path_db=self.all_mouse_inf.iloc[0]['WorkingStoragePath']
             
-            self.mouse_working_subproject_path=self.all_mouse_inf.iloc[0]['WorkingStoragePath']
+         
+            self.mouse_slow_subproject_path =self.data_managing_object.transform_databasepath_tolinux( self.mouse_slow_subproject_path_db)
+            self.mouse_working_subproject_path=self.data_managing_object.transform_databasepath_tolinux( self.mouse_working_subproject_path_db)
+
+            
     
             create_dir_structure( self.mouse_slow_subproject_path , Mouse.level0_structure)
             create_dir_structure(os.path.join( self.mouse_slow_subproject_path ,'surgeries'), Mouse.surgeries_structure)

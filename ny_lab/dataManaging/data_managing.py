@@ -12,7 +12,7 @@ import shutil
 import tkinter as Tkinter
 from distutils.dir_util import copy_tree
 import logging 
-
+from pathlib import Path
 
 
 module_logger  = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ class DataManaging():
         self.Database_ref=self.LabProjectObject.database
         # self.update_all_imaging_data_paths()
         if full:
-            self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data\Mice_Projects', r'Working_Mice_Data_1\Mice_Projects', r'Working_Mice_Data_2\Mice_Projects', r'Full_Mice_Pre_Processed_Data\Mice_Projects', 'Imaging']
+            self.data_paths=['Imaging', r'Full_Mice_Pre_Processed_Data'+os.sep+'Mice_Projects', r'Working_Mice_Data_1'+os.sep+'Mice_Projects', r'Working_Mice_Data_2'+os.sep+'Mice_Projects', r'Full_Mice_Pre_Processed_Data'+os.sep+'Mice_Projects', 'Imaging']
             self.data_paths_data={name:os.path.join(self.LabProjectObject.data_paths_project[name], self.data_paths[i])  for i , name in enumerate(self.LabProjectObject.data_paths_names)}     
     
             
@@ -74,6 +74,7 @@ class DataManaging():
             self.build_all_paririe_session_from_database()
             self.all_existing_unprocessed_sessions=[]
             self.all_existing_unprocessed_session2={}
+
             self.read_all_imaging_sessions_not_in_database()
             self.all_existing_sessions_not_database_objects={}
             self.build_all_prairie_sessions_not_in_database()
@@ -91,9 +92,9 @@ class DataManaging():
             
             module_logger.info('Reading directory structure')
             self.read_all_data_path_structures()
+            self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
             
                     
-            self.update_pre_process_slow_data_structure() # this adds new mouse folders to K(altern F) after new experimental mice are added
             module_logger.info('Data managing done')
             print('Data managing done')
         else:
@@ -351,17 +352,66 @@ class DataManaging():
 #%% prairrie session prcessing   
  #%% reading sessions                                      
     def read_all_imaging_sessions_from_directories(self):
-        self.all_existing_sessions={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw']+'\\**\\**', recursive=False)}
-        self.all_existing_sessions2={session[len(session)-8:]:'\\\?\\'+session for session in glob.glob( self.data_paths_data['Raw2']+'\\**\\**', recursive=False)}
+        multidirwild=os.sep+'**'+os.sep+'**'
+        longpathstr=os.sep+os.sep+os.sep+'?'+os.sep+os.sep
+        
+        
+        self.all_existing_sessions={session[len(session)-8:]:session for session in glob.glob( self.data_paths_data['Raw']+multidirwild, recursive=False)}
+        self.all_existing_sessions2={session[len(session)-8:]:session for session in glob.glob( self.data_paths_data['Raw2']+multidirwild, recursive=False)}
         self.all_existing_sessions.update(self.all_existing_sessions2)
- 
  
     def read_all_imaging_sessions_from_database(self): 
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
         self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
         
+    def transform_databasepath_tolinux(self,windows_path):    
+        longpathstr=os.sep+os.sep+os.sep+'?'+os.sep+os.sep
+        if not windows_path:
+            print('problem')
+        if ':' in windows_path:
+
+            if r'F:' in windows_path:
+                drive=r'F:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+                
+            elif r'J:' in windows_path:
+                drive=r'j:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+    
+            elif r'I:' in windows_path:
+                drive=r'I:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw2']
+                  
+            elif r'K:' in windows_path:
+                drive=r'K:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
+                
+            elif r'C:' in windows_path:
+                drive=r'C:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_1']
+            
+            elif r'G:' in windows_path:
+                drive=r'G:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_2']
+            
+            elif r'D:' in windows_path:
+                drive=r'D:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_interneurons_others']
+                    
+      
+                
+            linux_path=newstem+windows_path[windows_path.find(drive)+2:].replace('\\','/')
+        else:
+            linux_path=windows_path
+            
+        return linux_path
+
+        
     def read_all_imaging_sessions_not_in_database(self):     
-        test=[session[2] for session in self.all_existing_sessions_database]
+        
+        
+        test=[self.transform_databasepath_tolinux(session[2] ) for session in self.all_existing_sessions_database]
+
         self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in test]
         # this ignores jesus and hakim sessions any folder with name sin it
         thresholdforsession=datetime.datetime.strptime('20220630','%Y%m%d') #arbitrary dynamic
@@ -397,14 +447,14 @@ class DataManaging():
 #%% reading data_path_structures
 
     def read_all_data_path_structures(self):
-        self.mouse_data_structure_paths={name: [file for file in  glob.glob(self.data_paths_data[name]+'\\**\\SP**', recursive=True) if len(file)<120] 
+        self.mouse_data_structure_paths={name: [file for file in  glob.glob(self.data_paths_data[name]+os.sep+'**'+os.sep+'SP**', recursive=True) if len(file)<120] 
                                          for i , name in enumerate(self.LabProjectObject.data_paths_names) if 'Raw' not in name}
         
         self.mouse_data_structure_paths_mouse_codes={name: [i[-4:] for i in self.mouse_data_structure_paths[name]] 
                                                      for i , name in enumerate(self.mouse_data_structure_paths.keys()) }
         
         
-        self.mouse_data_structure_projects_mouse_codes={name: {  self.mouse_data_structure_paths_mouse_codes[name][i]   :j[j.find('\\Mice_Projects\\')+15:j.find('\\Mice_Projects\\')+41][:j[j.find('\\Mice_Projects\\')+15:j.find('\\Mice_Projects\\')+41].find('\\')] for i, j in enumerate(self.mouse_data_structure_paths[name])} for  name in self.mouse_data_structure_paths.keys()}
+        self.mouse_data_structure_projects_mouse_codes={name: {  self.mouse_data_structure_paths_mouse_codes[name][i]   :j[j.find('Mice_Projects'+os.sep)+15:j.find('\\Mice_Projects'+os.sep)+41][:j[j.find('\\Mice_Projects'+os.sep)+15:j.find('\\Mice_Projects'+os.sep)+41].find(''+os.sep)] for i, j in enumerate(self.mouse_data_structure_paths[name])} for  name in self.mouse_data_structure_paths.keys()}
         
         self.mouse_data_structure_paths={name:{i[-4:]: i for i in self.mouse_data_structure_paths[name] }
             for  name in self.mouse_data_structure_paths.keys()}
@@ -549,8 +599,8 @@ class DataManaging():
 
         for mouse in all_mouse_info:
 
-            slow_path='\\\\?\\'+ mouse[2]
-            fast_path='\\\\?\\'+ mouse[3]
+            slow_path='\\\\?'+os.sep+ mouse[2]
+            fast_path='\\\\?'+os.sep+ mouse[3]
             
             recursively_copy_changed_files_and_directories_from_slow_to_fast(slow_path, fast_path)
             recursively_eliminate_empty_folders(fast_path)
@@ -592,7 +642,43 @@ class DataManaging():
         self.update_all_imaging_data_paths()
         
         
+    def create_linux_mouse_path(self, windows_path):
         
+        if ':' in windows_path:
+
+            if r'F:' in windows_path:
+                drive=r'F:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+                
+            elif r'J:' in windows_path:
+                drive=r'j:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+    
+            elif r'I:' in windows_path:
+                drive=r'I:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw2']
+                  
+            elif r'K:' in windows_path:
+                drive=r'K:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
+                
+            elif r'C:' in windows_path:
+                drive=r'C:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_1']
+            
+            elif r'G:' in windows_path:
+                drive=r'G:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_2']
+            
+            elif r'D:' in windows_path:
+                drive=r'D:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_interneurons_others']
+                
+            linux_path=newstem+windows_path[windows_path.find(drive)+2:].replace('\\','/')
+        else:
+            linux_path=windows_path
+            
+            return linux_path
 
     def update_all_imaging_data_paths(self) :
         print('Correcting database paths for projects')
@@ -624,7 +710,7 @@ class DataManaging():
                 if imaged_mice_info:
                     for imaged_mouse in imaged_mice_info:
                         sessiondate=imaged_mouse[-1][imaged_mouse[-1].find('Mice')-9:imaged_mouse[-1].find('Mice')-1]
-                        imaged_mouse_relative_path='imaging\\'+sessiondate
+                        imaged_mouse_relative_path='imaging'+os.sep+sessiondate
                         new_slow_imaged_mice_path= os.path.join(mouse_SlowStoragePath , imaged_mouse_relative_path)
                         new_fast_imaged_mice_path= os.path.join(mouse_WorkingStoragePath , imaged_mouse_relative_path) 
                         isSlowStorage=os.path.isdir(new_slow_imaged_mice_path)
@@ -647,7 +733,7 @@ class DataManaging():
                         all_widefields_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_widefields,params).values.tolist()
                         if all_widefields_info:
                             for widefield in all_widefields_info:                                
-                                widefield_relative_path='widefield image\\' + widefield[-1]                               
+                                widefield_relative_path='widefield image'+os.sep + widefield[-1]                               
                                 new_slow_widefield_path= os.path.join(new_slow_imaged_mice_path , widefield_relative_path)
                                 new_fast_widefield_path= os.path.join(new_fast_imaged_mice_path , widefield_relative_path)
                                 isSlowStorage=os.path.isfile(new_slow_widefield_path)
@@ -688,29 +774,29 @@ class DataManaging():
                                 
                                     if not aqc[7]:
                                         if aqc[8]:
-                                            acquisiton_relative_path= '0Coordinate acquisition\\' + imaging_name[1]
+                                            acquisiton_relative_path= '0Coordinate acquisition'+os.sep + imaging_name[1]
                                         elif aqc[6]:
-                                            acquisiton_relative_path= 'test aquisitions\\' + imaging_name[1]
+                                            acquisiton_relative_path= 'test aquisitions'+os.sep + imaging_name[1]
                                         elif aqc[9]:
-                                            fov_relative_path= 'data aquisitions\\{}\\'.format(aqc[5][aqc[5].find('FOV_'):aqc[5].find('FOV_')+5])
+                                            fov_relative_path= 'data aquisitions\\{}'+os.sep.format(aqc[5][aqc[5].find('FOV_'):aqc[5].find('FOV_')+5])
                                             
                                             if aqc[10]:
-                                                acquisiton_relative_path= fov_relative_path+ 'SurfaceImage\\' + imaging_name[1]
+                                                acquisiton_relative_path= fov_relative_path+ 'SurfaceImage'+os.sep + imaging_name[1]
                                             elif '1050_Tomato' in aqc[5]:
-                                                acquisiton_relative_path= fov_relative_path+'1050_Tomato\\' + imaging_name[1]
+                                                acquisiton_relative_path= fov_relative_path+'1050_Tomato'+os.sep + imaging_name[1]
                                             elif '1050_3PlaneTomato' in aqc[5]:
-                                                acquisiton_relative_path= fov_relative_path+'1050_3PlaneTomato\\' + imaging_name[1]
+                                                acquisiton_relative_path= fov_relative_path+'1050_3PlaneTomato'+os.sep + imaging_name[1]
                                             elif '1050_HighResStackTomato' in aqc[5]:
-                                                acquisiton_relative_path=fov_relative_path+ '1050_HighResStackTomato\\' + imaging_name[1]
+                                                acquisiton_relative_path=fov_relative_path+ '1050_HighResStackTomato'+os.sep + imaging_name[1]
                                             elif 'HighResStackGreen' in aqc[5]:
-                                                acquisiton_relative_path=fov_relative_path+ 'HighResStackGreen\\' + imaging_name[1]
+                                                acquisiton_relative_path=fov_relative_path+ 'HighResStackGreen'+os.sep + imaging_name[1]
                                             elif 'OtherAcq' in aqc[5]:
-                                                acquisiton_relative_path=fov_relative_path+ 'OtherAcq\\' + imaging_name[1]
+                                                acquisiton_relative_path=fov_relative_path+ 'OtherAcq'+os.sep + imaging_name[1]
                                             else:
                                                 acquisiton_relative_path= fov_relative_path + imaging_name[1]
     
                                     elif imaging_name[1]:
-                                        acquisiton_relative_path='nonimaging acquisitions\\'+ imaging_name[1]
+                                        acquisiton_relative_path='nonimaging acquisitions'+os.sep+ imaging_name[1]
 
                                 elif not imaging_name :
                                     acquisiton_relative_path='nonimaging acquisitions\\Aq_1_NonImaging'    
@@ -770,12 +856,12 @@ class DataManaging():
                                         elif face_camera[-1]=='_1':
                                             facecamera_relative_path='eye camera\\Aq_1_NonImaging_full_face_camera.tiff'
                                         else :
-                                            facecamera_relative_path='eye camera\\'+ face_camera[-1]  +'_full_face_camera.tiff'
+                                            facecamera_relative_path='eye camera'+os.sep+ face_camera[-1]  +'_full_face_camera.tiff'
     
                                         new_slow_facecamera_path= os.path.join(new_slow_acquistion_path , facecamera_relative_path)
                                         new_fast_facecamera_path= os.path.join(new_fast_acquisition_path , facecamera_relative_path)
-                                        isSlowStorage=os.path.isfile('\\\\?\\'+new_slow_facecamera_path)
-                                        isWorkingStorage=os.path.isfile('\\\\?\\'+new_fast_facecamera_path) 
+                                        isSlowStorage=os.path.isfile('\\\\?'+os.sep+new_slow_facecamera_path)
+                                        isWorkingStorage=os.path.isfile('\\\\?'+os.sep+new_fast_facecamera_path) 
                                   
                                         query_facecamera_paths_update="""
                                              UPDATE FaceCamera_table
@@ -798,11 +884,11 @@ class DataManaging():
                                 if all_visualstimulations_info:
                                     for visual_stim in all_visualstimulations_info:
                 
-                                        visual_stim_relative_path='visual stim\\' + visual_stim[-1]                                       
+                                        visual_stim_relative_path='visual stim'+os.sep + visual_stim[-1]                                       
                                         new_slow_visstim_path= os.path.join(new_slow_acquistion_path , visual_stim_relative_path)
                                         new_fast_visstim_path= os.path.join(new_fast_acquisition_path , visual_stim_relative_path)
-                                        isSlowStorage=os.path.isfile('\\\\?\\'+new_slow_visstim_path)
-                                        isWorkingStorage=os.path.isfile('\\\\?\\'+new_fast_visstim_path) 
+                                        isSlowStorage=os.path.isfile('\\\\?'+os.sep+new_slow_visstim_path)
+                                        isWorkingStorage=os.path.isfile('\\\\?'+os.sep+new_fast_visstim_path) 
                                   
                                         query_visualstimulations_paths_update="""
                                               UPDATE VisualStimulations_table
@@ -862,12 +948,12 @@ class DataManaging():
     
     def copy_data_dir_to_dropbox(self, mouse_code):
         mouse_object=self.all_imaged_mice_objects[mouse_code]
-        aqc_list=glob.glob(os.path.join(mouse_object.mouse_slow_subproject_path, 'data'+'\\*'))
+        aqc_list=glob.glob(os.path.join(mouse_object.mouse_slow_subproject_path, 'data'+os.sep+'*'))
         for acq in aqc_list:
-            dirpath=os.path.join(self.LabProjectObject.data_paths_project['ResultsContainers'],'\\'.join(acq.split('\\')[-6:]) )
+            dirpath=os.path.join(self.LabProjectObject.data_paths_project['ResultsContainers'],''+os.sep.join(acq.split(''+os.sep)[-6:]) )
             if not os.path.isdir(dirpath):
                 os.makedirs(dirpath)
-            filestocopy=[i for i in glob.glob(acq+'\\*') if os.path.isfile(i)]
+            filestocopy=[i for i in glob.glob(acq+os.sep+'*') if os.path.isfile(i)]
             [shutil.copy(f,dirpath) for f in filestocopy]
             
         

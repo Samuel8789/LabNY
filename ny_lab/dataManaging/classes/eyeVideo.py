@@ -59,7 +59,7 @@ class EyeVideo():
 
             self.working_camera_full_metadata_path=os.path.join(self.associated_aquisiton.slow_storage_all_paths['eye camera'] ,self.associated_aquisiton.aquisition_name+'_full_face_camera_metadata.json')
         else:
-            self.camera_name=glob.glob(self.selected_eyevideo_raw_path+'\\**metadata.txt')[0][:-13]
+            self.camera_name=glob.glob(self.selected_eyevideo_raw_path+os.sep+'**metadata.txt')[0][:-13]
             self.working_camera_full_path=os.path.join(self.temporary_path, os.path.split(self.camera_name)[1]+'_full_face_camera.tiff')
             self.working_camera_full_metadata_path=os.path.join(self.temporary_path ,os.path.split(self.camera_name)[1]+'_full_face_camera_metadata.json')
             self.working_camera_full_path_hdf5=os.path.join(self.temporary_path, os.path.split(self.camera_name)[1]+'_full_face_camera.hdf5')
@@ -73,18 +73,18 @@ class EyeVideo():
             if os.path.isdir(os.path.join(self.selected_eyevideo_raw_path,'Default')):
                 
                 self.flag='single_file'
-                self.raw_image_sequence_paths=glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+'\\**.tif')
+                self.raw_image_sequence_paths=glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+os.sep+'**.tif')
                 
-                if glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+'\\**metadata.txt'):
-                    self.raw_metadata_path= glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+'\\**metadata.txt')[0]  
+                if glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+os.sep+'**metadata.txt'):
+                    self.raw_metadata_path= glob.glob(os.path.join(self.selected_eyevideo_raw_path,'Default')+os.sep+'**metadata.txt')[0]  
                 
             else:
                 self.flag='big_tiffs'
 
-                self.raw_image_sequence_paths=glob.glob(self.selected_eyevideo_raw_path+'\\**.tif')
+                self.raw_image_sequence_paths=glob.glob(self.selected_eyevideo_raw_path+os.sep+'**.tif')
                 
-                if glob.glob(os.path.join(self.selected_eyevideo_raw_path)+'\\**_metadata.txt'):
-                    self.raw_metadata_path= glob.glob(os.path.join(self.selected_eyevideo_raw_path)+'\\**_metadata.txt')[0]
+                if glob.glob(os.path.join(self.selected_eyevideo_raw_path)+os.sep+'**_metadata.txt'):
+                    self.raw_metadata_path= glob.glob(os.path.join(self.selected_eyevideo_raw_path)+os.sep+'**_metadata.txt')[0]
 
     
     def load_raw_camera_movies(self):  

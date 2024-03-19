@@ -44,7 +44,25 @@ class RunNYLab(Project):
                 self.change_and_save_selected_paths_roots()
                 self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}  
                 
+        elif Project.computer=='sp3660-YusteLab':
+           
+                self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others', 'Raw2']    
+                    
+                self.data_paths_roots={}
+                self.load_datbaseSaved_paths_roots()
+                try:
 
+                    self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots[name]], 'LabNY') for name in self.data_paths_names}
+                    self.data_paths_project['ResultsContainers']= os.path.join(self.all_paths_for_this_system['Dropbox'], 'LabNY','ResultsContainers')    
+
+        
+                except KeyError:
+                    self.change_and_save_selected_paths_roots()
+                    self.data_paths_project={name: os.path.join(self.all_paths_for_this_system[self.data_paths_roots], 'LabNY') for name in self.data_paths_names}  
+            
+            
+            
+            
         else:
             self.data_paths_names=['ResultsContainers']
             self.data_paths_project={name: os.path.join(self.all_paths_for_this_system['Dropbox'], 'LabNY','ResultsContainers') for name in self.data_paths_names}     
@@ -53,7 +71,8 @@ class RunNYLab(Project):
      
             
             
-            
+        self.database.database_backup()
+ 
         module_logger.info('Starting Data Managing')
         self.datamanaging=None
         self.gui=[]
@@ -79,10 +98,21 @@ class RunNYLab(Project):
         self.load_datbaseSaved_paths_roots()
             
     def load_datbaseSaved_paths_roots(self):
-        query_get_paths="""
-                    SELECT *
-                    FROM SavedPaths_table
-                    """                        
+        
+        
+        
+        if Project.computer=='DESKTOP-OKLQSQS':
+            query_get_paths="""
+                        SELECT *
+                        FROM SavedPaths_table
+                        """                
+        elif Project.computer=='sp3660-YusteLab':
+            query_get_paths="""
+                        SELECT *
+                        FROM SavedPathsLinux_table
+                        """                
+            
+            
         dataPaths=self.database.arbitrary_query_to_df(query_get_paths)
         self.data_paths_roots={name:dataPaths.Path.values.tolist()[i] for i, name  in enumerate(self.data_paths_names)}
 

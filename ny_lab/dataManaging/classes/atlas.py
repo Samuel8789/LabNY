@@ -32,7 +32,7 @@ class Atlas():
         if os.path.isdir(self.overview_raw_path):
             self.all_raw_Overviews={aqu:AtlasOverview(aqu,                                                          
                                                 self,
-                                                raw_input_path=glob.glob( self.overview_raw_path+'\\**',recursive=False)[0])
+                                                raw_input_path=glob.glob( self.overview_raw_path+os.sep+'**',recursive=False)[0])
                                      
                                   for aqu in os.listdir(self.overview_raw_path)
                                   if 'Aq_' in aqu}
@@ -44,7 +44,7 @@ class Atlas():
         if os.path.isdir(self.preview_raw_path):
             self.all_raw_Previews={aqu:AtlasPreview(aqu,                                                          
                                                 self,
-                                                raw_input_path=glob.glob( self.preview_raw_path+'\\**',recursive=False)[0])
+                                                raw_input_path=glob.glob( self.preview_raw_path+os.sep+'**',recursive=False)[0])
                                      
                                   for aqu in os.listdir(self.preview_raw_path)
                                   if 'Aq_' in aqu}
@@ -56,7 +56,7 @@ class Atlas():
         if os.path.isdir(self.volumes_raw_path):
             self.all_raw_Volumes={aqu:AtlasVolume(aqu,                                                          
                                                 self,
-                                                raw_input_path=glob.glob( self.volumes_raw_path+'\\**',recursive=False)[0])
+                                                raw_input_path=glob.glob( self.volumes_raw_path+os.sep+'**',recursive=False)[0])
                                      
                                   for aqu in os.listdir(self.volumes_raw_path)
                                   if 'Aq_' in aqu}

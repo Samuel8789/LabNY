@@ -19,6 +19,7 @@ try :
 except:
     from scrollbarFrame import ScrollbarFrame
 import time
+import subprocess 
 
 import numpy as np
 import shutil
@@ -805,19 +806,21 @@ class ImagingSessionPanel(tk.Toplevel):
       
     def open_acquisition_directory_action(self):
         
-        os.startfile(self.selected_acquisition_object.mouse_aquisition_path)
+        
+        subprocess.Popen(['xdg-open', os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice')])
+
         
     def open_slow_mouse_directory_action(self):
         
-        os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging',self.session_date))
+        subprocess.Popen(['xdg-open', os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging',self.session_date)])
       
     def open_raw_acquisition_directory_action(self):
         
-        os.startfile(self.datamanaging.all_existing_sessions_not_database_objects[ self.session_date].imaging_session_mice_path+'\\'+self.mouse_code)
+        subprocess.Popen(['xdg-open',self.datamanaging.all_existing_sessions_not_database_objects[ self.session_date].imaging_session_mice_path+'\\'+self.mouse_code])
 
     def open_dataset_directory_action(self):
         
-        os.startfile(self.selected_dataset_to_copy_object.selected_dataset_mmap_path)
+        subprocess.Popen(['xdg-open',self.selected_dataset_to_copy_object.selected_dataset_mmap_path])
 
     def open_facecamera_button(self):
         pass
@@ -1046,7 +1049,7 @@ if __name__ == "__main__":
         # mouse_code='SPKG'
         # mouse_object=datamanaging.all_experimetal_mice_objects[mouse_code]
         # imaging_session=mouse_object.imaging_sessions_not_yet_database_objects[session_name]
-        # os.startfile(imaging_session.mouse_session_path)
+        # subprocess.Popen(['xdg-open',imaging_session.mouse_session_path)
     
         # acqs=[datamanaging.all_experimetal_mice_objects[mouse_code].all_mouse_acquisitions  for mouse_code in mouse_codes]
         # imaging_session=[datamanaging.all_experimetal_mice_objects[mouse_code]  for mouse_code in mouse_codes]
@@ -1072,7 +1075,7 @@ if __name__ == "__main__":
         # # %matplotlib qt
         # fullalgrenplane1.most_updated_caiman.cnm_object.estimates.view_components()
         # fullalgrenplane1.selected_dataset_mmap_path
-        # os.startfile(fullalgrenplane1.selected_dataset_mmap_path)
+        # subprocess.Popen(['xdg-open',fullalgrenplane1.selected_dataset_mmap_path)
     
         # coord0=list(fullalen.FOV_object.mouse_imaging_session_object.all_0coordinate_Aquisitions.values())[0]
         # widef=fullalen.FOV_object.mouse_imaging_session_object.widefield_image[list(fullalen.FOV_object.mouse_imaging_session_object.widefield_image.keys())[0]]

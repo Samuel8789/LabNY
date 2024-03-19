@@ -114,7 +114,7 @@ class Metadata():
                 self.save_metadata_as_json()  
                 
                 
-            self.get_timestamps()
+        self.get_timestamps()
     
         # if self.video_params:    
         #     self.plotting()    
@@ -186,9 +186,9 @@ class Metadata():
                     self.timestamps=json.load(fout) 
                     
         if not self.timestamps:
-            if isinstance(self.video_params['relativeTimes'][0], list):      
+            if self.video_params and isinstance(self.video_params['relativeTimes'][0], list):      
                 self.timestamps={'Plane'+str(i+1):[vol[i] for vol in self.video_params['relativeTimes']] for i in range( len(self.video_params['relativeTimes'][0]))}
-            elif isinstance(self.video_params['relativeTimes'][0], float):
+            elif self.video_params and isinstance(self.video_params['relativeTimes'][0], float):
                 self.timestamps={'Plane1':self.video_params['relativeTimes']}
 
         if self.timestamps_path and not os.path.isfile(self.timestamps_path):
@@ -890,7 +890,7 @@ class Metadata():
 #%%   new functions
     def transfer_metadata(self):    
 
-        self.metadata_raw_files_full_path=[file for file in glob.glob(self.acquisition_directory_raw+'\\**', recursive=False) if '.xml' in file  ]
+        self.metadata_raw_files_full_path=[file for file in glob.glob(self.acquisition_directory_raw+os.sep+'**', recursive=False) if '.xml' in file  ]
         self.transfered_metadata_paths=[]
         for file in self.metadata_raw_files_full_path:
             if not os.path.isfile(os.path.join(self.temporary_path, os.path.split(file)[1])):
@@ -899,7 +899,7 @@ class Metadata():
   
     def check_metadata_in_folder(self):
         if self.acquisition_directory_raw:
-            xmlfiles=glob.glob(self.acquisition_directory_raw+'\\**.xml')
+            xmlfiles=glob.glob(self.acquisition_directory_raw+os.sep+'**.xml')
             for xml in xmlfiles:
                 if 'Cycle' not in xml:
                     self.imaging_metadata_file=xml
@@ -935,7 +935,9 @@ class Metadata():
             with open(self.read_voltage_metadata_path) as json_file:
                 self.full_voltage_recording_metadata = json.load(json_file)
 
-
+    def chek_frequency_error(self):
+        if self.translated_imaging_metadata:
+            print(f'Real Ac Time {self.translated_imaging_metadata["FullAcquisitionTime"]}\n Calculated Ac Tiem {self.translated_imaging_metadata["TotalVolumes"]*self.translated_imaging_metadata["FinalVolumePeriod"]}')        
     def get_all_metadata_from_database(self):
 
         self.aquisition_object.full_database_dictionary
@@ -956,7 +958,6 @@ class Metadata():
             # self.translated_imaging_metadata.pop('ToDoDeepCaiman')
             self.translated_imaging_metadata.pop('WorkingStoragePath')
             self.translated_imaging_metadata = dict( sorted(self.translated_imaging_metadata.items(), key=lambda x: x[0].lower()) )
-
 
         
         self.facecam_metadata= self.aquisition_object.full_database_dictionary['FaceCam'].to_dict('records')

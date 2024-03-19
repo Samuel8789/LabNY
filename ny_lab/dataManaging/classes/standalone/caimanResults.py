@@ -106,7 +106,7 @@ class CaimanResults():
             #     self.mat_results_path=[]
     
     
-            self.mat_results_paths=glob.glob(self.dataset_dir+'\\**_sort.mat')
+            self.mat_results_paths=glob.glob(self.dataset_dir+os.sep+'**_sort.mat')
         if self.mat_results_paths:
             self.mat_results_path=self.mat_results_paths[0]
         else:
@@ -192,7 +192,7 @@ class CaimanResults():
         self.dfdt_accepted_matrix= self.dfdt['S'][ self.accepted_indexes_sorter,:]
         self.dfdt_accepted_std= self.dfdt['S_std'][ self.accepted_indexes_sorter]
         self.thresholdline= self.dfdt_std_threshold* self.dfdt_accepted_std
-        self.std_filter=np.tile( np.expand_dims( self.thresholdline, 1), [1, self.dfdt_spikes.shape[1]])
+        self.std_filter=np.tile( np.expand_dims( self.thresholdline, 1), [1, self.dfdt_accepted_matrix.shape[1]])
         
         
         self.dfdt_thesholded_accepted_matrix=copy.copy( self.dfdt_accepted_matrix)

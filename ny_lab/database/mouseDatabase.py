@@ -58,7 +58,8 @@ class MouseDatabase():
         self.Experimental_class.update_variables()
         self.ImagingDatabase_class.update_variables()
         self.full_tables()
-        self.get_cage_number()       
+        self.get_cage_number()    
+
     def close_database(self):
         self.database_connection.close()
     def reconnect_database(self):
@@ -74,16 +75,20 @@ class MouseDatabase():
         
     def mouse_previsit(self, new_visit=False):       
         today_date=datetime.date.today().strftime("%Y%m%d")
-        file_path='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date
+        
+
+        
+        file_path=Path(self.LabProjectObject.all_paths_for_this_system['Documents'] ,'LabNY' ,'4. Mouse Managing' ,'MouseVisits', today_date)
+
         if not os.path.isdir(file_path):
             os.makedirs(file_path)
-        file_path='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date 
-        file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PreVisit_'
+          
+        file_path2= file_path / 'PreVisit_'
         self.max_codes = pd.DataFrame([[self.max_current_cage,self.max_current_code]], columns = ['MaxCage', 'MaxCode'])
-        pth=os.path.join(file_path ,'PreVisit_MouseVisit.pdf')
+        pth=file_path / 'PreVisit_MouseVisit.pdf'
         if new_visit:
-            file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PreVisit2_'
-            pth=os.path.join(file_path ,'PreVisit2_MouseVisit.pdf')
+            file_path2=file_path / 'PreVisit2_'
+            pth=file_path / 'PreVisit2_MouseVisit.pdf'
             # pth=os.path.join(file_path ,'PreVisit2_MouseVisit.html')
             # pth2=os.path.join(file_path ,'PreVisit2_MouseVisit.pdf')
 
@@ -131,7 +136,7 @@ class MouseDatabase():
                     
             fragments.append(fig)
             
-            pp = PdfPages(os.path.join(file_path2 + 'AllMice.pdf'))
+            pp = PdfPages(str(file_path2) + 'AllMice.pdf')
             
             for fig in fragments: ## will open an empty extra figure :(
                 pp.savefig( fig , bbox_inches='tight')
@@ -183,13 +188,13 @@ class MouseDatabase():
         else:
             today_date=date_performed
             
-        file_path='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date
-        file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PostVisit_'       
+        file_path=Path(self.LabProjectObject.all_paths_for_this_system['Documents'] ,'LabNY' ,'4. Mouse Managing' ,'MouseVisits', today_date)
+        file_path2=file_path / 'PostVisit_'       
         self.visit_actions=self.actions[self.actions['Date'].str.contains(datetime.date.today().strftime("%Y-%m-%d"))]
         all_dfs=[ self.breedings,self.current_litters,self.stock_mice,self.mice_to_genotype,self.visit_actions]
         pth=os.path.join(file_path ,'PostVisit_MouseVisit.xlsx')
         if new_visit:
-            file_path2='C:\\Users\\sp3660\\Documents\\Projects\\LabNY\\4. Mouse Managing\\MouseVisits\\' + today_date + '\\PostVisit2_'
+            file_path2=file_path / 'PostVisit2_'    
             pth=os.path.join(file_path ,'PostVisit2_MouseVisit.xlsx')
         
         with pd.ExcelWriter(pth,engine='xlsxwriter') as writer:
@@ -200,16 +205,22 @@ class MouseDatabase():
                 if i>0:
                     df.to_excel(writer,sheet_name='MouseVisit',startrow=lastrow+3 , startcol=0)
                     lastrow=lastrow+3+len(df)    
-        self.all_colony_mice.to_excel(os.path.join(file_path2 + 'AllMice.xlsx'))        
+        self.all_colony_mice.to_excel(str(file_path2) +'AllMice.xlsx')    
         
     def database_backup(self):
-        backuppath=r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\DatabaseBackups'
-        backuppath_dropbox=os.path.join(self.LabProjectObject.all_paths_for_this_system['Dropbox'],Path('LabNY/DatabaseBackups'))
-        backuppath_F=r'J:\Projects\LabNY\DatabaseBackups'
-        if self.LabProjectObject.platform=='win32':
-            list_of_backups = glob.glob(backuppath_dropbox+'\\*') # * means all if need specific format then *.csv
-        elif self.LabProjectObject.platform=='linux':
-            list_of_backups = glob.glob(backuppath_dropbox+'/*') # * means all if need specific format then *.csv
+        
+        backuppath=Path(self.LabProjectObject.all_paths_for_this_system['Documents'] ,'LabNY' ,'4. Mouse Managing' ,'DatabaseBackups')
+        backuppath_dropbox=Path(self.LabProjectObject.all_paths_for_this_system['Dropbox'],'LabNY' ,'DatabaseBackups')
+        backuppath_F=''
+        if hasattr(self.LabProjectObject, 'data_paths_project'):
+            backuppath_F=Path(self.LabProjectObject.data_paths_project['Raw'],'DatabaseBackups')
+        
+        
+        
+        # if self.LabProjectObject.platform=='win32':
+        #     list_of_backups = glob.glob(backuppath_dropbox+os.sep+'*') # * means all if need specific format then *.csv
+        # elif self.LabProjectObject.platform=='linux':
+        list_of_backups = glob.glob(str(backuppath_dropbox / '**')) # * means all if need specific format then *.csv
 
         latest_file = max(list_of_backups, key=os.path.getctime)
         
@@ -223,7 +234,7 @@ class MouseDatabase():
             dst=os.path.join(backuppath, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
             dst_dropbox=os.path.join(backuppath_dropbox, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
             dst_F=os.path.join(backuppath_F, 'MouseDatabase_Backup_{date}'.format(date=today_date)+'.db')
-            if self.LabProjectObject.platform=='win32':
+            if os.path.isdir(backuppath_F):
                 copyfile(self.database_file_path, dst)
                 copyfile(self.database_file_path, dst_F)
                 assert os.path.isfile(dst)

@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 import sys
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/AllFunctions')
 sys.path.insert(0, r'C:/Users/sp3660/Documents/Github/LabNY/MainClasses')
+sys.path.insert(0, r'/home/sp3660/Documents/Github/LabNY/AllFunctions')
+sys.path.insert(0, r'/home/sp3660/Documents/Github/LabNY/MainClasses')
 # import tkinter as Tkinter
 import pandas as pd
 import numpy as np
@@ -619,7 +621,7 @@ class ImagingDatabase():
         
         len(all_dfs[0])+3
         
-        with pd.ExcelWriter(os.path.join(r'C:\Users\sp3660\Desktop\Temp_Excel_Files' ,'MouseInfo_{0}_cages({1}).xlsx'.format(datetime.date.today().strftime("%Y%m%d"), str(cage_list)  )),engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(os.path.join(r'/home/sp3660/Desktop/Temp_Excel_Files' ,'MouseInfo_{0}_cages({1}).xlsx'.format(datetime.date.today().strftime("%Y%m%d"), str(cage_list)  )),engine='xlsxwriter') as writer:
             for i, df in enumerate(all_dfs):
                 df.to_excel(writer,sheet_name='Imaging',startrow=i*(len(all_dfs[0])+3) , startcol=0)
                 
@@ -666,7 +668,7 @@ class ImagingDatabase():
         ImagingDate=datetime.datetime.strptime(UnFormatttedSessionDate,'%Y%m%d')
         
         SessionMiceRawPath=os.path.join(session_path,'Mice')
-        imagedmicepaths=glob.glob( SessionMiceRawPath+'\\SP**', recursive=False)
+        imagedmicepaths=glob.glob( SessionMiceRawPath+os.sep+'SP**', recursive=False)
         
         # add all mouse here
         for mouse_path in imagedmicepaths:         
@@ -756,13 +758,13 @@ class ImagingDatabase():
         MouseRawPath=mice_code_path
         WideFieldPath=None
         WideFieldFolderPath=os.path.join(MouseRawPath, 'Widefield')
-        WideFieldPaths=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)
+        WideFieldPaths=glob.glob( WideFieldFolderPath+os.sep+'**.tif', recursive=False)
         if WideFieldPaths:
-            WideFieldPath=glob.glob( WideFieldFolderPath+'\\**.tif', recursive=False)[0]
+            WideFieldPath=glob.glob( WideFieldFolderPath+os.sep+'**.tif', recursive=False)[0]
         WideFieldID=np.nan
     
 
-        all_aq_folder=glob.glob( mice_code_path +'\\**\\**Aq_**', recursive=True)
+        all_aq_folder=glob.glob( mice_code_path +os.sep+'**'+os.sep+'**Aq_**', recursive=True)
         true_aq_folders=[aq for aq in all_aq_folder if aq[-1]!='_']
 
         slowstoragepath= os.path.join(self.databse_ref.arbitrary_query_to_df(query_get_exp_id, params).iloc[0]['SlowStoragePath'],'imaging', SessionDate)
@@ -939,8 +941,8 @@ class ImagingDatabase():
         Ishighrestomatostack=0  
         Ishighresgreenstack=0      
         Isotherfovaq=0   
-        if glob.glob( acquisition_path+'\\**', recursive=False) :
-            acq_name=glob.glob(acquisition_path+'\\**', recursive=False)[0]
+        if glob.glob( acquisition_path+os.sep+'**', recursive=False) :
+            acq_name=glob.glob(acquisition_path+os.sep+'**', recursive=False)[0]
         
       
         self.add_acquisition_info_window=AddAcquisitionInfo(gui, acq_name)
@@ -952,17 +954,17 @@ class ImagingDatabase():
 
         imaging_metadat_file=False
         
-        if glob.glob( acquisition_path+'\\**\\**.env', recursive=False) :
-            Prairieimagingpath=os.path.split(glob.glob( acquisition_path+'\\**\\**.env', recursive=False)[0])[0]
+        if glob.glob( acquisition_path+os.sep+'**'+os.sep+'**.env', recursive=False) :
+            Prairieimagingpath=os.path.split(glob.glob( acquisition_path+os.sep+'**'+os.sep+'**.env', recursive=False)[0])[0]
             Prairieimagingname=os.path.split(Prairieimagingpath)[1]
             IsImaging=1        
-            metadata_files=glob.glob( acquisition_path+'\\**\\**.xml', recursive=False)         
+            metadata_files=glob.glob( acquisition_path+os.sep+'**'+os.sep+'**.xml', recursive=False)         
             imaging_metadat_file=[file for file in metadata_files if  'VoltageOutput'  not in file and 'VoltageRecording' not in file][0]
             imaging_path=Prairieimagingpath
           
            
         voltage_metadata_file=False
-        voltage_files=glob.glob( acquisition_path+'\\**\\**VoltageRecording**', recursive=False)       
+        voltage_files=glob.glob( acquisition_path+os.sep+'**'+os.sep+'**VoltageRecording**', recursive=False)       
         if voltage_files:
             voltage_metadata_file= [voltage_file for voltage_file in voltage_files if '.xml' in voltage_file][0]
         else:
@@ -1068,7 +1070,7 @@ class ImagingDatabase():
                 workingstoragepath=os.path.join(os.path.split(workingstoragepath)[0],'OtherAcq',Prairieimagingname)         
               
         FaceCameraID=np.nan 
-        if glob.glob( acquisition_path+'\\**\\DisplaySettings.json', recursive=False) :
+        if glob.glob( acquisition_path+os.sep+'**'+os.sep+'DisplaySettings.json', recursive=False) :
            IsFaceCamera=1
            face_camera_path=os.path.join(acquisition_path,'FaceCamera')
            if face_camera_path:    
@@ -1076,12 +1078,12 @@ class ImagingDatabase():
                
                
         VisStimulationID=np.nan       
-        if glob.glob( acquisition_path+'\\VisStim\\**', recursive=False) :
+        if glob.glob( acquisition_path+os.sep+'VisStim'+os.sep+'**', recursive=False) :
            
             VisStim_path=os.path.join(acquisition_path,'VisStim')
             IsBehaviour=1        
             IsVisualStimulation=1
-            VisStimLog=glob.glob( VisStim_path+ '\\**.mat', recursive=False)[0]
+            VisStimLog=glob.glob( VisStim_path+ os.sep+'**.mat', recursive=False)[0]
             if VisStimLog:
                 VisStimulationID=self.add_new_visual_stimulation(acquisition_id, VisStim_path, VisStimLog,slowstoragepath, workingstoragepath)
         
@@ -1289,11 +1291,13 @@ class ImagingDatabase():
                     IsObjectiveStack=0
                     PlaneNumber=metadata.imaging_metadata[1]['PlaneNumber']
                    
-                    InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']
+                    # InterFramePeriod=metadata.imaging_metadata[0]['framePeriod']*FrameAveraging
+                    InterFramePeriod=metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod']*FrameAveraging
+
                     if not isinstance(metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod'], str):
-                        FinalVolumePeriod=metadata.imaging_metadata[2][0][list(metadata.imaging_metadata[2][0].keys())[0]]['framePeriod']*PlaneNumber
+                        FinalVolumePeriod=InterFramePeriod*PlaneNumber
                     else:
-                        FinalVolumePeriod= metadata.imaging_metadata[0]['framePeriod']*PlaneNumber
+                        FinalVolumePeriod=InterFramePeriod*PlaneNumber
                         
                     FinalFrequency=1/FinalVolumePeriod
                     TotalFrames=TotalVolumes*PlaneNumber
@@ -1544,7 +1548,7 @@ class ImagingDatabase():
         VideoPath=face_camera_path
         acq_name=os.path.split(aqslowstoragepath)[1]
         EyeCameraFilename_processed=acq_name+'_full_face_camera.tiff'          
-        # EyeCameraFilename= os.path.split(glob.glob( VideoPath+'\\**.tif', recursive=False)[0])[1]
+        # EyeCameraFilename= os.path.split(glob.glob( VideoPath+os.sep+'**.tif', recursive=False)[0])[1]
         slowstoragepath=os.path.join(aqslowstoragepath,'eye camera', EyeCameraFilename_processed)   
         workingstoragepath=os.path.join(aqworkingstoragepath,'eye camera', EyeCameraFilename_processed)  
 

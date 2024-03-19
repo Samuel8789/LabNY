@@ -53,7 +53,7 @@ class CaimanExtraction():
                  galois=False):
         
         module_logger.info('Instantiating ' +__name__)
-        self.temp_path=r'C:\Users\sp3660\Desktop\CaimanTemp'
+        self.temp_path=r'/home/sp3660/Desktop/CaimanTemp'
         self.galoistempdir='/home/sp3660/Desktop/caiman_temp'
         self.cnm_object=None
         self.dataset_object=dataset_object
@@ -127,9 +127,9 @@ class CaimanExtraction():
         
     def copy_fast_results_remove_all(self):
         
-        caiman_file=glob.glob(self.temp_path+'\**.hdf5')
-        motcorrectfile=glob.glob(self.temp_path+'\**MC_OnACID**.mmap')
-        shiftsfile=glob.glob(self.temp_path+'\**shifts**.pkl')
+        caiman_file=glob.glob(self.temp_path+os.sep+'**.hdf5')
+        motcorrectfile=glob.glob(self.temp_path+os.sep+'**MC_OnACID**.mmap')
+        shiftsfile=glob.glob(self.temp_path+os.sep+'**shifts**.pkl')
         if caiman_file:
             shutil.copyfile(caiman_file[0],os.path.join(os.path.split(self.original_path)[0],os.path.split(caiman_file[0])[1]))
         if motcorrectfile:
@@ -198,9 +198,9 @@ class CaimanExtraction():
             if self.objective=='MBL Olympus 20x':
                 self.halfsize=4
             elif '25' in self.objective:
-               self.halfsize=5          
+               self.halfsize=5        
                if '20x' in self.bidishifted_movie_path:
-                    self.halfsize=4  
+                    self.halfsize=4 
         except:
             module_logger.exception('No metdata found ' + self.bidishifted_movie_path )
 
@@ -220,7 +220,9 @@ class CaimanExtraction():
     def set_caiman_parameters(self):
         
         self.movie_slice=np.empty(0)
-  
+        print(self.volume_period )
+        print(self.halfsize )
+
         fr = 1/self.volume_period  # frame rate (Hz) 3pl + 4ms = 15.5455
         decay_time = 0.2# 2 for s 0.5 for f # approximate length of transient event in seconds
         gSig = (self.halfsize,self.halfsize)  # expected half size of neurons
@@ -230,17 +232,18 @@ class CaimanExtraction():
         gnb = 2  # number of background components
         gSig = tuple(np.ceil(np.array(gSig) / ds_factor).astype('int')) # recompute gSig if downsampling is involved
         mot_corr = False  # flag for online motion correction
-        pw_rigid = False  # flag for pw-rigid motion correction (slower but potentially more accurate)
+        pw_rigid = True  # flag for pw-rigid motion correction (slower but potentially more accurate)
         max_shifts_online = 10  # maximum allowed shift during motion correction
         sniper_mode = True  # use a CNN to detect new neurons (o/w space correlation)
         rval_thr = 0.8  # soace correlation threshold for candidate components
         # set up some additional supporting parameters needed for the algorithm
         # (these are default values but can change depending on dataset properties)
-        init_batch = 700 # number of frames for initialization (presumably from the first file)
-        K = 20 # initial number of components
+        # init_batch = 700 # number of frames for initialization (presumably from the first file)
+        K = 2 # initial number of components
         epochs = 2 # number of passes over the data
         show_movie = False # show the movie as the data gets processed
         merge_thr = 0.8
+        rf=20
         use_cnn = True  # use the CNN classifier
         min_cnn_thr = 0.90  # if cnn classifier predicts below this value, reject
         cnn_lowest = 0.3  # neurons with cnn probability lowe
@@ -258,7 +261,7 @@ class CaimanExtraction():
                                            'ds_factor': ds_factor,
                                            'nb': gnb,
                                            'motion_correct': mot_corr,
-                                           'init_batch': init_batch,
+                                           # 'init_batch': init_batch,
                                            'init_method': 'bare',
                                            'normalize': True,
                                            'sniper_mode': sniper_mode,
@@ -273,7 +276,9 @@ class CaimanExtraction():
                                            'min_cnn_thr': min_cnn_thr,
                                            'cnn_lowest': cnn_lowest,
                                            'fudge_factor':fudge_factor,
-                                           'splits_els':100
+                                           'splits_els': 100,
+                                           'splits_rig': 100,
+                                           'rf':rf
                                             }
         
     def apply_caiman(self): 
@@ -346,8 +351,8 @@ class CaimanExtraction():
           self.mc_onacid_full_path=None
           self.mc_onacid_path=None
           
-          self.mc_onacid_full_paths=glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_d1**.mmap')
-          self.mc_onacid_custom_paths=glob.glob(self.temporary_path+'\\**end_MC_OnACID_d1**.mmap')
+          self.mc_onacid_full_paths=glob.glob(self.temporary_path+os.sep+'**Movie_MC_OnACID_d1**.mmap')
+          self.mc_onacid_custom_paths=glob.glob(self.temporary_path+os.sep+'**end_MC_OnACID_d1**.mmap')
 
           if self.mc_onacid_full_paths:
               self.mc_onacid_full_path= self.mc_onacid_full_paths[0]
@@ -367,10 +372,10 @@ class CaimanExtraction():
         self.caiman_full_path=None
         self.caiman_path=None
         
-        self.caiman_full_paths=sorted(glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
-        self.caiman_custom_paths=sorted(glob.glob(self.temporary_path+'\\**end_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
+        self.caiman_full_paths=sorted(glob.glob(self.temporary_path+os.sep+'**Movie_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
+        self.caiman_custom_paths=sorted(glob.glob(self.temporary_path+os.sep+'**end_MC_OnACID_**.hdf5'), key=os.path.getmtime) 
         
-        self.caiman_sorted_files=sorted(glob.glob(self.temporary_path+'\\**sort.mat'), key=os.path.getmtime) 
+        self.caiman_sorted_files=sorted(glob.glob(self.temporary_path+os.sep+'**sort.mat'), key=os.path.getmtime) 
 
    
         if  self.first_pass_mot_correct:
@@ -411,8 +416,8 @@ class CaimanExtraction():
          self.caiman_shifts_full_path=None
          self.caiman_shifts_path=None
          
-         self.caiman_shifts_full_paths=glob.glob(self.temporary_path+'\\**Movie_MC_OnACID_shifts**.pkl') 
-         self.caiman_shifts_custom_paths=glob.glob(self.temporary_path+'\\**end_MC_OnACID_shifts**.pkl') 
+         self.caiman_shifts_full_paths=glob.glob(self.temporary_path+os.sep+'**Movie_MC_OnACID_shifts**.pkl') 
+         self.caiman_shifts_custom_paths=glob.glob(self.temporary_path+os.sep+'**end_MC_OnACID_shifts**.pkl') 
 
          if self.caiman_shifts_full_paths:
              self.caiman_shifts_full_path= self.caiman_shifts_full_paths[0]

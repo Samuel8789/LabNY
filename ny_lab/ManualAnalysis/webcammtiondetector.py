@@ -42,6 +42,7 @@ def motionDetection():
     ret, frame2 = cap.read()
 
     while cap.isOpened():
+       
         diff = cv.absdiff(frame1, frame2)
         diff_gray = cv.cvtColor(diff, cv.COLOR_BGR2GRAY)
         blur = cv.GaussianBlur(diff_gray, (5, 5), 0)
@@ -65,11 +66,12 @@ def motionDetection():
         # cv.imshow("Video", frame1)
         frame1 = frame2
         ret, frame2 = cap.read()
-
-
-
         if cv.waitKey(50) == 27:
             break
+
+
+
+       
 
     cap.release()
     cv.destroyAllWindows()

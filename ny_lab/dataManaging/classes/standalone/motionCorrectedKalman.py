@@ -124,8 +124,8 @@ class MotionCorrectedKalman:
          self.kalman_path=None
 
          
-         self.kalman_full_paths=glob.glob(self.temporary_path + '\\**Movie_MC_OnACID_**MC_kalman.tiff')
-         self.kalman_custom_paths=glob.glob(self.temporary_path + '\\**end_MC_OnACID_**MC_kalman.tiff')
+         self.kalman_full_paths=glob.glob(self.temporary_path + os.sep+'**Movie_MC_OnACID_**MC_kalman.tiff')
+         self.kalman_custom_paths=glob.glob(self.temporary_path + os.sep+'**end_MC_OnACID_**MC_kalman.tiff')
 
          if self.kalman_full_paths:
              self.kalman_full_path= self.kalman_full_paths[0]
@@ -145,8 +145,8 @@ class MotionCorrectedKalman:
          self.gauss_path=None
 
         
-         self.gauss_full_paths=glob.glob(self.temporary_path + '\\**Movie_MC_OnACID_**MC_smoothed_100ms.tiff')
-         self.gauss_custom_paths=glob.glob(self.temporary_path + '\\**end_MC_OnACID_**MC_smoothed_100ms.tiff')
+         self.gauss_full_paths=glob.glob(self.temporary_path + os.sep+'**Movie_MC_OnACID_**MC_smoothed_100ms.tiff')
+         self.gauss_custom_paths=glob.glob(self.temporary_path + os.sep+'**end_MC_OnACID_**MC_smoothed_100ms.tiff')
 
          if self.gauss_full_paths:
             self.gauss_full_path= self.gauss_full_paths[0]
@@ -317,7 +317,7 @@ class MotionCorrectedKalman:
 
  
     def remove_some_files_form_temp(self):
-        list_of_files = glob.glob(self.dump_temp_path+'\\**')
+        list_of_files = glob.glob(self.dump_temp_path+os.sep+'**')
         if list_of_files:
            oldest_file = min(list_of_files, key=os.path.getctime)
         if len(list_of_files)>5 and oldest_file !=  self.MC_file_path:

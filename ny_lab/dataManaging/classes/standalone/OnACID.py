@@ -33,7 +33,6 @@ import time
 import pickle
 
 
-
 # %%
 def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, mot_corretc=False, save_mot_correct=False, initial_shallow=False):
     module_logger.info('running ' +__name__)
@@ -51,7 +50,6 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     start_t=time.time()
     fnamestemp=parameter_dict['fnames']
     opts = cnmf.params.CNMFParams(params_dict=parameter_dict)
-    opts.set('temporal', {'fudge_factor':0.99})
 
     # %% fit online
     #stadard cnmf
@@ -62,7 +60,8 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     
     
     try:
-        cnm = cnmf.online_cnmf.OnACID(params=opts)
+        cnm = cnmf.online_cnmf.OnACID(params=opts,dview=None)
+        cnm.params.motion.update({'splits_els': 100, 'splits_rig': 100,})
         module_logger.info('start processing')
         preprocetime=time.time()
         now = datetime.now()
@@ -119,13 +118,19 @@ def run_on_acid(caiman_extraction_object, parameter_dict, dataset_object=False, 
     Yr, dims, T = cm.load_memmap(fnamestemp)
 
     images = np.reshape(Yr.T, [T] + list(dims), order='F')
-    cnm.estimates.evaluate_components(images, cnm.params, dview=None)
+   
+    try:
+        cnm.estimates.evaluate_components(images, cnm.params, dview=None)
+    except:
+        module_logger.exception('error evaluationg components ocaiman'+ fnamestemp)   
+    
     timestr = time.strftime("%Y%m%d-%H%M%S")
     caiman_results_path='_'.join([MC_onacid_file_path, timestr,filename_append])  
 
     #%%
     try:
         cnm.save(caiman_results_path)
+        print(caiman_results_path)
     except:
          module_logger.exception('caiman not propery saved '+ fnamestemp)   
     #%%

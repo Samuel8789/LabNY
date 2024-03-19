@@ -123,7 +123,7 @@ class VoltageSignalsExtractions():
                     # seems to be stabe and easy
                     self.proces_opto_signals()
                     # this id pproblematis as the optodrift function uses final signals instead of signlas 
-                    self.proces_spont_visual_signals()
+                    # self.proces_spont_visual_signals()
                     self.load_acquisition_info()
                     #this is to align the voltage signals with the movie based onthe lED artifcat and then redo the transitions
                     module_logger.info('aligning voltages to movie')
@@ -133,7 +133,7 @@ class VoltageSignalsExtractions():
 
                     # self.proces_synch_signals(aligned=True)
                     self.proces_opto_signals(aligned=True)
-                    self.proces_spont_visual_signals(aligned=True)
+                    # self.proces_spont_visual_signals(aligned=True)
                     module_logger.info('This downsamples the alignes transition to movie')
 
                     self.downsample_transitions_times()
@@ -385,13 +385,16 @@ class VoltageSignalsExtractions():
         self.calcium_datasets={key:values for key,values in   self.voltage_signals_object.acquisition_object.all_datasets.items() if 'Green' in key }
         self.calcium_datasets[list(self.calcium_datasets.keys())[0]].bidishift_object.create_output_names_if_dont_exist()     
         self.mean_movie_path =self.calcium_datasets[list(self.calcium_datasets.keys())[0]].bidishift_object.mean_movie_path
+
         if not os.path.isfile(self.mean_movie_path):
-            movie = cm.load(glob.glob(os.path.join(self.voltage_signals_object.acquisition_object.database_acq_raw_path, 'Ch2Green','plane1',"**Ch2**.tif")))
+
+            movie = cm.load(glob.glob(str(self.voltage_signals_object.acquisition_object.database_acq_raw_path / 'Ch2Green'/'plane1'/"**Ch2**.tif")))
             self.meanmov=movie.mean(axis=(1, 2)) 
             np.save(self.mean_movie_path,self.meanmov)
             del(movie)
         else:
             self.meanmov=np.load(self.mean_movie_path)
+            # if len( self.meanmov)
         
         self.start_frame, self.end_frame=self.voltage_signals_object.acquisition_object.all_datasets[list(self.voltage_signals_object.acquisition_object.all_datasets.keys())[0]].bidishift_object.load_LED_tips()
         self.all_planes_timestamps= copy.deepcopy(self.voltage_signals_object.acquisition_object.metadata_object.timestamps)
@@ -405,7 +408,7 @@ class VoltageSignalsExtractions():
             self.all_planes_clipped_timestamps=self.all_planes_timestamps
             
     def align_signals_based_on_LED(self):    
-        module_logger.info('Aligning movie and voltages vased on LED')
+        module_logger.info('Aligning movie and voltages based on LED')
 
         
         transitions, result, scaling_factors, shifts, inverted_shifts=self.get_shifts_from_LED_alignment()
@@ -448,19 +451,22 @@ class VoltageSignalsExtractions():
                 self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal]=signal_dataframe
                 self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal+'_corrections']=corrections    
 
-    def get_shifts_from_LED_alignment(self, threshold=0.1):
+    def get_shifts_from_LED_alignment(self, threshold=0.5,plot=False):
         # tthis is the fundamental function to align the LED voltage signal to the LED movie artifact
         #the alignment loos for the led transition in both signalk with split transtiinm correction
-        
+        manualcorrect=False
         led_prairie=self.all_signals['Prairie_movie_length_clipped']['LED'].values
         mean_mov=sg.medfilt(np.squeeze(self.meanmov), kernel_size=1)
+        # remove middle of the movie in case of led artifacts
+        if manualcorrect:
+            mean_mov[200:-200]=mean_mov[0]
+        
         prairie_LED=sg.medfilt(np.squeeze(led_prairie), kernel_size=1)
         timestamps_video_milisecond=np.array(self.all_planes_timestamps['Plane1'])*1000
         if len(mean_mov)-len(timestamps_video_milisecond)==1:
             mean_mov=mean_mov[:-1]
-        elif len(mean_mov)-len(timestamps_video_milisecond)>1:
-            module_logger.info('somthing worng with movi length')
-
+        elif abs(len(mean_mov)-len(timestamps_video_milisecond))>1:
+            module_logger.info('somthing wrong with movie length')
         else:
             pass
 
@@ -473,8 +479,6 @@ class VoltageSignalsExtractions():
         # self.check_split_transitions(mov,[split_corrected_movie,a,aa,corrections_mov])
         # self.check_split_transitions(sig, [split_corrected_led,b,bb,corrections_vol])
 
-    
-   
     
         transitions={'movie':{'up':'','down':''},'led':{'up':'','down':''} }
         tracenames=['movie','led']
@@ -490,18 +494,19 @@ class VoltageSignalsExtractions():
                     tr='up'
                     transitions[tracenames[i]][tr]=np.argwhere(np.diff(trace,prepend=mov[0])>thr).flatten()
 
-        
-        f,ax=plt.subplots(2,sharex=True) 
-        f.suptitle('THIS IS TO CHECK LED SIGNAL-MOVIE ALIGNMENT')
-        titles=['Raw','SplitCorrected']
-        for j,trac in enumerate([[mov,sig],[split_corrected_movie,split_corrected_led]]):
-            ax[j].plot(timestamps_video_milisecond,trac[0],label='movie')
-            ax[j].plot(self.all_signals['Prairie_movie_length_clipped']['Time'],trac[1],label='voltage')
-            ax[j].legend()
-            ax[j].set_title(titles[j])
-            for i,trace in enumerate(trac):
-                for tran in ['up','down']:
-                        ax[j].plot(timestamps[i][transitions[tracenames[i]][tran]],trace[transitions[tracenames[i]][tran]],'o')
+        if plot:
+            f,ax=plt.subplots(2,sharex=True) 
+            f.suptitle('THIS IS TO CHECK LED SIGNAL-MOVIE ALIGNMENT')
+            titles=['Raw','SplitCorrected']
+            for j,trac in enumerate([[mov,sig],[split_corrected_movie,split_corrected_led]]):
+                ax[j].plot(timestamps_video_milisecond,trac[0],label='movie')
+                ax[j].plot(self.all_signals['Prairie_movie_length_clipped']['Time'],trac[1],label='voltage')
+                ax[j].legend()
+                ax[j].set_title(titles[j])
+                for i,trace in enumerate(trac):
+                    for tran in ['up','down']:
+                            ax[j].plot(timestamps[i][transitions[tracenames[i]][tran]],trace[transitions[tracenames[i]][tran]],'o')
+            plt.show()
 
         transitions['movies_timestamps']={}
         for k,v in transitions['movie'].items():
@@ -519,10 +524,10 @@ class VoltageSignalsExtractions():
         shifts={}
         for i in result.keys():
             shifts[i]={}
-            scaling_factors[i]=(result[i]['led'][-1]-result[i]['led'][0])/(result[i]['movies_timestamps'][-1]-result[i]['movies_timestamps'][0])
+            scaling_factors[i]=(result[i]['led'][-1]-result[i]['led'][0])/(result[i]['movies_timestamps'][-1]-result[i]['movies_timestamps'][0])            
             shifts[i]['begining']=np.round(result[i]['led'][0] - (result[i]['movies_timestamps'][0]*scaling_factors[i]))
             shifts[i]['end']=np.round(result[i]['led'][1] - (result[i]['movies_timestamps'][1]*scaling_factors[i]))
-   
+            
    
         inverted_shifts = {}
         for k1, subdict in shifts.items():
@@ -534,6 +539,7 @@ class VoltageSignalsExtractions():
         shift_mean= np.round(np.mean(list(inverted_shifts['begining'].values())))
            
         plt.close('all')
+    
         sh=['shift_up','shift_end','shift_mean']
         for i,shift in enumerate([shift_up,shift_end,shift_mean]):
             shift=int(shift)
@@ -542,19 +548,32 @@ class VoltageSignalsExtractions():
             shifted_voltage_timestamps, shifted_scaled_trace= self.shift_scale_voltage_trace(split_corrected_led,shift,scaling_factor)
             
             shifted_scaled_trace,_,_,corrections=self.correct_voltage_split_transitions(shifted_scaled_trace)
-    
-            f,ax=plt.subplots(2,sharex=True)
-            ax[0].plot( timestamps_video_milisecond,mov,label='Mov')
-            ax[0].plot( self.all_signals['Prairie_movie_length_clipped']['Time'],sig,label='LED')
-            ax[0].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
-            ax[0].plot(  self.all_signals['Prairie_movie_length_clipped']['Time'],split_corrected_led,label='Split_LED')
-    
             
-            ax[1].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
-            ax[1].plot( shifted_voltage_timestamps,shifted_scaled_trace,label='Shifted Scaled LED ')
-            ax[0].legend()
-            ax[1].legend()
-            f.suptitle(f'{sh[i]}')
+        if plot:
+
+            for i,shift in enumerate([shift_up,shift_end,shift_mean]):
+                shift=int(shift)
+                scaling_factor=np.mean(list(scaling_factors.values()))
+                 
+                shifted_voltage_timestamps, shifted_scaled_trace= self.shift_scale_voltage_trace(split_corrected_led,shift,scaling_factor)
+                
+                shifted_scaled_trace,_,_,corrections=self.correct_voltage_split_transitions(shifted_scaled_trace)
+        
+                f,ax=plt.subplots(2,sharex=True)
+                ax[0].plot( timestamps_video_milisecond,mov,label='Mov')
+                ax[0].plot( self.all_signals['Prairie_movie_length_clipped']['Time'],sig,label='LED')
+                ax[0].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
+                ax[0].plot(  self.all_signals['Prairie_movie_length_clipped']['Time'],split_corrected_led,label='Split_LED')
+        
+                
+                ax[1].plot( timestamps_video_milisecond,split_corrected_movie,label='Split_Mov')
+                ax[1].plot( shifted_voltage_timestamps,shifted_scaled_trace,label='Shifted Scaled LED ')
+                ax[0].legend()
+                ax[1].legend()
+                f.suptitle(f'{sh[i]}')
+                
+            plt.show()
+
    
         tracenames=['shifted_led']
         for i,trace in enumerate([shifted_scaled_trace]):
@@ -2340,7 +2359,7 @@ class VoltageSignalsExtractions():
         
     def check_csv_in_folder(self):
      if self.acquisition_directory_raw:
-            csvfiles=glob.glob(self.acquisition_directory_raw+'\\**.csv')
+            csvfiles=glob.glob(self.acquisition_directory_raw+os.sep+'**.csv')
             for csv in csvfiles:
                 if 'VoltageRecording'  in csv:
                     self.voltage_excel_path=csv

@@ -52,7 +52,7 @@ def file_cleanup_prairie_dataset(Prairireaqpath):
 
                 elif any('Volume' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
                     last_cycle=len(folder_selected_list_red) + aq_info[9]
-                    PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+'\\**'))     
+                    PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+os.sep+'**'))     
                     Multiplane=False
     
                 else:
@@ -73,7 +73,7 @@ def file_cleanup_prairie_dataset(Prairireaqpath):
                         
                 elif any('Volume' in file_name  for file_name in folder_selected_list_green if os.path.isdir(os.path.join(directory_green , file_name))):
                     last_cycle=len(folder_selected_list_green) + aq_info[10]
-                    PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+'\\**'))     
+                    PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+os.sep+'**'))     
                 
                 else:
                    aq_info=check_channels_and_planes(directory_green, correction)
@@ -119,7 +119,7 @@ def file_cleanup_prairie_dataset(Prairireaqpath):
           # module_logger.info('Moving Files')   
           time.sleep(10)
           if correction:
-              if glob.glob(Prairireaqpath+'\\**.tif', recursive=False):             
+              if glob.glob(Prairireaqpath+os.sep+'**.tif', recursive=False):             
                   move_files(Prairireaqpath,ChannelPaths,PlanePaths, Multiplane,aq_info[-1] ) 
               for channel_folder in ChannelPaths:
                   if os.path.isdir(channel_folder):
@@ -152,7 +152,7 @@ def file_cleanup_prairie_dataset(Prairireaqpath):
                          
             Multiplane=aq_info[8]
             if correction:
-                if glob.glob(Prairireaqpath+'\\**.tif', recursive=False):             
+                if glob.glob(Prairireaqpath+os.sep+'**.tif', recursive=False):             
                     move_files(Prairireaqpath,ChannelPaths,CyclesPaths, Multiplane,aq_info[-1] ) 
                 for channel_folder in ChannelPaths:
                     if os.path.isdir(channel_folder):
