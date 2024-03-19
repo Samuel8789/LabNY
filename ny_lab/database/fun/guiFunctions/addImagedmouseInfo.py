@@ -7,7 +7,7 @@ Created on Sat Sep 25 10:24:05 2021
 
 import tkinter as tk
 from tkinter import END, Label, RAISED, Text, WORD, StringVar, Button
-
+import os
 
 class AddImagedmouseInfo(tk.Toplevel):
     def __init__(self,  gui, session_date, mouse_code):
@@ -15,7 +15,7 @@ class AddImagedmouseInfo(tk.Toplevel):
         self.gui_ref=gui    
         self.geometry("+2555+0")
 
-        colname=session_date+'\\'+mouse_code
+        colname=session_date+os.sep+mouse_code
         row_labels=['TimeSetOnWheel',
                     'EyesComments',
                     'BehaviourComments',

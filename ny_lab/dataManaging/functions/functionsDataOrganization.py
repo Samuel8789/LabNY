@@ -20,19 +20,19 @@ import pathlib
 
     
 def move_all_files_from_source_to_dest(source,dest):
-    file_list = glob.glob(source+'\**')
+    file_list = glob.glob(source+os.sep+'**')
     for fname in file_list:
         shutil.move(fname,os.path.join(dest,os.path.split(fname)[1]))
 
 
 def open_directory(foldername):
     systems = {
-        'nt': os.startfile,
+        'nt': lambda foldername: os.startfile,
         'posix': lambda foldername: os.system('xdg-open "%s"' % foldername),
         'os2': lambda foldername: os.system('open "%s"' % foldername)
          }
     
-    systems.get(os.name, os.startfile)(foldername)
+    systems.get(os.name)(foldername)
     return foldername
 
     
@@ -176,7 +176,7 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     sq_type=[]
     sq_type=list(short_metadata_type_check(image_sequence_directory_full_path))
     
-    cleaneduplist=glob.glob(image_sequence_directory_full_path+'\**Cycle**.tif')
+    cleaneduplist=glob.glob(image_sequence_directory_full_path+os.sep+'**Cycle**.tif')
 
     # if 'TSeries ZSeries Element' separate by plane
     # if 'Single'
@@ -188,14 +188,14 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
     Multiplane=False
     RedPlaneNumber=0
     GreenPlaneNumber=0   
-    ChannelRedExists=any(glob.glob(image_sequence_directory_full_path+'\\**_Ch1_**', recursive=False))
-    ChannelGreenExists=any(glob.glob(image_sequence_directory_full_path+'\\**_Ch2_**', recursive=False))  
+    ChannelRedExists=any(glob.glob(image_sequence_directory_full_path+os.sep+'**_Ch1_**', recursive=False))
+    ChannelGreenExists=any(glob.glob(image_sequence_directory_full_path+os.sep+'**_Ch2_**', recursive=False))  
        
     possible_channels=2
     if sq_type[0]!='':
         pass
     else:
-        alltiffs=glob.glob(image_sequence_directory_full_path+'\**.tif')
+        alltiffs=glob.glob(image_sequence_directory_full_path+os.sep+'**.tif')
 
         if cleaneduplist and os.path.getsize(cleaneduplist[0])>200000:
             
@@ -206,11 +206,11 @@ def check_channels_and_planes(image_sequence_directory_full_path, correction=Fal
             
         elif os.path.isdir(os.path.join(image_sequence_directory_full_path,'Ch1Red')):
             
-            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch1Red','plane1')+'\**.tif')[0])
+            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch1Red','plane1')+os.sep+'**.tif')[0])
             
         else :
             
-            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch2Green','plane1')+'\**.tif')[0])
+            img_fpath = pathlib.Path(glob.glob(os.path.join(image_sequence_directory_full_path,'Ch2Green','plane1')+os.sep+'**.tif')[0])
     
     
             
@@ -444,8 +444,8 @@ def restore_initial_org():
     ch1='Ch1Red'
     ch2='Ch2Green'
 
-    images1=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch1)+'\\**\\**.tif')
-    images2=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch2)+'\\**\\**.tif')
+    images1=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch1)+os.sep+'**\\**.tif')
+    images2=glob.glob(os.path.join(sphaqpath,aq,aq_name,ch2)+os.sep+'**\\**.tif')
 
     for i in images1:
         os.rename(i, os.path.join( sphaqpath,aq,aq_name,os.path.split(i)[1]))

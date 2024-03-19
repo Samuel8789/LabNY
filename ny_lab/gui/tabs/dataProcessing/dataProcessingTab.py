@@ -11,6 +11,7 @@ from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import matplotlib.image as mpimg
 import datetime
 import os
+import subprocess 
 
 from ...utils import button_update_database  
 from .widgetSelectAcquisition import WidgetSelectAcquisition
@@ -198,9 +199,12 @@ class DataProcessingTab(tk.Frame):
         later add the pipeilen to process automatically
         '''
         session_name=os.path.split( self.session_to_process.get())[1]
-        os.startfile(r'G:\Projects\TemPrairireSSH\TranfseringFilesFromPrairireRig.txt')
-        os.system("start /B start cmd.exe @cmd /k mycommand...")
-        os.startfile(os.path.join(r'G:\Projects\TemPrairireSSH', session_name))
+        # # import subprocess 
+        # # subprocess.Popen(['xdg-open', desktop])
+        
+        # os.startfile(r'G:\Projects\TemPrairireSSH\TranfseringFilesFromPrairireRig.txt')
+        # os.system("start /B start cmd.exe @cmd /k mycommand...")
+        # os.startfile(os.path.join(r'G:\Projects\TemPrairireSSH', session_name))
 
     def clean_up_raw_imaging_folders_button(self):
         print('Started Processing Raw Permanent Folders')
@@ -211,7 +215,10 @@ class DataProcessingTab(tk.Frame):
         # button_update_database(self.gui_ref)
         print('Finsihed Processing Raw Permanent Folders')
         if os.path.isdir(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice')):
-            os.startfile(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice'))
+            # os.startfile(os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice'))
+            
+            subprocess.Popen(['xdg-open', os.path.join(self.gui_ref.lab.datamanaging.all_new_unprocessed_session[session_name],'Mice')])
+            
         self.cleanedup_session_objects[session_name]=prairie_session
         
     def preprocess_raw_session(self):
@@ -247,8 +254,7 @@ class DataProcessingTab(tk.Frame):
                 for dataset in mouse_object.all_raw_mouse_acquisitions_datasets.values():
                     dataset.process_raw_dataset(forcing=self.v.get())
         
-        
-        
+        dataset=list(mouse_object.all_raw_mouse_acquisitions_datasets.values())[0]
         
         print('Finished Processing (bidishift, le clip and summary images )datasets')
         

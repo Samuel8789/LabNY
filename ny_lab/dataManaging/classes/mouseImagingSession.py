@@ -93,7 +93,7 @@ class MouseImagingSession():
 
             # this organizez folders in permanent directiory
             self.raw_session_folder_org()
-            print('Finished Folder Organization'+  raw_imaging_session_path +  self.mouse_code)
+            print('Finished Folder Organization: '+  raw_imaging_session_path +os.sep+  self.mouse_code)
            
             #then create acquisitoin objects and copy to slow , this is slow because of metadta read
             # self.raw_session_preprocessing()
@@ -180,8 +180,8 @@ class MouseImagingSession():
         self.Testacquisitionspath=os.path.join(self.mouse_raw_imaging_session_path,'TestAcquisitions') 
         self.correctComplexacquisitonsNames('FOV_')
         self.correctComplexacquisitonsNames('Atlas_')
-        self.all_fovs=glob.glob(self.mouse_raw_imaging_session_path +'\\FOV_**', recursive=False) 
-        self.all_atlases=glob.glob(self.mouse_raw_imaging_session_path +'\\Atlas_**', recursive=False) 
+        self.all_fovs=glob.glob(self.mouse_raw_imaging_session_path +os.sep+'FOV_**', recursive=False) 
+        self.all_atlases=glob.glob(self.mouse_raw_imaging_session_path +os.sep+'Atlas_**', recursive=False) 
         
         self.all_simple_Aq_folders=[self.raw_Coordinate0path, self.raw_Noniima, self.Testacquisitionspath]
         
@@ -216,7 +216,7 @@ class MouseImagingSession():
             module_logger.info('creating directory structures' + aq_folder)
 
             self.createAqFolders(aq_folder)
-            allaq=glob.glob(aq_folder +'\\Aq_**', recursive=False)  
+            allaq=glob.glob(aq_folder +os.sep+'Aq_**', recursive=False)  
 
             for aq in allaq:
                 module_logger.info('processing acquisitions'+ aq_folder)
@@ -247,8 +247,8 @@ class MouseImagingSession():
           
 
             # no detect fovs with fov number highr thant totAL NIMBER OF FOVS AND CHANGE IT        
-            all_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname+'**', recursive=False) 
-            unnumbered_compacqs=glob.glob(self.mouse_raw_imaging_session_path +'\\'+ComplexAcqname, recursive=False) 
+            all_compacqs=glob.glob(self.mouse_raw_imaging_session_path +os.sep+''+ComplexAcqname+'**', recursive=False) 
+            unnumbered_compacqs=glob.glob(self.mouse_raw_imaging_session_path +os.sep+''+ComplexAcqname, recursive=False) 
     
             if unnumbered_compacqs:
                 named_compacqs_paths=[i for i in all_compacqs if i not in unnumbered_compacqs]
@@ -274,7 +274,7 @@ class MouseImagingSession():
                            to_change_to.remove(to_change_to[0])
                
             for compacq in unnumbered_compacqs:
-                if not glob.glob( compacq+'\\**\\**.env', recursive=True) and not glob.glob( compacq+'\\**\\**.xy', recursive=True) :
+                if not glob.glob( compacq+os.sep+'**'+os.sep+'**.env', recursive=True) and not glob.glob( compacq+os.sep+'**'+os.sep+'**.xy', recursive=True) :
     
                     recursively_eliminate_empty_folders(compacq) 
                 else:
@@ -288,10 +288,10 @@ class MouseImagingSession():
                                            
     
     def createAqFolders(self, generic_aq):
-        generic_aq_folder_prairieaq=glob.glob(generic_aq +'\\**\\**.env', recursive=False) 
+        generic_aq_folder_prairieaq=glob.glob(generic_aq +os.sep+'**'+os.sep+'**.env', recursive=False) 
                        
-        allaq=glob.glob(generic_aq +'\\Aq_**', recursive=False) 
-        emptyaq=glob.glob(generic_aq +'\\Aq_', recursive=False) 
+        allaq=glob.glob(generic_aq +os.sep+'Aq_**', recursive=False) 
+        emptyaq=glob.glob(generic_aq +os.sep+'Aq_', recursive=False) 
 
         Aq_number=[os.path.split(i)[1] for i in allaq if i not in emptyaq]
         # currentaq=[i for i in allaq if i not in emptyaq]
@@ -310,11 +310,11 @@ class MouseImagingSession():
          self.UnprocessedVisStim=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedVisStim')   
          self.UnprocessedDaqRecording=os.path.join(self.mouse_raw_imaging_session_path,'UnprocessedDaq')   
 
-         self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +'\\**\\**Default.ome.tif', recursive=False)
-         self.UnprocessedFaceCameraspaths2=glob.glob(self.UnprocessedFaceCameras +'\\**\\Default\\**000000000_z000.tif', recursive=False)
+         self.UnprocessedFaceCameraspaths=glob.glob(self.UnprocessedFaceCameras +os.sep+'**'+os.sep+'**Default.ome.tif', recursive=False)
+         self.UnprocessedFaceCameraspaths2=glob.glob(self.UnprocessedFaceCameras +os.sep+'**'+os.sep+'Default'+os.sep+'**000000000_z000.tif', recursive=False)
 
-         self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +'\\**.mat', recursive=False)
-         self.UnprocessedDaqRecordingpaths=glob.glob(self.UnprocessedDaqRecording +'\\**.mat', recursive=False)
+         self.UnprocessedVisStimpaths=glob.glob(self.UnprocessedVisStim +os.sep+'**.mat', recursive=False)
+         self.UnprocessedDaqRecordingpaths=glob.glob(self.UnprocessedDaqRecording +os.sep+'**.mat', recursive=False)
          self.UnprocessedFaceCamerasnames=[]
          self.UnprocessedVisStimnames=[]
          self.UnprocessedDaqRecordingnames=[]
@@ -337,8 +337,8 @@ class MouseImagingSession():
          else:
              self.UnprocessedVisStimnames=[os.path.split(self.UnprocessedVisStimpath)[1] for self.UnprocessedVisStimpath in self.UnprocessedVisStimpaths]
              self.UnprocessedVisStimnames=['None']+self.UnprocessedVisStimnames
-             if glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False) :
-                 for mat in glob.glob(self.UnprocessedVisStim +'\\**.mat.mat', recursive=False):      
+             if glob.glob(self.UnprocessedVisStim +os.sep+'**.mat.mat', recursive=False) :
+                 for mat in glob.glob(self.UnprocessedVisStim +os.sep+'**.mat.mat', recursive=False):      
                      os.rename(mat,mat[:-4])
 
          if not self.UnprocessedDaqRecordingpaths:
@@ -347,8 +347,8 @@ class MouseImagingSession():
          else:
              self.UnprocessedDaqRecordingnames=[os.path.split(self.UnprocessedDaqRecordingpath)[1] for self.UnprocessedDaqRecordingpath in self.UnprocessedDaqRecordingpaths]
              self.UnprocessedDaqRecordingnames=['None']+self.UnprocessedDaqRecordingnames
-             if glob.glob(self.UnprocessedDaqRecording +'\\**.mat.mat', recursive=False) :
-                 for mat in glob.glob(self.UnprocessedDaqRecording +'\\**.mat.mat', recursive=False):      
+             if glob.glob(self.UnprocessedDaqRecording +os.sep+'**.mat.mat', recursive=False) :
+                 for mat in glob.glob(self.UnprocessedDaqRecording +os.sep+'**.mat.mat', recursive=False):      
                      os.rename(mat,mat[:-4])            
                 
     def process_aquisition_folder(self, aq):
@@ -379,7 +379,7 @@ class MouseImagingSession():
            self.guiref=self.mouse_object.data_managing_object.LabProjectObject.gui
                 
         print('Openeing extra data selection')   
-        self.select_face_camera_window=select_face_camera(self.guiref, os.path.split(glob.glob(aq +'\\**', recursive=False)[0])[1], self.UnprocessedFaceCamerasnames, self.UnprocessedVisStimnames, self.UnprocessedDaqRecordingnames)
+        self.select_face_camera_window=select_face_camera(self.guiref, os.path.split(glob.glob(aq +os.sep+'**', recursive=False)[0])[1], self.UnprocessedFaceCamerasnames, self.UnprocessedVisStimnames, self.UnprocessedDaqRecordingnames)
         self.select_face_camera_window.wait_window()
         get_values= self.select_face_camera_window.values
         self.select_face_camera_window.destroy()
@@ -391,13 +391,13 @@ class MouseImagingSession():
             # unprocessedfacecameraname= os.path.split(os.path.split([name for name in UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0])[1]
             if self.UnprocessedFaceCameraspaths:
                 unprocessedfacecamerafullpath=os.path.split([name for name in self.UnprocessedFaceCameraspaths if get_values[1][1] in name][0])[0]
-                files = glob.glob(unprocessedfacecamerafullpath+'\\**' )
+                files = glob.glob(unprocessedfacecamerafullpath+os.sep+'**' )
                 for f in files:
                       shutil.move(f, facecameradir)               
             
             elif self.UnprocessedFaceCameraspaths2:
                 unprocessedfacecamerafullpath2=os.path.split(os.path.split([name for name in self.UnprocessedFaceCameraspaths2 if get_values[1][1] in name][0])[0])[0]
-                files2 = glob.glob(unprocessedfacecamerafullpath2+'\\**' )
+                files2 = glob.glob(unprocessedfacecamerafullpath2+os.sep+'**' )
                 for f in files2:
                     if os.path.isfile(f):
                         shutil.move(f, facecameradir)       
@@ -432,8 +432,8 @@ class MouseImagingSession():
     def load_raw_nonimaging_Aquisitions(self):   
         if os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions')):           
             for i, aqu in enumerate(os.listdir(os.path.join(self.mouse_raw_imaging_session_path, 'NonImagingAcquisitions'))):
-                 if (os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)) and glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)+'\\**\\**.env', recursive=False)):
-                    self.all_raw_nonimaging_Aquisitions[str(aqu)]=NonimagingAquisition(os.path.split(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)+'\\**\\**.env', recursive=False)[0])[0],
+                 if (os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)) and glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)+os.sep+'**'+os.sep+'**.env', recursive=False)):
+                    self.all_raw_nonimaging_Aquisitions[str(aqu)]=NonimagingAquisition(os.path.split(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)+os.sep+'**'+os.sep+'**.env', recursive=False)[0])[0],
                                                                               self,
                                                                               os.path.join( self.mouse_raw_imaging_session_path ,'NonImagingAcquisitions', aqu)) 
                  else:
@@ -457,7 +457,7 @@ class MouseImagingSession():
     def load_raw_Test_Aquisitions(self):   
          if os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'TestAcquisitions')):
          
-             self.all_raw_Test_Aquisitions={str(aqu):TestAquisition(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'TestAcquisitions', aqu)+'\\**',recursive=False)[0],
+             self.all_raw_Test_Aquisitions={str(aqu):TestAquisition(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'TestAcquisitions', aqu)+os.sep+'**',recursive=False)[0],
                                                                        self,
                                                                        os.path.join( self.mouse_raw_imaging_session_path ,'TestAcquisitions', aqu)) 
                                         
@@ -482,7 +482,7 @@ class MouseImagingSession():
          
          if os.path.isdir(os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton')):
          
-             self.all_raw_0coordinate_Aquisitions={str(aqu):Coordinate0Aquisition(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton', aqu)+'\\**',recursive=False)[0],
+             self.all_raw_0coordinate_Aquisitions={str(aqu):Coordinate0Aquisition(glob.glob(os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton', aqu)+os.sep+'**',recursive=False)[0],
                                                                        self,
                                                                        os.path.join( self.mouse_raw_imaging_session_path ,'0CoordinateAcquisiton', aqu)) 
                                         

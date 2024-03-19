@@ -70,7 +70,7 @@ class RawAcquisitionManager:
             self.raw_dataset_directory_path=self.scanimage_dataset_directory
             self.scanimage_raw=True
             
-        self.raw_dataset_fullfile_paths=glob.glob(self.raw_dataset_directory_path+'\\**.tif')
+        self.raw_dataset_fullfile_paths=glob.glob(self.raw_dataset_directory_path+os.sep+'**.tif')
 
     def define_dataset_info(self):
         
@@ -105,7 +105,7 @@ class RawAcquisitionManager:
     def real_saved_mmap_file_path(self):
         self.saved_raw_mmap_file_path=''
         
-        mmap_files=glob.glob(os.path.split(self.raw_mmap_file_path)[0]+'\\**.mmap')
+        mmap_files=glob.glob(os.path.split(self.raw_mmap_file_path)[0]+os.sep+'**.mmap')
         saved_raw_mmap_file_paths=[fil  for fil in mmap_files if '_'.join([self.raw_dataset_name, self.raw_dataset_channel, self.raw_dataset_plane]) in fil]
         if saved_raw_mmap_file_paths:
             self.saved_raw_mmap_file_path=saved_raw_mmap_file_paths[0]

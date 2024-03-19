@@ -84,7 +84,7 @@ class FOV():
          
     def load_raw_1050tomato(self):
         if os.path.isdir(os.path.join(self.FOV_path,'1050_Tomato')):
-            self.all_raw_1050tomato={aqu:Tomato1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_Tomato')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_1050tomato={aqu:Tomato1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_Tomato')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path,'1050_Tomato', aqu))
                                      
@@ -96,7 +96,7 @@ class FOV():
          
     def load_raw_10503planetomato(self):
         if os.path.isdir(os.path.join(self.FOV_path,'1050_3PlaneTomato')):
-            self.all_raw_10503planetomato={aqu:Tomato3Plane1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_3PlaneTomato')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_10503planetomato={aqu:Tomato3Plane1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_3PlaneTomato')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path, '1050_3PlaneTomato',aqu))
                                   for aqu in os.listdir(os.path.join(self.FOV_path,'1050_3PlaneTomato'))
@@ -107,7 +107,7 @@ class FOV():
          
     def load_raw_1050HighResStackTomato(self):
         if os.path.isdir(os.path.join(self.FOV_path,'1050_HighResStackTomato')): 
-            self.all_raw_1050HighResStackTomato={aqu:TomatoHighResStack1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_HighResStackTomato')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_1050HighResStackTomato={aqu:TomatoHighResStack1050Acquisition(glob.glob( os.path.join(self.FOV_path, '1050_HighResStackTomato')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path,'1050_HighResStackTomato', aqu))
                                   for aqu in os.listdir(os.path.join(self.FOV_path,'1050_HighResStackTomato'))
@@ -118,7 +118,7 @@ class FOV():
     
     def load_raw_HighResStackGreen(self):
         if os.path.isdir(os.path.join(self.FOV_path,'HighResStackGreen')):
-            self.all_raw_HighResStackGreen={aqu:HighResStackGreenAcquisition(glob.glob( os.path.join(self.FOV_path, 'HighResStackGreen')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_HighResStackGreen={aqu:HighResStackGreenAcquisition(glob.glob( os.path.join(self.FOV_path, 'HighResStackGreen')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path,'HighResStackGreen', aqu))
                                   for aqu in os.listdir(os.path.join(self.FOV_path,'HighResStackGreen'))
@@ -129,7 +129,7 @@ class FOV():
          
     def load_raw_OtherAcq(self):
         if os.path.isdir(os.path.join(self.FOV_path,'OtherAcq')):
-            self.all_raw_OtherAcq={aqu:OtherAcqAquisition(glob.glob( os.path.join(self.FOV_path, 'OtherAcq')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_OtherAcq={aqu:OtherAcqAquisition(glob.glob( os.path.join(self.FOV_path, 'OtherAcq')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path,'OtherAcq', aqu))
                                   for aqu in os.listdir(os.path.join(self.FOV_path,'OtherAcq'))
@@ -142,7 +142,7 @@ class FOV():
             
     def load_raw_SurfaceImage(self):
         if os.path.isdir(os.path.join(self.FOV_path,'SurfaceImage')):
-            self.all_raw_SurfaceImage={aqu:SurfaceImageAquisition(glob.glob( os.path.join(self.FOV_path, 'SurfaceImage')+'\\**',recursive=False)[0],                                                          
+            self.all_raw_SurfaceImage={aqu:SurfaceImageAquisition(glob.glob( os.path.join(self.FOV_path, 'SurfaceImage')+os.sep+'**',recursive=False)[0],                                                          
                                                 self,
                                                 raw_input_path=os.path.join( self.FOV_path,'SurfaceImage', aqu))
                                   for aqu in os.listdir(os.path.join(self.FOV_path,'SurfaceImage'))
@@ -156,7 +156,7 @@ class FOV():
         self.all_aquisitions={aqu:Aquisition(aqu, 
                                              FOV_object=self) 
                               for aqu in os.listdir(self.mouse_session_FOV_path)                          
-                              if glob.glob(os.path.join(self.mouse_session_FOV_path,aqu)+'\\planes', recursive=False)}
+                              if glob.glob(os.path.join(self.mouse_session_FOV_path,aqu)+os.sep+'planes', recursive=False)}
         
     
     def load_existing_1050tomato(self):

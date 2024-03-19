@@ -7,13 +7,13 @@ Created on Sat Sep 25 10:58:51 2021
 
 import tkinter as tk
 from tkinter import END, Label, RAISED, Text, WORD, Button
-
+import os
 class AddWidefieldInfo(tk.Toplevel):
     def __init__(self,  gui, session_date, mouse_code):
         tk.Toplevel.__init__(self, gui) #i
         self.geometry("+2555+0")
         
-        colname=session_date+'\\'+mouse_code
+        colname=session_date+os.sep+mouse_code
         row_labels=['WideFieldComments']
         self.total_rows=len(row_labels)+1
         self.values=list()

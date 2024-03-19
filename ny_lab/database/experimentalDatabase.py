@@ -632,7 +632,7 @@ class ExperimentalDatabase():
         
         good_mice_exp=[i for i in mice_exp if i[3] in selected_codes]
          
-        moved_room=int(all_inject_params[1][26])
+        moved_room=int(all_inject_params[1][all_inject_params[0].index('MovedRoom')])
         
         
         labels_list=[mouse[1] for mouse in all_inject_params[1:]]
@@ -642,10 +642,7 @@ class ExperimentalDatabase():
             mouse[1]=labels[i]
         
 
-        # udate actions room change and experiment 
-        if moved_room:
-            self.move_cage_to_experimental_room(cage, raw_date_performed)
-            
+      
         
         # update queries  
         query_mice_injected_update="""
@@ -691,29 +688,39 @@ class ExperimentalDatabase():
    
         for i, mouse in enumerate(good_mice_exp):
             noinjection=0
-            if not (all_inject_params[i+1][3] or all_inject_params[i+1][4] or all_inject_params[i+1][3] ):
+            if not any([all_inject_params[i+1][all_inject_params[0].index('Virus1')], 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus2')] , 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus3')] , 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus4')]]):
                 for j, k in enumerate(all_inject_params[i+1][:-1]):
-                    if j>5:
+                    if j>all_inject_params[0].index('Virus4'):
                         all_inject_params[i+1][j]=np.nan                       
                         noinjection=1
-        # update MICE_table
-            params=(all_inject_params[i+1][1], mouse[1],)
-            self.databse_ref.arbitrary_updating_record(query_mice_injected_update,params)
-        # update exper
-   
-            params=(all_inject_params[i+1][1], date_performed ,mouse[0] )
-            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+       
+       
         # update injection
         
-            virus_tuple=(all_inject_params[i+1][3],all_inject_params[i+1][4],all_inject_params[i+1][5])
+          
+
+        
+            virus_tuple=(all_inject_params[i+1][all_inject_params[0].index('Virus1')], 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus2')] , 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus3')] , 
+                    all_inject_params[i+1][all_inject_params[0].index('Virus4')])
             if any(virus_tuple):
                 viruscomb=get_combination_from_virus(virus_tuple, self)
             else:
                 viruscomb=[[28]]
-            list_for_update=[all_inject_params[i+1][2],viruscomb[0][0]]+all_inject_params[i+1][6:]  
+            list_for_update=[all_inject_params[i+1][all_inject_params[0].index('Date')],viruscomb[0][0]]+all_inject_params[i+1][all_inject_params[0].index('Virus4')+1:]  
             list_for_update[0]=date_performed
+           
             if not noinjection:
-                list_for_update_integercorrected=[ int(float(j))  if i in [5,6,7,14] else j for i,j in enumerate(list_for_update)]
+                 
+                tocorretc=[all_inject_params[0].index('CorticalArea')-5,
+                all_inject_params[0].index('InjectionSites')-5,
+                all_inject_params[0].index('Injection1Coordinates')-5,
+                all_inject_params[0].index('Injection2Coordinates')-5]
+                list_for_update_integercorrected=[ int(float(j))  if i in tocorretc else j for i,j in enumerate(list_for_update)]
             else:
                 list_for_update_integercorrected=list_for_update
             tuple_for_update=tuple(list_for_update_integercorrected[:-1] )
@@ -722,6 +729,20 @@ class ExperimentalDatabase():
             
             params=(tuple_for_update)
             self.databse_ref.arbitrary_updating_record(query_update_injections,params)
+            
+            # update exper
+       
+            params=(all_inject_params[i+1][1], date_performed ,mouse[0] )
+            self.databse_ref.arbitrary_updating_record(query_update_exps,params)
+            
+            # update MICE_table
+            params=(all_inject_params[i+1][1], mouse[1],)
+            self.databse_ref.arbitrary_updating_record(query_mice_injected_update,params)
+            
+            # udate actions room change and experiment 
+            if moved_room:
+                self.move_cage_to_experimental_room(cage, raw_date_performed)
+                
             
         self.databse_ref.independent_commit()    
         

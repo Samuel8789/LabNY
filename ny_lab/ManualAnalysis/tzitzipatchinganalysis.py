@@ -155,7 +155,7 @@ def save_pdf(filename):
 #%% Load on acid and movie data
 
 # cnm = cnmf.online_cnmf.OnACID(path=hdf5_file_path)
-data = mat73.loadmat(r'C:\Users\sp3660\Desktop\Chandelier_ Calcium&Volatage\Chandelie_AS-003_20230610-102153_sort.mat')
+data = mat73.loadmat(r'/home/sp3660/Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi/Chandelier_ Calcium&Volatage/Chandelie_AS-003_20230610-102153_sort.mat')
 accepted_list_sorter=data['proc']['comp_accepted'].astype(int)
 accepted_list_sorter_core=data['proc']['comp_accepted_core'].astype(int)
 # substract 1 from matlab indexes
@@ -177,7 +177,7 @@ plt.plot(raw[chandelier,1:])
 
 #%%       compute  
 #loading data and variables
-dirpath=r'C:\Users\sp3660\Desktop\Chandelier_ Calcium&Volatage'
+dirpath=r'/home/sp3660/Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi//Chandelier_ Calcium&Volatage'
 dataname='Chandelie_AS-003_data.mat'
 full_data_path=os.path.join(dirpath,dataname)
 voltagedat='VoltageRecording_AS_003_ctr.csv'
@@ -191,6 +191,7 @@ noisdatapath=os.path.join(dirpath,noisecellsname)
 noisedata=pd.read_csv(noisdatapath)
 
 noiserois=noisedata.values.T
+
 
 
 voltagedata=pd.read_csv(os.path.join(dirpath,voltagedat))
@@ -215,7 +216,6 @@ thr_isi=0.2
 bursts=np.argwhere(isi>thr_isi)+1
 bursts=np.insert(bursts,0,0)
 bursts_times_seconds=spiketimes_seconds[bursts]
-
 
 
 # convolving spikes with gaussian

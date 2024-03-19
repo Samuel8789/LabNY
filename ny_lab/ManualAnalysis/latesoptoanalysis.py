@@ -33,13 +33,19 @@ import scipy.signal as sg
 import scipy.stats as st
 import pandas as pd
 import shutil
-import copy
+from copy import deepcopy
 import os
 import seaborn as sns
 from math import sqrt
 import pickle
 import glob
 import scipy.stats as st
+from pylab import *
+import matplotlib
+
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
+
 
 #%% PROCESSING FUNCTIONS
 deriv=lambda x:np.diff(x,prepend=x[0] )
@@ -52,9 +58,9 @@ def save_temp_data(multiple_analysis,datapath):
             pickle.dump(multiple_analysis, f, pickle.HIGHEST_PROTOCOL)
     return datapath
             
-def check_temp_data(tempprocessingpat) :
+def check_temp_data(tempprocessingpat,experimentalmousename) :
     temp_data_list=[]
-    temp_data_list=glob.glob(tempprocessingpat+f'\\**{experimentalmousename}**', recursive=False)
+    temp_data_list=glob.glob(tempprocessingpat+os.sep+f'**{experimentalmousename}', recursive=False)
     
     return temp_data_list
 
@@ -248,7 +254,7 @@ def get_response(analysis,full_data,mean_sweep_response,pval ):
             
     return response
 
-def get_stimulus_table(analysis,visstimtranstionts,pre_time=500,post_time=1000):
+def get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=1000,post_time=2000):
 
    #ms
     pre_frames=np.ceil(pre_time/analysis.milisecond_period).astype(int)
@@ -301,9 +307,20 @@ def get_stimulus_table(analysis,visstimtranstionts,pre_time=500,post_time=1000):
     analysis.full_data['visstim_info']['OptoDrift']={}
     analysis.full_data['visstim_info']['OptoDrift']['stimulus_table']=sorted_df
     
-    return sorted_df,pre_frames,post_frames
+    return sorted_df,pre_frames,post_frames,pre_time,post_time
 
-def get_sweep_response(analysis,full_data,traces,blank_opt,visstimtranstionts,use_scaled=False,smoothwindow=False,dff=False):
+def get_sweep_response(analysis,
+                       full_data,
+                       traces,
+                       blank_opt,
+                       visstimtranstionts,
+                       use_scaled=False,
+                       smoothwindow=False,
+                       dff=False, 
+                       pre_time=1000,
+                       post_time=2000,
+                       meanstimtime=1000,
+                       mean_start=0):
    
     titstr='raw'
     substracted=None
@@ -314,27 +331,36 @@ def get_sweep_response(analysis,full_data,traces,blank_opt,visstimtranstionts,us
     
     if smoothwindow:
   
-      traces,smoothwindow=smooth_activity_array(traces, smoothwindow)
+      traces,smoothwindow=smooth_activity_array(analysis,traces, smoothwindow)
       titstr=titstr+'_smoothed'
     else:
         traces=traces
+        
+    mean_frames=np.ceil(meanstimtime/analysis.milisecond_period).astype(int)
+    stratframe=np.ceil((pre_time+mean_start)/analysis.milisecond_period).astype(int)
+    
     
 
-    sorted_df,pre_frames,post_frames=get_stimulus_table(analysis,visstimtranstionts)
+    sorted_df,pre_frames,post_frames,pre_time,post_time=get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=500, post_time=2000)
     
-    def do_mean(x,pre_frames=13,post_frames=25):
-        # +1])
+    def do_mean(x,stratframe=13,mean_frames=13):
+        # print(f'{stratframe}:{ stratframe+mean_frames}')
         return np.mean(
-            x[pre_frames:
-              pre_frames + post_frames])
+            x[stratframe:
+              stratframe+mean_frames])
 
-    def do_p_value(x,pre_frames=13,post_frames=25):
+    def do_p_value(x,pre_frames=13,stratframe=13,mean_frames=13):
+        print(f'baseline:0:{pre_frames}')
+        print(f'stimframes{stratframe}:{stratframe + mean_frames}')
+
         (_, p) = \
             st.f_oneway(
                 x[:pre_frames],
-                x[pre_frames:
-                  pre_frames + post_frames])
+                x[stratframe:
+                  stratframe + mean_frames])
         return p
+
+    
 
     numberc=len(traces)
     speed=full_data['voltage_traces']['Speed']
@@ -349,7 +375,9 @@ def get_sweep_response(analysis,full_data,traces,blank_opt,visstimtranstionts,us
     
     for index, row in sorted_df.iterrows():
         start = int(row['start'] - pre_frames)
-        end = int(row['start'] + post_frames + pre_frames)
+        # end = int(row['start'] + post_frames + pre_frames)
+        end = int(row['start'] + post_frames)
+
 
         for nc in range(numberc):
             temp = traces[int(nc), start:end]
@@ -364,11 +392,10 @@ def get_sweep_response(analysis,full_data,traces,blank_opt,visstimtranstionts,us
             
         sweep_response['dx'][index] = speed[start:end]
 
-    mean_sweep_response = sweep_response.applymap(do_mean,pre_frames=pre_frames, post_frames=post_frames)
-
+    mean_sweep_response = sweep_response.applymap(do_mean,stratframe=stratframe, mean_frames=mean_frames)
+    pval = sweep_response.applymap(do_p_value,pre_frames=pre_frames,stratframe=stratframe, mean_frames=mean_frames)
     
-    pval = sweep_response.applymap(do_p_value,pre_frames=pre_frames, post_frames=post_frames)
-    return sweep_response, mean_sweep_response, pval, full_data
+    return sweep_response, mean_sweep_response, pval, full_data, meanstimtime,mean_frames
 
 def process_vis_stim(analysis):
     
@@ -377,7 +404,6 @@ def process_vis_stim(analysis):
 
     optograting=analysis.acquisition_object.visstimdict['opto']['randomoptograting']
 
-
     final_stim_onsets={}
     for key, stim in analysis.signals_object.optodrift_info.items():
         final_stim_onsets[key]=stim['ArrayFinal_downsampled_LED_clipped']
@@ -385,9 +411,7 @@ def process_vis_stim(analysis):
   
     
     return   final_stim_onsets
-    
-        
-    
+
 def load_chandelier_cell_file(analysis):
     
     all_planes_chand_indexes={}
@@ -404,7 +428,7 @@ def load_chandelier_cell_file(analysis):
         
     return all_planes_chand_indexes
 
-def create_opto_transitions_array(analysis,stimulated_cells_number,nTrials,opto_repetitions,c,blank_opt):
+def create_opto_transitions_array(analysis,stimulated_cells_number,nTrials,opto_repetitions,led_opt,blank_opt):
     up=analysis.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['up']
     down=analysis.full_data['voltage_traces']['Full_signals_transitions']['PhotoStim']['aligned_downsampled_LEDshifted']['Prairie']['down']
     
@@ -448,6 +472,23 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
     all_planes_distances_from_optocell={}
     accepted_all_plane_distances=None
     
+    all_planes_cell_coordinates={}  
+    all_planes_As={}
+    for plane in analysis.caiman_results.keys():
+        
+        planename=plane[plane.find('Plane'):plane.find('Plane')+len('Plane')+1]
+        res=analysis.caiman_results[plane]
+        # res.data['est']['contours']
+        A=res.data['est']['A']
+        nA = np.sqrt(np.ravel(A.power(2).sum(axis=0)))
+        nA_inv_mat = scipy.sparse.spdiags(1. / nA, 0, nA.shape[0], nA.shape[0])
+        A = A * nA_inv_mat
+        A=A.toarray().reshape([256,256,len(res.data['est']['contours'])])
+           
+        
+        cell_coordinates=np.vstack(res.centers_of_mass)
+        all_planes_cell_coordinates[planename]=cell_coordinates
+        all_planes_As[planename]=A
     
     if analysis.acquisition_object.metadata_object.photostim_file:
         ref_image=Image.fromarray(analysis.acquisition_object.reference_image_dic[[i for i in analysis.acquisition_object.reference_image_dic.keys() if ('Red-8bit' in i) or ('Red-Green-8bit' in i)][0]])
@@ -456,19 +497,7 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
           coordinates.append((float(v['points']['Point_1']['x_pos'])*256,float(v['points']['Point_1']['y_pos'])*256,float(v['points']['Point_1']['spiral_width'])*256))
           
           
-        all_planes_cell_coordinates={}  
-        for plane in analysis.caiman_results.keys():
-            res=analysis.caiman_results[plane]
-            # res.data['est']['contours']
-            A=res.data['est']['A']
-            nA = np.sqrt(np.ravel(A.power(2).sum(axis=0)))
-            nA_inv_mat = scipy.sparse.spdiags(1. / nA, 0, nA.shape[0], nA.shape[0])
-            A = A * nA_inv_mat
-            A=A.toarray().reshape([256,256,len(res.data['est']['contours'])])
-               
-            
-            cell_coordinates=np.vstack(res.centers_of_mass)
-            all_planes_cell_coordinates[plane]=cell_coordinates
+     
      
         optoplane=[m for m in all_planes_cell_coordinates.keys() if 'Plane1' in m][0]
         optocellids=np.zeros(len(coordinates),dtype=int)
@@ -489,13 +518,14 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
             for key in all_planes_distances_from_optocell.keys():
                 plane=key[key.find('Plane'):key.find('Plane')+6]
                 accepted_all_plane_distances[plane]=all_planes_distances_from_optocell[key][analysis.full_data['imaging_data']['All_planes_rough']['CellIds'][plane]]
-            accepted_all_plane_distances=np.hstack(accepted_all_plane_distances.values())
+            accepted_all_plane_distances=np.hstack(list(accepted_all_plane_distances.values()))
             
                 
             
+        plane_to_plot='Plane1'
         f,ax=plt.subplots(1,3)
-        ax[0].imshow(A[:,:,analysis.full_data['imaging_data']['Plane1']['CellIds']].sum(axis=2).T)
-        ax[1].imshow(A[:,:,optocellids].sum(axis=2).T)
+        ax[0].imshow(all_planes_As[plane_to_plot][:,:,analysis.full_data['imaging_data'][plane_to_plot]['CellIds']].sum(axis=2).T)
+        ax[1].imshow(all_planes_As[plane_to_plot][:,:,optocellids].sum(axis=2).T)
         ax[2].imshow(ref_image.resize((256, 256)))
         for coord in coordinates:
             circles=[]
@@ -509,8 +539,21 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
             
     else:
         
+        
+        
         alloptocellids=all_planes_chand_indexes
+        
+        for plane_to_plot in ['Plane1','Plane2']:
+            
+            if plane_to_plot in analysis.full_data['imaging_data'].keys():
+                f,ax=plt.subplots(1,3)
+                ax[0].imshow(all_planes_As[plane_to_plot][:,:,analysis.full_data['imaging_data'][plane_to_plot]['CellIds']].sum(axis=2).T)
+                ax[1].imshow(all_planes_As[plane_to_plot][:,:,alloptocellids[plane_to_plot]].sum(axis=2).T)
        
+        
+        
+        
+        
         
         
         
@@ -530,9 +573,6 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
                         'all':{'all':{}}
                         }
     
-
-   
-        
     for plane,ids in analysis.full_data['imaging_data']['All_planes_rough']['CellIds'].items():
         
         optocellindex_dict['opto']['all'][plane]=np.where(np.in1d(ids, alloptocellids[plane]))[0]
@@ -573,7 +613,7 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
 
     return optocellindex_dict,traces_dict,accepted_all_plane_distances
 
-def slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=False): 
+def slice_by_optotrial(analysis,stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=False): 
     prestim=int(pretime*fr)
     poststim=int(posttime*fr)        
     trialtimevector=np.linspace(-pretime,posttime,prestim+poststim)
@@ -598,11 +638,11 @@ def slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_ar
                      'substracted_smoothed':np.zeros((traces_dict['all']['all']['All_planes']['demixed'].shape[0],stimulated_cells_number,nTrials,prestim+poststim)).mean(axis=2) 
                      }
     
-    activity_dict={'opto':  {'trials':copy.deepcopy(build_dict),
-                             'mean': copy.deepcopy(build_mean_dict)  
+    activity_dict={'opto':  {'trials':deepcopy(build_dict),
+                             'mean': deepcopy(build_mean_dict)  
                              },
-                   'control':{'trials':copy.deepcopy(build_dict),
-                              'mean':  copy.deepcopy(build_mean_dict)
+                   'control':{'trials':deepcopy(build_dict),
+                              'mean':  deepcopy(build_mean_dict)
                               },
                    'speed':{'trials': {'raw':np.empty(0),
                                         'raw_smoothed':np.zeros((stimulated_cells_number,nTrials,prestimspeed+poststimspeed)),
@@ -616,33 +656,33 @@ def slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_ar
         
     # f,ax=plt.subplots()
     # ax.imshow(traces_dict['all']['all']['All_planes']['demixed'],aspect='auto')
-    
+    traces_dict_scaled=deepcopy(traces_dict)
     if use_scaled:
-        traces_dict['all']['all']['All_planes']['demixed']=scale_to_range(traces_dict['all']['all']['All_planes']['demixed'])
+        traces_dict_scaled['all']['all']['All_planes']['demixed']=scale_to_range(traces_dict['all']['all']['All_planes']['demixed'])
     
     
-    for cell in range(traces_dict['all']['all']['All_planes']['demixed'].shape[0]):
+    for cell in range(traces_dict_scaled['all']['all']['All_planes']['demixed'].shape[0]):
         for opto_idx in range(stimulated_cells_number):
             for i, opto  in enumerate(transition_array[opto_idx,:,0,0]):
-                activity_dict['opto']['trials']['raw'][cell,opto_idx,i,:]=traces_dict['all']['all']['All_planes']['demixed'][cell,opto-prestim:opto+poststim]
+                activity_dict['opto']['trials']['raw'][cell,opto_idx,i,:]=traces_dict_scaled['all']['all']['All_planes']['demixed'][cell,opto-prestim:opto+poststim]
                 
     if gratingcontrol.any():
-        for cell in range(traces_dict['all']['all']['All_planes']['demixed'].shape[0]):
+        for cell in range(traces_dict_scaled['all']['all']['All_planes']['demixed'].shape[0]):
             for opto_idx in range(stimulated_cells_number):
                 for i, cont  in enumerate(gratingcontrol):
-                    activity_dict['control']['trials']['raw'][cell,opto_idx,i,:]=traces_dict['all']['all']['All_planes']['demixed'][cell,cont-prestim:cont+poststim]
+                    activity_dict['control']['trials']['raw'][cell,opto_idx,i,:]=traces_dict_scaled['all']['all']['All_planes']['demixed'][cell,cont-prestim:cont+poststim]
                     
     activity_dict['control']['mean']['raw']=activity_dict['control']['trials']['raw'].mean(axis=2)
     activity_dict['opto']['mean']['raw']=activity_dict['opto']['trials']['raw'].mean(axis=2)
 
     
     print('Substracting baseline all cells')
-    for cell in range(traces_dict['all']['all']['All_planes']['demixed'].shape[0]):
+    for cell in range(traces_dict_scaled['all']['all']['All_planes']['demixed'].shape[0]):
         for opto_idx in range(stimulated_cells_number):
             for trial  in range(nTrials):
                 for treat in ['opto','control']:
 
-                    activity_dict[treat]['trials']['substracted'][cell,opto_idx,trial,:]=      (activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:]- activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:prestim].mean())/activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:prestim].mean()
+                    activity_dict[treat]['trials']['substracted'][cell,opto_idx,trial,:]= 100*(activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:]- activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:prestim].mean())/activity_dict[treat]['trials']['raw'][cell,opto_idx,trial,:prestim].mean()
     
     activity_dict['opto']['mean']['substracted']= activity_dict['opto']['trials']['substracted'].mean(axis=2)
     activity_dict['control']['mean']['substracted']=   activity_dict['control']['trials']['substracted'].mean(axis=2)
@@ -653,10 +693,9 @@ def slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_ar
     for opto_idx in range(stimulated_cells_number):
         for treat in ['opto','control']:
             for p in ['raw','substracted']:
-                activity_dict[treat]['mean'][p+'_smoothed'][:,opto_idx,:],_=smooth_activity_array(activity_dict[treat]['mean'][p][:,opto_idx,:],smoothwindows)
-                for trial  in range(nTrials):
-
-                    activity_dict[treat]['trials'][p+'_smoothed'][:,opto_idx,trial,:],_=smooth_activity_array(activity_dict[treat]['trials'][p][:,opto_idx,trial,:],smoothwindows)
+                activity_dict[treat]['mean'][p+'_smoothed'][:,opto_idx,:],_=smooth_activity_array(analysis,activity_dict[treat]['mean'][p][:,opto_idx,:],smoothwindows)
+                for trial  in range(nTrials):                   
+                    activity_dict[treat]['trials'][p+'_smoothed'][:,opto_idx,trial,:], _ = smooth_activity_array(analysis,activity_dict[treat]['trials'][p][:,opto_idx,trial,:],smoothwindows)
 
     
     print('Scaling and smoothing speed')
@@ -678,9 +717,8 @@ def slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_ar
     
     
     return activity_dict
-           
-def smooth_activity_array(ac_array, smoothwindow):
-    
+#%% utility functions           
+def smooth_activity_array(analysis,ac_array, smoothwindow):
     
     smoothed_array=np.zeros_like(ac_array)
     for row in range(ac_array.shape[0]):
@@ -708,7 +746,7 @@ def scale_to_range(selectedtraces):
 
 def mean_opto_response(activity_dict,stat='mean',stimtime=2):
     tracetypes=list(activity_dict['opto']['trials'].keys())
-    new_activity_dict=copy.deepcopy(activity_dict)
+    new_activity_dict=deepcopy(activity_dict)
     if stat=='mean':
         measure=lambda x:x.mean()
     elif stat=='max':
@@ -861,7 +899,7 @@ def plot_optostimulated_cell_activities(analysis,speedtimestamps,speed, optocell
     
     titstr='raw'
     substracted=None
-    selectedtraces=traces_dict['opto']['all']['All_planes']['demixed']
+    selectedtraces=traces_dict['chand']['all']['All_planes']['demixed']
     if use_scaled:
         selectedtraces=scale_to_range(selectedtraces)
         titstr=titstr+'_scaled'
@@ -869,7 +907,7 @@ def plot_optostimulated_cell_activities(analysis,speedtimestamps,speed, optocell
     
     if smoothwindow:
 
-      optotraces,smoothwindow=smooth_activity_array(selectedtraces, smoothwindow)
+      optotraces,smoothwindow=smooth_activity_array(analysis,selectedtraces, smoothwindow)
       titstr=titstr+'_smoothed'
     else:
         optotraces=selectedtraces
@@ -882,7 +920,7 @@ def plot_optostimulated_cell_activities(analysis,speedtimestamps,speed, optocell
     for i in range(optotraces.shape[0]):
         trace=optotraces[i,:]
         ax[i].plot(analysis.mov_timestamps_miliseconds['shifted']/1000,analysis.smooth_trace(trace,smoothwindow),'k')
-        ax[i].plot(speedtimestamps/1000,analysis.scale_signal(speed),'r',alpha=0.5)
+        # ax[i].plot(speedtimestamps/1000,analysis.scale_signal(speed),'r',alpha=0.5)
         ax[i].margins(x=0)
         if transition_array.shape[0]>1:
             m=i
@@ -901,6 +939,8 @@ def plot_several_traces(analysis,speedtimestamps,speed, optocellindex_dict,trace
     titstr='raw'
 
     selectedtraces=traces_dict['opto']['all']['All_planes']['demixed']
+    selectedtraces=traces_dict['chand']['all']['All_planes']['demixed']
+
     selectedtraces_non_chand=traces_dict['non_chand']['non_opto']['All_planes']['demixed']
     
     all_traces=[selectedtraces,selectedtraces_non_chand]
@@ -913,7 +953,7 @@ def plot_several_traces(analysis,speedtimestamps,speed, optocellindex_dict,trace
 
         if smoothwindow:
     
-          traces,smoothwindow=smooth_activity_array(traces, smoothwindow)
+          traces,smoothwindow=smooth_activity_array(analysis,traces, smoothwindow)
           titstr=titstr+'_smoothed'
         processed[f'Plane{i+1}']=traces
    
@@ -922,22 +962,39 @@ def plot_several_traces(analysis,speedtimestamps,speed, optocellindex_dict,trace
     # #lpot clean traces of all opt and some non oppto cells
     plt.rcParams["figure.figsize"] = [16, 5]
     plt.rcParams["figure.autolayout"] = True
-    non_chand_toplot=10
+    non_chand_toplot=5
+    
+   
+    optospont= analysis.aq_all_info['stim_table'][(analysis.aq_all_info['stim_table']['opto']==1) & (analysis.aq_all_info['stim_table']['blank_sweep']==1)]['start'].values
+    optograt= analysis.aq_all_info['stim_table'][(analysis.aq_all_info['stim_table']['opto']==1) & (analysis.aq_all_info['stim_table']['blank_sweep']==0)]['start'].values
+    
    
     totalcells=optotraces.shape[0]+non_chand_toplot
     f,ax=plt.subplots(totalcells+1,sharex=True)    
     for i in range(optotraces.shape[0]):
         trace=optotraces[i,:]
-        ax[i].plot(analysis.mov_timestamps_miliseconds['shifted']/1000,analysis.smooth_trace(trace,10),c='y')
-        for j in range(len(transition_array[i,:,0,0])):
-            ax[i].axvline(x=analysis.mov_timestamps_miliseconds['shifted'][transition_array[i,j,0,0]]/1000)  
-        
+        ax[i].plot(analysis.mov_timestamps_miliseconds['clipped']/1000,analysis.smooth_trace(trace,10),c='y')
+        if optotraces.shape[0]!=transition_array.shape[0]:
+            transition_array=np.repeat(transition_array,optotraces.shape[0],axis=0)
+        for j in range(optospont.shape[0]):
+            ax[i].axvline(x=analysis.mov_timestamps_miliseconds['shifted'][optospont[j]]/1000,c='r')  
+        for p in range(optograt.shape[0]):
+            ax[i].axvline(x=analysis.mov_timestamps_miliseconds['shifted'][optograt[p]]/1000,c='c')  
+
+    bias=10    
     for i in range(non_chand_toplot):
-        trace=  traces_non_chand[i,:]
+        trace=  traces_non_chand[i+bias,:]
     
         ax[i+optotraces.shape[0]].plot(analysis.mov_timestamps_miliseconds['shifted']/1000,analysis.smooth_trace(trace,10),c='g')
         
-    ax[-1].plot(speedtimestamps/1000,speed,'r')
+        if optotraces.shape[0]!=transition_array.shape[0]:
+            transition_array=np.repeat(transition_array,optotraces.shape[0],axis=0)
+        for j in range(optospont.shape[0]):
+            ax[i+optotraces.shape[0]].axvline(x=analysis.mov_timestamps_miliseconds['shifted'][optospont[j]]/1000,c='r')  
+        for p in range(optograt.shape[0]):
+            ax[i+optotraces.shape[0]].axvline(x=analysis.mov_timestamps_miliseconds['shifted'][optograt[p]]/1000,c='c')  
+        
+    # ax[-1].plot(speedtimestamps/1000,speed,'r')
     for i,a in enumerate(ax):
         a.margins(x=0)
         if i<len(ax)-1:
@@ -947,9 +1004,11 @@ def plot_several_traces(analysis,speedtimestamps,speed, optocellindex_dict,trace
             a.spines['right'].set_visible(False)
             a.spines['left'].set_visible(False)
             a.get_yaxis().set_ticks([])
-            a.set_xlabel('Time(s)')
+            a.set_xlabel('Time(s)',fontsize=18)
             
-    f.suptitle(f'Raw Activity Examples {titstr}', fontsize=16)
+    # f.suptitle(f'Raw Activity Examples {titstr}', fontsize=16)
+    # f.savefig("/home/sp3660/Desktop/fIGUREled/chandelier fuill traces.pdf", transparent=False)
+
     plt.show()
 
          
@@ -1072,13 +1131,13 @@ def plot_rasters_treatment(optocellindex_dict,activity_dict,substracted=False,sm
     optocell=0
     trace_type=select_trace_type(substracted=substracted,smoothed=smoothed)
 
-    ordered_by_distance=np.argsort(accepted_all_plane_distances)
+    # ordered_by_distance=np.argsort(accepted_all_plane_distances)
     
     non_opto_mean_trial_traces=  activity_dict['opto']['mean'][trace_type][optocellindex_dict['non_chand']['non_opto']['All_planes'],optocell,:]
     meanoptoresponse=  activity_dict['opto']['mean'][trace_type][optocellindex_dict['non_chand']['non_opto']['All_planes'],optocell,np.argmin(abs(activity_dict['parameters']['trialtimevector']-0.5)):].mean(axis=1)
     non_opto_mean_trial_control_traces=  activity_dict['control']['mean'][trace_type][optocellindex_dict['non_chand']['non_opto']['All_planes'],optocell,:]
                     
-    f, ax = plt.subplots(2,1, figsize=(12, 12),sharex=True)
+    f, ax = f,axs=plt.subplots(1,2,figsize=(8,4),dpi=300)
     ax[0].imshow( non_opto_mean_trial_traces[np.flip(np.argsort(meanoptoresponse)),:])      
     ax[1].imshow(non_opto_mean_trial_control_traces[np.flip(np.argsort(meanoptoresponse)),:])   
     
@@ -1088,7 +1147,7 @@ def plot_rasters_treatment(optocellindex_dict,activity_dict,substracted=False,sm
      
        
     ticks =np.linspace(0,non_opto_mean_trial_traces.shape[1], 9)
-    lab=np.arange(scaled_activity_dict['parameters']['trialtimevector'][0],scaled_activity_dict['parameters']['trialtimevector'][-1]+0.5,0.5)
+    lab=np.arange(activity_dict['parameters']['trialtimevector'][0],activity_dict['parameters']['trialtimevector'][-1]+0.5,0.5)
     ticklabels = ["{:6.2f}".format(i) for i in lab]
     for i in range(len(ax)):
         ax[i].set_xticks(ticks)
@@ -1101,17 +1160,14 @@ def plot_rasters_treatment(optocellindex_dict,activity_dict,substracted=False,sm
         ax[i].margins(x=0)
     ax[0].set_title('Opto')
     ax[1].set_title('Ctrl')
-
-
-    f.suptitle(f'Tomato- Averaged Activity (OptoTrial Grating) {trace_type}', fontsize=16)
-
+    f.tight_layout()
+    # f.suptitle(f'Tomato- Averaged Activity (OptoTrial Grating) {trace_type}', fontsize=16)
+    # f.savefig("/home/sp3660/Desktop/fIGUREled/nonoptoraster.pdf", transparent=False)
     # f.suptitle(f'Tomato- Averaged Activity (OptoTrial Grating)', fontsize=16)
     # f.suptitle(f'Tomato- Averaged Activity (Non Chand Grating) {trace_type}', fontsize=16)
-    # f.suptitle(f'Tomato- Averaged Activity (OptoTrial Background)', fontsize=16)
+    f.suptitle(f'Tomato- Averaged Activity (OptoTrial Background)', fontsize=16)
     # f.suptitle(f'Tomato- Averaged Activity (Background Grating)', fontsize=16)
 
-    
-    f.tight_layout()
     plt.show()
 def plot_nono_opto_single_trials(transition_array,optocellindex_dict,activity_dict,opto_repetitions,led_opt,substracted=False,smoothed=False):
     
@@ -1120,21 +1176,42 @@ def plot_nono_opto_single_trials(transition_array,optocellindex_dict,activity_di
 #%% basic setup
 all_analysis=selected_analysis
 selected=all_analysis[0]
-
-tempprocessingpat= r'C:\Users\sp3660\Desktop\TempPythonObjects'
+multiple_analysis=None
+tempprocessingpat= r'/home/sp3660/Desktop/TempPythonObjects'
 experimentalmousename= selected['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name
-datapath=os.path.join(tempprocessingpat,experimentalmousename)
+
+#check for mul.tiple mice
+mouse_loaded=list(set([i['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name for i in all_analysis]))
+if len(mouse_loaded)>1:
+    datapath=os.path.join(tempprocessingpat,'_'.join(mouse_loaded))
+else:
+    datapath=os.path.join(tempprocessingpat,mouse_loaded[0])
 dataindex=0
+selected_pre_time=500 #ms forr statistic purtposes
+selected_post_time=2000 #ms forr statistic purtposes
+
+mean_Stim_decision_idx=2
+mean_Stim_decision=['full','half','remove_led']
+
+if mean_Stim_decision[mean_Stim_decision_idx]=='full':
+    mean_start=0 # from begining of grating
+    meanstimtime=2000 # full grat period when mean_start= 0
+elif mean_Stim_decision[mean_Stim_decision_idx]=='half':
+    mean_start=0 # rom begining of grating
+    meanstimtime=1000 # first  half of grat stim period
+elif mean_Stim_decision[mean_Stim_decision_idx]=='remove_led':
+    mean_start=1000 # remove led 
+    meanstimtime=1000 # non led half of grat stim period
 
 
-temp_data_list=check_temp_data(tempprocessingpat)
+temp_data_list=check_temp_data(tempprocessingpat,os.path.split(datapath)[1])
 multiple_analysis=load_temp_data(temp_data_list,dataindex)
-
 
 if not multiple_analysis:
     for selected in all_analysis:   
         analysis=selected['analysis']
         full_data=selected['full_data']
+        
         # tt=analysis.signals_object.signal_transitions
         # analysis.signals_object.extract_transitions_optodrift('VisStim', led_clipped=True, plot=False)
         # analysis.signals_object.optodrift_info
@@ -1233,7 +1310,7 @@ if not multiple_analysis:
                 good='Incorrect'
             print(f'{good} number of {sig[0]} transitions detected')
         if 1/frequency==inter_rep_time:
-            print('Seems correct opto timings)')
+            print('Seems correct opto timings')
         fr=analysis.full_data['imaging_data']['Frame_rate']   
         
         review=0
@@ -1241,26 +1318,42 @@ if not multiple_analysis:
             analysis.review_aligned_signals_and_transitions()
     
     
-# process cells and tramsitions
+#%process cells and tramsitions
         
     
         sweepscale=True
-        sweepsmoothed=True
+        sweepsmoothed=10
         sweepdff=True
         optocellindex_dict,traces_dict,accepted_all_plane_distances=find_optostim_cells(analysis,chand_indexes)
+       
         traces=traces_dict['all']['all']['All_planes']['demixed']
-        sweep_response, mean_sweep_response, pval, full_data=get_sweep_response(analysis,full_data,traces,blank_opt,visstimtranstionts,use_scaled=sweepscale,smoothwindow=sweepsmoothed,dff=sweepdff)
+        print('doing allen sweep response')
+        sweep_response, mean_sweep_response, pval, full_data, meanstimtime, mean_frames=get_sweep_response(analysis,
+                                                                                                          full_data,
+                                                                                                          traces,
+                                                                                                          blank_opt,
+                                                                                                          visstimtranstionts,
+                                                                                                          use_scaled=sweepscale,
+                                                                                                          smoothwindow=sweepsmoothed,
+                                                                                                          dff=sweepdff,
+                                                                                                          pre_time=selected_pre_time, 
+                                                                                                          post_time=selected_post_time,
+                                                                                                          meanstimtime=meanstimtime,
+                                                                                                          mean_start=mean_start)
         response=get_response(analysis,full_data,mean_sweep_response,pval )
         peak=get_peak(full_data,response,sweep_response,mean_sweep_response)
+        print('allen sweep response done')
+
     
-    
+        sorted_df,pre_frames,post_frames,pre_time,post_time=get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=selected_pre_time, post_time=selected_post_time)
         transition_array=create_opto_transitions_array(analysis,stimulated_cells_number,nTrials,opto_repetitions,led_opt,blank_opt)
-        pretime=1
-        posttime=3
-        
-        activity_dict= slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=False)
-        scaled_activity_dict= slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=True)   
-        
+        pretime=selected_pre_time/1000
+        posttime=selected_post_time/1000
+        print('doing my sweep response')
+        activity_dict= slice_by_optotrial(analysis,stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=False)
+        scaled_activity_dict= slice_by_optotrial(analysis,stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=True)   
+        print('my sweep response done')
+
         
         activity_dict_peak=mean_opto_response(activity_dict,stat='mean',stimtime=2)       
         scaled_activity_dict_peak=mean_opto_response(scaled_activity_dict,stat='max',stimtime=2)    
@@ -1302,7 +1395,16 @@ if not multiple_analysis:
                   'peak':peak,               
                   'sweepscale':sweepscale,
                   'sweepsmoothed':sweepsmoothed ,
-                  'dff':sweepdff
+                  'dff':sweepdff,
+                  'blank_opt':blank_opt,
+                  'mean_start':mean_start,
+                  'meanstimtime':meanstimtime,
+                  'mean_Stim_decision':mean_Stim_decision[mean_Stim_decision_idx],
+                  'stim_table':sorted_df,
+                  'pre_frames_df':pre_frames,
+                  'post_frames_df':post_frames,
+                  'pre_time_df':pre_time,
+                  'post_time_df':post_time
                   }
         
         multiple_analysis[analysis.acquisition_object.aquisition_name]=all_info
@@ -1312,112 +1414,405 @@ if not multiple_analysis:
 else:
     for selected in all_analysis:  
         analysis=selected['analysis']
-        multiple_analysis[analysis.acquisition_object.aquisition_name]['visstimtranstionts']
+        visstimtranstionts=multiple_analysis[analysis.acquisition_object.aquisition_name]['visstimtranstionts']
 
-
-        sorted_df,pre_frames,post_frames=get_stimulus_table(analysis,visstimtranstionts)
-     
+        analysis.signals_object.extract_transitions_optodrift('VisStim', led_clipped=True, plot=False)
+        analysis.signals_object.downsample_optodrift_onsets()
+        blank_opt=multiple_analysis[analysis.acquisition_object.aquisition_name]['blank_opt']
+    
 #%% manual play
-
 
 i=0
 experiment=list(multiple_analysis.keys())[i]
-aq_analysis=all_analysis[i]['analysis']
+aq_analysis=[all_analysis[i]['analysis'] for i in range(len(all_analysis)) if all_analysis[i]['analysis'].acquisition_object.aquisition_name==experiment][0]
 aq_all_info=multiple_analysis[experiment]
+aq_analysis.aq_all_info=aq_all_info
+
 
 
 aq_all_info['gratingcontrol']
 aq_all_info['transition_array'][0,:,0,0]
 aq_all_info.keys()
 
-    
-stimt=aq_analysis.full_data['visstim_info']['OptoDrift']['stimulus_table']
+
+
+stimt=aq_all_info['stim_table']
 stimt.opto==1
 stimt.blank_sweep==0
 optotrialsst=stimt[(stimt.opto==1) & (stimt.blank_sweep==0)]
 orival=optotrialsst.orientation.unique()[0]
 optotrialcontrolsst=stimt[(stimt.opto==0) & (stimt.orientation==orival)]
-
-
 optotrialblanksst=stimt[(stimt.opto==1) & (stimt.blank_sweep==1)]
 optotrialblankcontrolsst=stimt[(stimt.opto==0) & (stimt.blank_sweep==1)]
+trial_structure={'opt_grating':optotrialsst,
+                 'opto_blank':optotrialblanksst,
+                 'control_grating':optotrialcontrolsst,
+                 'control_blank':optotrialblankcontrolsst
+                 }
 
 
 
-tt=aq_all_info['sweep_response']
-tt=aq_all_info['mean_sweep_response']
-tt=aq_all_info['pval']
-tt=aq_all_info['response']
-tt=aq_all_info['peak']
 
 
 
 #%%plotting full recordings traces
 plt.close('all')
-# plot_optostimulated_cell_activities(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=False)
-# plot_optostimulated_cell_activities(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=True)
-# plot_optostimulated_cell_activities(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=False)
-plot_optostimulated_cell_activities(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
-
-# plot_several_traces(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=False)
-# plot_several_traces(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=True)
-# plot_several_traces(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=False)
-plot_several_traces(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
-
+# plot_optostimulated_cell_activities(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=False)
+# plot_optostimulated_cell_activities(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=True)
+plot_optostimulated_cell_activities(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=False)
+plot_optostimulated_cell_activities(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'], aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
+#%%
+# plot_several_traces(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=False)
+# plot_several_traces(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=False,smoothwindow=True)
+plot_several_traces(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=False)
+plot_several_traces(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
    
 #%% processng trials
 
 # meanswepresponse filter for non cha ndlier and significancly opt have to select the optograting and comare opto vs non opto
 
-aq_all_info['mean_sweep_response']
-aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']
-aq_analysis.full_data['visstim_info']['OptoDrift']['stimulus_table']
-aq_all_info['pval']
- 
+# aq_all_info['mean_sweep_response']
+# aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']
+# aq_analysis.full_data['visstim_info']['OptoDrift']['stimulus_table']
+# aq_all_info['pval']
 
-optononchandpval=aq_all_info['pval'].iloc[optotrialsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandpvalcontrol=aq_all_info['pval'].iloc[optotrialcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandblankpval=aq_all_info['pval'].iloc[optotrialblanksst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandpvalblankcontrol=aq_all_info['pval'].iloc[optotrialblankcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
+def get_trial_structure(trial_structure,aq_all_info,chand=True,opto=True):
+    if chand and opto:
+        indexes=aq_all_info['optocellindex_dict']['chand']['opto']['All_planes']
+        cell_type='Chandelier'
+    elif chand and not opto:
+        indexes=aq_all_info['optocellindex_dict']['chand']['non_opto']['All_planes']
+        cell_type='Chandelier'
 
-optononchandmeansweep=aq_all_info['mean_sweep_response'].iloc[optotrialsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandmeansweepcontrol=aq_all_info['mean_sweep_response'].iloc[optotrialcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandblankmeansweep=aq_all_info['mean_sweep_response'].iloc[optotrialblanksst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandblankmeansweepcontrol=aq_all_info['mean_sweep_response'].iloc[optotrialblankcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
+        
+    elif not chand:
+        indexes=aq_all_info['optocellindex_dict']['non_opto']['all']['All_planes']
+        cell_type='Non Chandelier'
+
+    #reprocessing data
+    trial_structure_sweep={k:aq_all_info['sweep_response'].iloc[v.index.values,indexes] for k,v in trial_structure.items()}
+    trial_structure_sweep_mean={k:aq_all_info['mean_sweep_response'].iloc[v.index.values,indexes] for k,v in trial_structure.items()}
+    trial_structure_sweep_p_val={k:aq_all_info['pval'].iloc[v.index.values,indexes] for k,v in trial_structure.items()}
+    trial_averaged_mean_opto_blank=trial_structure_sweep_mean['opto_blank'].mean(axis=0).values
+    
+     
+    trial_structure_sweep_trial_averaged={}
+    for k,v in trial_structure_sweep.items():
+
+        swepresparray=np.zeros((v.shape[1],v.shape[0],v.iloc[0,0].shape[0]))
+    
+        for cell in range(v.shape[1]):
+           swepresparray[cell,:,:]=np.vstack(v.iloc[:,cell].values)
+          
+        trial_structure_sweep_trial_averaged[k]=swepresparray.mean(axis=1)
+    
+    return trial_structure_sweep, trial_structure_sweep_mean, trial_structure_sweep_p_val, trial_averaged_mean_opto_blank,trial_structure_sweep_trial_averaged,cell_type,indexes
 
 
-optononchandsweep=aq_all_info['sweep_response'].iloc[optotrialsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandsweepcontrol=aq_all_info['sweep_response'].iloc[optotrialcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandblanksweep=aq_all_info['sweep_response'].iloc[optotrialblanksst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
-optononchandblanksweepcontrol=aq_all_info['sweep_response'].iloc[optotrialblankcontrolsst.index.values,aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes']]
+def plot_sweep_4raster(trial_structure,aq_all_info, chand=True,opto=True,only_blank=False,remove_led=False,clean_trace=True):
+    #plot chandelier trila averaged rastet for 4 treatemnts orderre by optoblank responses
+    # aq_all_info['mean_Stim_decision']
+    # aq_all_info['mean_start']
+    # aq_all_info['meanstimtime']
+    # mean_Stim_decision[mean_Stim_decision_idx]
+    
+    trial_structure_sweep, trial_structure_sweep_mean, trial_structure_sweep_p_val, trial_averaged_mean_opto_blank,trial_structure_sweep_trial_averaged,cell_type,indexes= get_trial_structure(trial_structure,aq_all_info, chand=chand,opto=opto)
+    
+    pre_time=aq_all_info['pre_time_df']
+    post_time=aq_all_info['post_time_df']
+    pre_frames=aq_all_info['pre_frames_df']
+    post_frames=aq_all_info['post_frames_df']
+  
+    trialtimevector=np.linspace(-pre_time/1000,post_time/1000,pre_frames+post_frames)
+
+    lab=np.arange(-pre_time/1000,post_time/1000+0.5,0.5)
+    if remove_led:
+        sliced_trial_structure_sweep_trial_averaged={}
+        for k,v in trial_structure_sweep_trial_averaged.items():
+            sliced_trial_structure_sweep_trial_averaged[k]=np.concatenate((v[:,:pre_frames],v[:,pre_frames+int(np.ceil(post_frames/2)):]),axis=1)
+            
+        if clean_trace:    
+            slicetimevector=np.concatenate((trialtimevector[:pre_frames],trialtimevector[pre_frames+int(np.ceil(post_frames/2)):]-1))
+            lab_toplot=np.concatenate((lab[:2],lab[4:]))
+
+        else:
+            slicetimevector=np.concatenate((trialtimevector[:pre_frames],trialtimevector[pre_frames+int(np.ceil(post_frames/2)):]))
+            lab_toplot=np.concatenate((lab[:2],lab[4:]))
+
+
+        trialtimevector_toplot=slicetimevector
+        trial_structure_sweep_trial_averaged_toplot=sliced_trial_structure_sweep_trial_averaged
+        linevavalue=1
+    else:
+        trialtimevector_toplot=trialtimevector
+        trial_structure_sweep_trial_averaged_toplot=trial_structure_sweep_trial_averaged
+        lab_toplot=lab
+        linevavalue=0
+
+        
+    ticks_toplot =np.linspace(0,list(trial_structure_sweep_trial_averaged_toplot.values())[0].shape[1],len(lab_toplot))
+    labels_toplot = ["{:6.2f}".format(i) for i in lab_toplot]
+
+                   
+    f, ax = f,axs=plt.subplots(2,2,figsize=(20,2),dpi=300,sharex=True,layout='compressed')
+    
+    for i,(k,v) in enumerate(trial_structure_sweep_trial_averaged_toplot.items()):
+        ax.flatten()[i].imshow(v[np.flip(np.argsort(trial_averaged_mean_opto_blank)),:],interpolation='nearest',aspect='auto',vmin=-30,vmax=120)      
+        ax.flatten()[i].set_xticks(ticks_toplot)
+        ax.flatten()[i].set_xticklabels(labels_toplot)
+        ax.flatten()[i].axvline(x=ticks_toplot[np.argwhere(lab_toplot==linevavalue)[0][0]]) 
+        if i>1:
+            ax.flatten()[i].set_xlabel('Time(s)')
+        ax.flatten()[i].set_ylabel('Cell')
+        ax.flatten()[i].set_aspect('equal')
+        ax.flatten()[i].margins(x=0)
+        ax.flatten()[i].set_title(k)
+    f.suptitle(f'Trial Averaged {cell_type} Responses', fontsize=16)
+    plt.show()
+    
+    
+
+    f, ax = f,axs=plt.subplots(2,2,figsize=(20,10),dpi=300,sharex=True,layout='compressed')
+    for i,(k,v) in enumerate(trial_structure_sweep_trial_averaged_toplot.items()):     
+        for cell in range(v.shape[0]):
+            ax.flatten()[i].plot(trialtimevector_toplot,v[cell,:])
+            ax.flatten()[i].axvline(x=0) 
+            ax.flatten()[i].margins(x=0)
+            ax.flatten()[i].set_title(k)
+            ax.flatten()[i].set_ylim([-30,120])
+            if clean_trace and i>1:
+                ax.flatten()[i].set_xticklabels([str(i)for i in np.concatenate((ax.flatten()[0].get_xticks()[:4],    ax.flatten()[0].get_xticks()[4:]+1)).tolist()])
+
+    f.suptitle(f'Trial Averaged {cell_type} Responses', fontsize=16)
+    plt.show()
+    return 
+
+def get_cell_indexes(index,aq_all_info,analysis):
+    
+    plane='Plane1'
+    # separate full raster index among planes(coorecxt plane2 indexes)
+    if index>=len(aq_all_info['optocellindex_dict']['all']['all']['Plane1']):
+        index=index-  len(aq_all_info['optocellindex_dict']['all']['all']['Plane1'])
+        plane='Plane2'
+    
+    pyhton_sorter_idx=analysis.full_data['imaging_data']['All_planes_rough']['CellIds'][plane][index]
+    matlab_sorter_idx=pyhton_sorter_idx+1
+    
+    return matlab_sorter_idx, pyhton_sorter_idx, index,plane
+
+#%%
+plot_sweep_4raster(trial_structure,aq_all_info, chand=True,opto=True,only_blank=False,remove_led=False,clean_trace=True)
+plot_sweep_4raster(trial_structure,aq_all_info, chand=False,opto=True,only_blank=False,remove_led=False,clean_trace=True)
+plot_sweep_4raster(trial_structure,aq_all_info, chand=True,opto=True,only_blank=False,remove_led=True,clean_trace=True)
+plot_sweep_4raster(trial_structure,aq_all_info, chand=False,opto=True,only_blank=False,remove_led=True,clean_trace=True)
+plot_sweep_4raster(trial_structure,aq_all_info, chand=True,opto=True,only_blank=False,remove_led=True,clean_trace=False)
+plot_sweep_4raster(trial_structure,aq_all_info, chand=False,opto=True,only_blank=False,remove_led=True,clean_trace=False)
 
 
 
 
-df=optononchandpval<0.05
-df2=optononchandpvalcontrol<0.05
-df3=optononchandblankpval<0.05
-df4=optononchandpvalblankcontrol<0.05
+#%% analyze non chand cells
+trial_structure_sweep, trial_structure_sweep_mean, \
+trial_structure_sweep_p_val, \
+trial_averaged_mean_opto_blank,\
+trial_structure_sweep_trial_averaged,\
+cell_type,indexes= get_trial_structure(trial_structure,aq_all_info, chand=False,opto=False)
+
+aq_all_info['mean_Stim_decision']
+
+
+#%% find significantly activated non chand in opto blank trials
+pvalthr=0.05
+
+trial_structure_significant_cells={}    
+for k,v in trial_structure.items() :
+    
+    df=trial_structure_sweep_p_val[k]<pvalthr
+    trial_numb_thr=df.shape[0]*3/4
+
+    number_significant_trials=df.sum()
+    sig_trials=number_significant_trials>=trial_numb_thr
+    f,ax=plt.subplots(1)
+    ax.hist(number_significant_trials)
+    significant_cells=[int(c) for c in sig_trials.index[np.argwhere(sig_trials.values).flatten()]]
+
+    trial_structure_significant_cells[k]=significant_cells
+
+significant_cells=trial_structure_significant_cells['opto_blank']
+trialtimevector=np.linspace(-pre_time/1000,post_time/1000,pre_frames+post_frames)
+lab=np.arange(-pre_time/1000,post_time/1000+0.5,0.5)
+ticks_toplot =np.linspace(0,list(trial_structure_sweep.values())[0].iloc[0,0].shape[0],len(lab))
+labels_toplot = ["{:6.2f}".format(i) for i in lab]
+for cell in significant_cells:
+
+    f, ax = f,axs=plt.subplots(2,2,figsize=(20,10),dpi=300,sharex=True,layout='compressed')
+    for i,(k,v) in enumerate(trial_structure_sweep.items()):
+        ax.flatten()[i].imshow(np.vstack(v[str(cell)].values),interpolation='nearest',aspect='auto',vmin=-30,vmax=120)      
+        ax.flatten()[i].set_xticks(ticks_toplot)
+        ax.flatten()[i].set_xticklabels(labels_toplot)
+        ax.flatten()[i].axvline(x=ticks_toplot[np.argwhere(lab==0)[0][0]]) 
+        if i>1:
+            ax.flatten()[i].set_xlabel('Time(s)')
+        ax.flatten()[i].set_ylabel('Trials')
+        ax.flatten()[i].set_aspect('equal')
+        ax.flatten()[i].margins(x=0)
+        ax.flatten()[i].set_title(k)
+    f.suptitle(f'Trial {cell_type} Responses/n Cell:{cell}', fontsize=16)
+    plt.show()
+    
+
+    f, ax = f,axs=plt.subplots(2,2,figsize=(20,10),dpi=300,sharex=True,sharey=True,layout='compressed')
+    for i,(k,v) in enumerate(trial_structure_sweep.items()):
+        ax.flatten()[i].plot(trialtimevector,np.mean(np.vstack(v[str(cell)].values),axis=0))
+        f.suptitle(f'Trial Averaged {cell_type} Responses/n Cell:{cell}', fontsize=16)
+        ax.flatten()[i].axvline(x=0)
+        ax.flatten()[i].set_ylim([-30,120])
+
+#%% go back to original cel dta
+index=40
+matlab_sorter_idx, pyhton_sorter_idx, plane_index,plane=get_cell_indexes(index,aq_all_info,analysis)
+
+tt=aq_all_info['traces_dict']['all']['all']['All_planes']['demixed'][index,:]
+ttt=analysis.full_data['imaging_data']['All_planes_rough']['Traces']['demixed'][index,:]
+
+
+
+f,ax=plt.subplots(2,sharex=True,sharey=True)
+ax[0].plot(ttt)
+ax[0].plot(tt)
+plt.imshow(activity_dict['opto']['trials']['raw'][index,0,:,:])
+plt.imshow(activity_dict['opto']['trials']['raw_smoothed'][index,0,:,:])
+plt.imshow(activity_dict['opto']['trials']['substracted'][index,0,:,:])
+plt.imshow(activity_dict['opto']['trials']['substracted_smoothed'][index,0,:,:])
+
+
+
+
+non_significant_cells= np.delete(indexes, np.where(np.in1d(indexes, significant_cells))[0])
+for cell in non_significant_cells:
+  f, ax = f,axs=plt.subplots(2,2,figsize=(20,10),dpi=300,sharex=True,layout='compressed')
+  for i,(k,v) in enumerate(trial_structure_sweep.items()):
+      ax.flatten()[i].imshow(np.vstack(v[str(cell)].values),interpolation='nearest',aspect='auto')      
+      ax.flatten()[i].set_xticks(ticks_toplot)
+      ax.flatten()[i].set_xticklabels(labels_toplot)
+      ax.flatten()[i].axvline(x=ticks_toplot[np.argwhere(lab==0)[0][0]]) 
+      if i>1:
+          ax.flatten()[i].set_xlabel('Time(s)')
+      ax.flatten()[i].set_ylabel('Trials')
+      ax.flatten()[i].set_aspect('equal')
+      ax.flatten()[i].margins(x=0)
+      ax.flatten()[i].set_title(k)
+  f.suptitle(f'Trial {cell_type} Responses/n Cell:{cell}', fontsize=16)
+  plt.show()
+  
+
+  f, ax = f,axs=plt.subplots(2,2,figsize=(20,10),dpi=300,sharex=True,sharey=True,layout='compressed')
+  for i,(k,v) in enumerate(trial_structure_sweep.items()):
+      ax.flatten()[i].plot(trialtimevector,np.mean(np.vstack(v[str(cell)].values),axis=0))
+      f.suptitle(f'Trial Averaged {cell_type} Responses/n Cell:{cell}', fontsize=16)
+      ax.flatten()[i].axvline(x=0)
+
+
+all_rows=[]
+
+for i,cell in enumerate(significantcells):
+    sig=1
+    contsig=0
+  
+    if cell in significantcellscontrol:
+        contsig=1
+
+    all_rows.append((cell,sig,contsig, significanmeansweep.iloc[i],significanmeansweepcontrol.iloc[i]))
+
+for i,cell in enumerate(nonsignificantcells):
+    sig=0
+    contsig=0
+  
+    if cell in significantcellscontrol:
+        contsig=1
+        
+        
+    all_rows.append((cell,sig,contsig, nonsignificantmeansweep.iloc[i],nonsignificantmeansweepcontrol.iloc[i]))
+
+
+optogratingdf = pd.DataFrame(all_rows, columns =['cellid','optosignificant','controlsignigficant','meanopto','meancontrol'])
+                                      
+                                      
+
+all_rows=[]
+
+for i,cell in enumerate(significantcellsblank):
+    sig=1
+    contsig=0
+  
+    if cell in significantcellsblankcontrol:
+        contsig=1
+
+    all_rows.append((cell,sig,contsig, significanblankmeansweep.iloc[i],significanblankmeansweepcontrol.iloc[i]))
+
+for i,cell in enumerate(nonsignificantcellsblank):
+    sig=0
+    contsig=0
+  
+    if cell in significantcellsblankcontrol:
+        contsig=1
+        
+        
+    all_rows.append((cell,sig,contsig, nonsignificantblankmeansweep.iloc[i],nonsignificantblankmeansweepcontrol.iloc[i]))
+
+
+
+optoblankdf = pd.DataFrame(all_rows, columns =['cellid','optosignificant','controlsignigficant','meanopto','meancontrol'])
+
+
+#%%
+df=trial_structure_sweep_p_val['opt_grating']<pvalthr
+df2=trial_structure_sweep_p_val['control_grating']<pvalthr
+df3=trial_structure_sweep_p_val['opto_blank']<pvalthr
+df4=trial_structure_sweep_p_val['control_blank']<pvalthr
 
 numbersignificanttrials=df.sum()
 numbersignificancontrol=df2.sum()
 numbersignificanttrialsblank=df4.sum()
 numbersignificanblankcontrol=df2.sum()
 
-tt=numbersignificanttrials>=10
-ttt=numbersignificancontrol>=10
-tttt=numbersignificanttrialsblank>=10
-ttttt=numbersignificanblankcontrol>=10
+trialnumbthr=10
 
-significantcells=[int(c) for c in tt.index[np.argwhere(tt.values).flatten()]]
-significantcellscontrol=[int(c) for c in ttt.index[np.argwhere(ttt.values).flatten()]]
-significantcellsblank=[int(c) for c in tttt.index[np.argwhere(tttt.values).flatten()]]
-significantcellsblankcontrol=[int(c) for c in ttttt.index[np.argwhere(ttttt.values).flatten()]]
+optogratsigtrials=numbersignificanttrials>=trialnumbthr
+controlgratsigtrials=numbersignificancontrol>=trialnumbthr
+optoblanksigtrials=numbersignificanttrialsblank>=trialnumbthr
+controlblanksigtrials=numbersignificanblankcontrol>=trialnumbthr
+f,ax=plt.subplots(4)
+ax[0].hist(numbersignificanttrials)
+ax[1].hist(numbersignificancontrol)
+ax[2].hist(numbersignificanttrialsblank)
+ax[3].hist(numbersignificanblankcontrol)
+
+
+significantcells=[int(c) for c in optogratsigtrials.index[np.argwhere(optogratsigtrials.values).flatten()]]
+significantcellscontrol=[int(c) for c in controlgratsigtrials.index[np.argwhere(controlgratsigtrials.values).flatten()]]
+significantcellsblank=[int(c) for c in optoblanksigtrials.index[np.argwhere(optoblanksigtrials.values).flatten()]]
+significantcellsblankcontrol=[int(c) for c in controlblanksigtrials.index[np.argwhere(controlblanksigtrials.values).flatten()]]
+
+cell=significantcells[0]
+
+for cell in significantcellsblank:
+
+    f,ax=plt.subplots(4,sharex=True)
+    ax[0].imshow(np.vstack(trial_structure_sweep['opt_grating'][str(cell)].values),aspect='auto')
+    ax[1].imshow(np.vstack(trial_structure_sweep['control_grating'][str(cell)].values),aspect='auto')
+    ax[2].imshow(np.vstack(trial_structure_sweep['opto_blank'][str(cell)].values),aspect='auto')
+    ax[3].imshow(np.vstack(trial_structure_sweep['control_blank'][str(cell)].values),aspect='auto')
+    f,ax=plt.subplots(4,sharex=True,sharey=True)
+    ax[0].plot(trialtimevector,np.mean(np.vstack(trial_structure_sweep['opt_grating'][str(cell)].values),axis=0))
+    ax[1].plot(trialtimevector,np.mean(np.vstack(trial_structure_sweep['control_grating'][str(cell)].values),axis=0))
+    ax[2].plot(trialtimevector,np.mean(np.vstack(trial_structure_sweep['opto_blank'][str(cell)].values),axis=0))
+    ax[3].plot(trialtimevector,np.mean(np.vstack(trial_structure_sweep['control_blank'][str(cell)].values),axis=0))
+    f.suptitle(f'Cell:{cell}')
 
 
 nonsignificantcells= np.delete(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], np.where(np.in1d(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], significantcells))[0])
 nonsignificantcellscontrol= np.delete(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], np.where(np.in1d(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], significantcellscontrol))[0])
-
 nonsignificantcellsblank= np.delete(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], np.where(np.in1d(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], significantcellsblank))[0])
 nonsignificantcellsblankcontrol= np.delete(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], np.where(np.in1d(aq_all_info['optocellindex_dict']['non_chand']['non_opto']['All_planes'], significantcellsblankcontrol))[0])
 
@@ -1497,14 +1892,14 @@ optoblankdf = pd.DataFrame(all_rows, columns =['cellid','optosignificant','contr
 
 
 
-f,axs=plt.subplots(1,len(multiple_analysis))
-f,axs=plt.subplots(1,2)
+# f,axs=plt.subplots(1,len(multiple_analysis))
+# f,axs=plt.subplots(1,2)
 
-for i, aq_all_info in enumerate(multiple_analysis.values()):
-    sns.barplot(ax=axs[i], x="optosignificant", y="meanopto", data=df, capsize=.1, ci="sd")
-    sns.swarmplot(ax=axs[i], x="optosignificant", y="meanopto", data=df, color="0", alpha=.35)
-    axs[i].set_ylim(0,1)
-plt.show()
+# for i, aq_all_info in enumerate(multiple_analysis.values()):
+#     sns.barplot(ax=axs[i], x="optosignificant", y="meanopto", data=df, capsize=.1, ci="sd")
+#     sns.swarmplot(ax=axs[i], x="optosignificant", y="meanopto", data=df, color="0", alpha=.35)
+#     axs[i].set_ylim(0,1)
+# plt.show()
 
 signif=optogratingdf[(optogratingdf['meanopto']-optogratingdf['meancontrol']>0) & (optogratingdf['controlsignigficant']==0) & (optogratingdf['optosignificant']==1)]
 nonsignif=optogratingdf[(optogratingdf['controlsignigficant']==0) & (optogratingdf['optosignificant']==0)]
@@ -1517,7 +1912,14 @@ sns.swarmplot(ax=axs[1], x="optosignificant", y="meancontrol", data=result, colo
 axs[0].set_title('Opto Trials')
 axs[1].set_title('Control Trials')
 f.suptitle('Opto + Grating Activated')
+# f.savefig("/home/sp3660/Desktop/fIGUREled/meanactivity.pdf", transparent=False)
 
+
+opto= result[result['optosignificant']==1]['meanopto'].values
+nonopto     =result[result['optosignificant']==0]['meanopto'].values  
+(_, p) = st.f_oneway(opto,  nonopto)
+stat_results = [scipy.stats.mannwhitneyu(opto, nonopto, alternative="two-sided"),]
+       
 
 signif=optogratingdf[(optogratingdf['meanopto']-optogratingdf['meancontrol']<0) & (optogratingdf['controlsignigficant']==0) & (optogratingdf['optosignificant']==1)]
 nonsignif=optogratingdf[(optogratingdf['controlsignigficant']==0) & (optogratingdf['optosignificant']==0)]
@@ -1560,25 +1962,25 @@ axs[1].set_title('Control Trials')
 f4.suptitle('Opto Only Inhibited')
 plt.show()
 
-plt.figure()
-plt.plot(np.vstack(significansweep.iloc[:,0].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,1].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,2].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,3].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,4].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,5].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,6].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,7].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,8].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,9].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,10].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,11].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,12].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,13].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,14].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,15].values).mean(axis=0))
-plt.plot(np.vstack(significansweep.iloc[:,16].values).mean(axis=0))
-plt.show()
+f5,axs=plt.subplots(1,figsize=(9,4.5),dpi=300)
+axs.plot(np.vstack(significansweep.iloc[:,0].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,1].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,2].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,3].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,4].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,5].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,6].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,7].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,8].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,9].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,10].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,11].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,12].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,13].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,14].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,15].values).mean(axis=0))
+axs.plot(np.vstack(significansweep.iloc[:,16].values).mean(axis=0))
+# f5.savefig("/home/sp3660/Desktop/fIGUREled/signigficant non opt.pdf", transparent=False)
 
 
 plt.figure()
@@ -1650,22 +2052,27 @@ f,axs=plt.subplots(1,2)
 aq_all_info=multiple_analysis[list(multiple_analysis.keys())[0]]
 for i, aq_all_info in multiple_analysis.items():
     
-    # analysis=aq_all_info['analysis']
-    # speedtimestamps=aq_all_info['speedtimestamps']
-    # optocellindex_dict=aq_all_info['optocellindex_dict']
-    # traces_dict=aq_all_info['traces_dict']
-    # transition_array=aq_all_info['transition_array']
+    analysis=aq_analysis
+    speedtimestamps=aq_all_info['speedtimestamps']
+    optocellindex_dict=aq_all_info['optocellindex_dict']
+    traces_dict=aq_all_info['traces_dict']
+    transition_array=aq_all_info['transition_array']
     
     
-    plot_optostimulated_cell_activities(aq_all_info['analysis'],aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
-    # plot_several_traces(analysis,speedtimestamps,aq_all_info['speed'],  optocellindex_dict,traces_dict,transition_array,use_scaled=True,smoothwindow=True)
+    plot_optostimulated_cell_activities(aq_analysis,aq_all_info['speedtimestamps'],aq_all_info['speed'],aq_all_info['optocellindex_dict'],aq_all_info['traces_dict'],aq_all_info['transition_array'],use_scaled=True,smoothwindow=True)
+    #%%
+    plot_several_traces(analysis,speedtimestamps,aq_all_info['speed'],  optocellindex_dict,traces_dict,transition_array,use_scaled=True,smoothwindow=True)
+    plot_rasters_treatment(aq_all_info['optocellindex_dict'],aq_all_info['scaled_activity_dict'],substracted=False,smoothed=False)
+    plot_rasters_treatment(aq_all_info['optocellindex_dict'],aq_all_info['scaled_activity_dict'],substracted=False,smoothed=True)
+    plot_rasters_treatment(aq_all_info['optocellindex_dict'],aq_all_info['scaled_activity_dict'],substracted=True,smoothed=False)
     plot_rasters_treatment(aq_all_info['optocellindex_dict'],aq_all_info['scaled_activity_dict'],substracted=True,smoothed=True)
+
     plot_rasters_treatment(aq_all_info['optocellindex_dict'],aq_all_info['activity_dict'],substracted=True,smoothed=True)
     plot_optostimcell_single_trials(aq_all_info['transition_array'],aq_all_info['optocellindex_dict'],aq_all_info['scaled_activity_dict'],aq_all_info['opto_repetitions'],aq_all_info['gratingcontrol'],aq_all_info['led_opt'],substracted=True,smoothed=True)
     # plot_optostimcell_single_trials(aq_all_info['transition_array'],aq_all_info['optocellindex_dict'],aq_all_info['activity_dict'],aq_all_info['opto_repetitions'],aq_all_info['gratingcontrol'],aq_all_info['led_opt'],substracted=True,smoothed=True)
 
-
-
+optocellindex_dict=aq_all_info['optocellindex_dict']
+activity_dict=aq_all_info['traces_dict']['all']['all']['All_planes']['demixed']
 #%%
 
     
@@ -1705,311 +2112,4 @@ plot_optostimcell_tiled_cell(stimulated_cells_number,transition_array,optocellin
 # plot_optostimcell_single_trials(transition_array,optocellindex_dict,scaled_activity_dict,opto_repetitions,gratingcontrol,led_opt,substracted=False,smoothed=True)
 # plot_optostimcell_single_trials(transition_array,optocellindex_dict,scaled_activity_dict,opto_repetitions,gratingcontrol,led_opt,substracted=True,smoothed=False)
 plot_optostimcell_single_trials(transition_array,optocellindex_dict,scaled_activity_dict,opto_repetitions,gratingcontrol,led_opt,substracted=True,smoothed=True)
-        #%%
-for selectedgrating in range(8):
-    grattrialarray=np.zeros((stimulated_cells_number,nTrials,1,1)).astype(np.uint16)
-    gratingtrialctrl=visstimtranstionts[selectedgrating,:,1,0]
-    grattrialarray[0,:,0,0]=visstimtranstionts[selectedgrating,:,0,0]
-    
-    activity_dict= slice_by_optotrial(stimulated_cells_number,pretime,posttime,fr,grattrialarray,traces_dict,gratingtrialctrl,use_scaled=True)
-    plot_rasters_treatment(optocellindex_dict,activity_dict,substracted=False,smoothed=False)
 
-    #%%
-
-# for l in range(2):
-#     f,ax=plt.subplots(int(transition_array.shape[1]/2),2)
-#     for i,opto  in enumerate(transition_array[0,:,0,0]):
-#         row = i // 2  # determine the row index based on the iteration index
-#         col = i % 2   # determine the column index based on the iteration index
-#         # ax[row, col].plot(analysis.activity_dict['parameters']['trialtimevector'],analysis.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
-#         ax[row, col].plot(activity_dict['parameters']['trialtimevector'],activity_dict['opto']['trials']['raw_smoothed'][l,0,i,:]),'k'
-
-#         # ax[row, col].plot(analysis.activity_dict['parameters']['trialtimevector'],smoothedoptotracessubstracetd[l,l,i,:],'b')
-#         ax[row, col].plot(  activity_dict['parameters']['trialspeedtimevector'],   activity_dict['speed']['trials']['raw_smoothed'][0,i,:],'r')
-#         ax[row, col].axvline(x=0)  
-#         # ax[row, col].set_ylim(-3,8)
-#         ax[row, col].margins(x=0)
-#         for m in range(opto_repetitions):               
-#             ax[row, col].add_patch(Rectangle((activity_dict['parameters']['trialtimevector'][activity_dict['parameters']['prestim']+activity_dict['parameters']['interoptoframes']*m], 0.8), 0.01, 0.2,color='r'))
-
-#         ax[row, col].set_xlabel('Time(s)')
-#         ax[row, col].set_ylabel('Activity(a.u.)')
-        
-#     f.suptitle(f'Single Trial Optogenetic Stimulation Pyr Cell{str(l+1)}', fontsize=16)
-    
-# if gratingcontrol.any():
-
-#     #plot single optotirals individually 
-#     for l in range(10):
-#         f,ax=plt.subplots(int(gratingcontrol.shape[0]/2),2)
-#         for i,opto  in enumerate(gratingcontrol):
-#             row = i // 2  # determine the row index based on the iteration index
-#             col = i % 2   # determine the column index based on the iteration index
-#             # ax[row, col].plot(analysis.activity_dict['parameters']['trialtimevector'],analysis.scale_signal(smoothedoptotraces[l,l,i,:]),'k')
-#             ax[row, col].plot(analysis.activity_dict['parameters']['trialtimevector'],activity_dict['control']['trials']['raw_smoothed'][l,0,i,:]),'k'
-
-#             # ax[row, col].plot(analysis.activity_dict['parameters']['trialtimevector'],smoothedoptotracessubstracetd[l,l,i,:],'b')
-#             ax[row, col].plot(analysis.  activity_dict['parameters']['trialspeedtimevector'],analysis.   activity_dict['speed']['trials']['raw_smoothed'][0,i,:],'r')
-#             ax[row, col].axvline(x=0)  
-#             # ax[row, col].set_ylim(-3,8)
-#             ax[row, col].margins(x=0)
-       
-#             ax[row, col].set_xlabel('Time(s)')
-#             ax[row, col].set_ylabel('Activity(a.u.)')
-            
-#         f.suptitle(f'Single Trial Grating Control Pyr Stimulation Cell{str(l+1)}', fontsize=16)
-    
-
-
-
-# #%% in rafaaanalysis
-# dtset=analysis.calcium_datasets[list(analysis.calcium_datasets.keys())[0]]
-# dtset.most_updated_caiman.CaimanResults_object.load_all()
-# f,ax=plt.subplots(2)
-# for i in range(2):
-#     trace=dtset.most_updated_caiman.CaimanResults_object.raw[i,:]
-#     ax[0].plot(trace)
-#     ax[1].plot(analysis.smooth_trace(trace,10))
-    
-# volt=dtset.associated_aquisiton.voltage_signal_object
-# dtset.most_updated_caiman.CaimanResults_object.load_caiman_hdf5_results()
-# cnm=dtset.most_updated_caiman.CaimanResults_object.cnm.estimates
-# cnm.view_components()
-# full_raw=cnm.C+cnm.YrA   
-
-
-
-# sig=volt.voltage_signals_dictionary
-# sig['PhotoStim']
-# sig['PhotoTrig'].plot()
-    
-# phototriggers=sig['PhotoTrig'].values.flatten()
-# photosignals=sig['PhotoStim'].values.flatten()
-# timestamps=dtset.associated_aquisiton.metadata_object.timestamps['Plane1']
-
-    
-# volt=dtset.associated_aquisiton.voltage_signal_object
-# dtset.most_updated_caiman.CaimanResults_object.load_caiman_hdf5_results()
-# cnm=dtset.most_updated_caiman.CaimanResults_object.cnm.estimates
-# cnm.view_components()
-# full_raw=cnm.C+cnm.YrA
-
-# chandeliers=np.array([ 0,])
-
-
-# chandeliertraces=full_raw[chandeliers,:]
-
-
-# sig=volt.voltage_signals_dictionary
-# sig['PhotoStim']
-# sig['PhotoTrig'].plot()
-    
-# phototriggers=sig['PhotoTrig'].values.flatten()
-# photosignals=sig['PhotoStim'].values.flatten()
-# timestamps=dtset.associated_aquisiton.metadata_object.timestamps['Plane1']
-
-# stimnumber=5
-# frequency=20#hz
-# duration=20/1000#ms
-# stimperiod=1/frequency #s
-# isi=stimperiod-duration
-
-# optotimes=np.arange(0,5*stimperiod,stimperiod)
-
-# plt.rcParams["figure.figsize"] = [16, 5]
-# plt.rcParams["figure.autolayout"] = True
-# plt.close('all')
-# smoothwindows=10
-# fr=dtset.metadata.translated_imaging_metadata['FinalFrequency']
-# framen=len(dtset.most_updated_caiman.CaimanResults_object.raw[1,:])
-# lengthtime=framen/fr
-# period=1/fr
-# fulltimevector=np.arange(0,lengthtime,period)
-
-# f,ax=plt.subplots(6)    
-# for i in range(6):
-#     trace=dtset.most_updated_caiman.CaimanResults_object.raw[i,:]
-#     if i==3:
-#         ax[i].plot(fulltimevector,smooth_trace(trace,10),c='y')
-#     else:
-#         ax[i].plot(fulltimevector,smooth_trace(trace,10),c='g')
-
-#     for i,a in enumerate(ax):
-#         a.margins(x=0)
-#         if i<len(ax)-1:
-#             a.axis('off')
-     
-#         elif i==len(ax)-1:
-            
-#             a.spines['top'].set_visible(False)
-#             a.spines['right'].set_visible(False)
-#             a.spines['left'].set_visible(False)
-#             a.get_yaxis().set_ticks([])
-            
-# f,ax=plt.subplots(1)
-# f.tight_layout()
-# for i in range(3,6):
-#     trace=dtset.most_updated_caiman.CaimanResults_object.raw[i,:]
-#     ax.plot(fulltimevector,smooth_trace(trace,smoothwindows))
-    
-#     ax.margins(x=0)
-#     for j in range(len(estimatedoptotimes)):
-#         ax.axvline(x=fulltimevector[estimatedoptotimes[j]],c='r')  
-#     ax.set_xlabel('Time(s)')
-#     ax.set_ylabel('Activity(a.u.)')
-#     f.suptitle('Optogenetic Stimulation of Chandelier Cells', fontsize=16)
-
-   
-# smoothedtraces=np.zeros_like(dtset.most_updated_caiman.CaimanResults_object.raw)        
-# for i in range(6):
-#     smoothedtraces[i,:]=smooth_trace(dtset.most_updated_caiman.CaimanResults_object.raw[i,:],smoothwindows)
-      
-# optotrialarraysmoothed=np.zeros((3,10,60))
-# activity_dict['parameters']['trialtimevector']=np.arange(-period*activity_dict['parameters']['prestim'],period*poststim,period)
-
-
-# # f,ax=plt.subplots(5,2)
-# for i,opto  in enumerate(estimatedoptotimes):
-#     for j in range(3,6):
-# #         row = i // 2  # determine the row index based on the iteration index
-# #         col = i % 2   # determine the column index based on the iteration index
-#         optotrialarraysmoothed[j-3,i,:]=smoothedtraces[j,opto-activity_dict['parameters']['prestim']:opto+poststim]
-# #         ax[row, col].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothed[j-3,i,:])
-
-# #         ax[row, col].axvline(x=0,c='r')  
-# #         ax[row, col].set_ylim(-1,3)
-# #         ax[row, col].margins(x=0)
-# #         ax[row, col].set_xlabel('Time(s)')
-# #         ax[row, col].set_ylabel('Activity(a.u.)')
-# #         for m in optotimes:
-# #             ax[row, col].add_patch(Rectangle((m, 2.8), 0.01, 0.2))
-               
-#    # 
-
-            
-# #plotting all trials and mean for chandelier
-# # fullmean=optotrialarraysmoothed.mean(axis=1)
-# # for j in range(3,6):
-# #     f,ax=plt.subplots(1)
-# #     for i,opto  in enumerate(estimatedoptotimes):
-# #         ax.plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothed[j-3,i,:],c='k',alpha=0.2)
-# #         ax.plot(activity_dict['parameters']['trialtimevector'],fullmean[j-3,:],c='k')
-# #         ax.axvline(x=0,c='r')  
-# #         ax.set_ylim(-1,3)
-# #         ax.margins(x=0)
-        
-# #     for m in optotimes:
-# #         ax.add_patch(Rectangle((m, 2.8), 0.01, 0.2))
-        
-# meanactivations=optotrialarraysmoothed[:,[0,4,6,9],:].mean(axis=1)
-# meanalocomotion=optotrialarraysmoothed[:,7,:]
-# meannonactivations=optotrialarraysmoothed[:,[1,2,3,5,8],:].mean(axis=1)
-
-# # f,ax=plt.subplots(3)
-# # for i in range(3):
-# #     ax[0].plot(activity_dict['parameters']['trialtimevector'],meanactivations[i,:])
-# #     ax[1].plot(activity_dict['parameters']['trialtimevector'],meannonactivations[i,:])  
-# #     ax[2].plot(activity_dict['parameters']['trialtimevector'],meanalocomotion[i,:])
-# #     for j in [0,4,6,9]:
-# #         ax[0].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothed[i,j,:],alpha=0.2)
-# #     for j in [7]:
-# #         ax[2].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothed[i,j,:],alpha=0.2)  
-# #     for j in [1,2,3,5,8]:
-# #         ax[1].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothed[i,j,:],alpha=0.2)
-
-# #     for n in range(3):
-# #         ax[n].margins(x=0)
-# #         ax[n].set_ylim(-1,3)
-# #         ax[n].axvline(x=0,c='r')  
-# #         for m in optotimes:
-# #             ax[n].add_patch(Rectangle((m, 2.8), 0.01, 0.2))
-# #         ax[n].set_xlabel('Time(s)',fontsize=20)
-# #         ax[n].set_ylabel('Activity(a.u.)')
-# #     ax[0].set_title('Responsive Trials')
-# #     ax[1].set_title('Unresponsive Trials')
-# #     ax[2].set_title('Running Trials')
-
-            
-# #     f.suptitle('Trial segmented PSTH', fontsize=25)
-        
-
-        
-#  #baseline substractes       
-        
-# optotrialarraysmoothedDF=np.zeros_like(optotrialarraysmoothed)
-# meanbaselinesmoothed=optotrialarraysmoothed[:,:,0:20].mean(axis=2)
-# for i in range(3):
-#     for j in range(10):
-#         optotrialarraysmoothedDF[i,j,:]=(optotrialarraysmoothed[i,j,:]-meanbaselinesmoothed[i,j])
-
-
-# f,ax=plt.subplots(5,2)
-# for i,opto  in enumerate(estimatedoptotimes):
-#     for j in range(3,6):
-#         row = i // 2  # determine the row index based on the iteration index
-#         col = i % 2   # determine the column index based on the iteration index
-#         ax[row, col].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothedDF[j-3,i,:])
-#         ax[row, col].axvline(x=0,c='r')  
-#         ax[row, col].set_ylim(-1,3)
-#         ax[row, col].margins(x=0)
-#         for m in optotimes:
-#             ax[row, col].add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
-#         ax[row, col].set_xlabel('Time(s)')
-#         ax[row, col].set_ylabel('Activity(a.u.)')
-        
-#     f.suptitle('Single Trial Optogenetic Stimulation', fontsize=16)
-
-               
-# #plotting all trials and mean for chandelier
-# fullmeandf=optotrialarraysmoothedDF.mean(axis=1)
-# cells=['Chand','Pyr1','Pyr2']
-# for j in range(3,6):
-#     f,ax=plt.subplots(1)
-#     for i,opto  in enumerate(estimatedoptotimes):
-#         ax.plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothedDF[j-3,i,:],c='k',alpha=0.2)
-#         ax.plot(activity_dict['parameters']['trialtimevector'],fullmeandf[j-3,:],c='k')
-#         ax.axvline(x=0,c='r')  
-#         ax.set_ylim(-1,3)
-#         ax.margins(x=0)
-        
-#         ax.set_xlabel('Time(s)')
-#         ax.set_ylabel('Activity(a.u.)')
-#         for m in optotimes:
-#             ax.add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
-        
-#     f.suptitle(f'Global Optostimulation PSTH {cells[j-3]}', fontsize=16)
-
-                        
- 
-# meanactivationsbasesub=optotrialarraysmoothedDF[:,[0,4,6,9],:].mean(axis=1)
-# meanalocomotionbasesub=optotrialarraysmoothedDF[:,7,:]
-# meannonactivationsbasesub=optotrialarraysmoothedDF[:,[1,2,3,5,8],:].mean(axis=1)       
-# for i in range(3):
-#     f,ax=plt.subplots(3)
-
-#     ax[0].plot(activity_dict['parameters']['trialtimevector'],meanactivationsbasesub[i,:])
-#     ax[1].plot(activity_dict['parameters']['trialtimevector'],meannonactivationsbasesub[i,:])  
-#     ax[2].plot(activity_dict['parameters']['trialtimevector'],meanalocomotionbasesub[i,:])
-#     for k in [0,4,6,9]:
-#         ax[0].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)
-#     for k in [7]:
-#         ax[2].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)  
-#     for k in [1,2,3,5,8]:
-#         ax[1].plot(activity_dict['parameters']['trialtimevector'],optotrialarraysmoothedDF[i,k,:],c='k',alpha=0.2)
-    
-#     for j in range(3):
-#         ax[j].margins(x=0)
-#         ax[j].set_ylim(-1,3)
-#         ax[j].axvline(x=0,c='r')  
-#         for m in optotimes:
-#             ax[j].add_patch(Rectangle((m, 2.8), 0.01, 0.2,color='r'))
-        
-#         ax[j].set_xlabel('Time(s)')
-#         ax[j].set_ylabel('Activity(a.u.)')
-#     ax[0].set_title('Responsive Trials')
-#     ax[1].set_title('Unresponsive Trials')
-#     ax[2].set_title('Running Trials')
-
-
-        
-#     f.suptitle(f'Trial segmented PSTH {cells[i]}', fontsize=16)

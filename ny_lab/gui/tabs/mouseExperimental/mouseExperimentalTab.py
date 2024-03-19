@@ -18,7 +18,7 @@ from .new_window_update_done_windows import  new_window_update_done_windows
 from .new_window_post_op_injections import  new_window_post_op_injections
 from ....database.fun.guiFunctions.plan_window_parameters import plan_window_parameters
 from .new_window_move_to_exp_room import new_window_move_to_exp_room
-
+from pathlib import Path
 from ..mouseVisit.widgetSelectStockCageMice import WidgetSelectStockCageMice
 from .processBrainWindow import ProcessBrain
 
@@ -246,7 +246,10 @@ class MouseExperimentalTab(tk.Frame):
 
             selectedinjections=self.gui_ref.MouseDat.Experimental_class.all_mouse_to_do_injection.loc[self.gui_ref.MouseDat.Experimental_class.all_mouse_to_do_injection['Code'].isin(selected_codes)]
             selectedinjectionsinfo=selectedinjections[['Code','Lab_Number','Sex','Cage','Age','Line_Short','Projects','Labels_types']]
-            selectedinjectionsinfo.to_excel(os.path.join(r'C:\Users\sp3660\Desktop\Temp_Excel_Files' ,'InfoForInjectionTemplates_{0}.xlsx'.format(datetime.date.today().strftime("%Y%m%d") )))
+            selectedinjectionsinfo.to_excel(os.path.join(r'/home/sp3660/Desktop/Temp_Excel_Files' ,'InfoForInjectionTemplates_{0}.xlsx'.format(datetime.date.today().strftime("%Y%m%d") )))
+            
+            
+            # Path()
             
     def update_done_injection_button(self): 
                 

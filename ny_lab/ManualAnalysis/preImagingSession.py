@@ -14,10 +14,8 @@ import numpy as np
 import pandas as pd 
 import sys
 from pathlib import Path
-
-sys.path.insert(
-    0, r"C:\Users\sp3660\Documents\Github\LabNY\ny_lab\dataManaging\functions"
-)
+import subprocess
+sys.path.insert(0, r"/home/sp3660/Documents/Github/LabNY/ny_lab/dataManaging/functions")
 from functionsDataOrganization import recursively_eliminate_empty_folders
 
 class PreImagingSession():
@@ -26,11 +24,13 @@ class PreImagingSession():
         
         self.mice=mice
         self.sessiondate=sessiondate
-        self.tempdir=r'C:\Users\sp3660\Desktop\SessionTemplatesDirectories'
-        self.template=r'C:\Users\sp3660\Desktop\ImagingSessionDate' 
+        self.tempdir=r'/home/sp3660/Desktop/SessionTemplatesDirectories'
+        self.template=r'/home/sp3660/Desktop/ImagingSessionDate' 
         self.transfer='scp -r '
-        self.removedir='rmdir /s '
-        self.copyfolder='Xcopy /E /I '
+        self.wremovedir='rmdir /s '
+        self.wcopyfolder='Xcopy /E /I '
+        self.removedir='rmdir -p '
+        self.copyfolder='cp -r '
 
         self.WS1_IP='yustelab@128.59.247.96'
         self.WS2_IP='rylab@128.59.39.236'
@@ -63,17 +63,19 @@ class PreImagingSession():
 #     set "Key="
         
 #         ssh --% yustelab@128.59.247.96 icacls.exe "C:\Users\yustelab\.ssh\authorized_keys" /inheritance:r /grant "Administrators:F" /grant "SYSTEM:F"
-# scp -r C:\Users\sp3660\Desktop\authorized_keys yustelab@128.59.247.96:C:\Users\yustelab\.ssh\
+# scp -r /home/sp3660/Desktop/authorized_keys yustelab@128.59.247.96:C:\Users\yustelab\.ssh\
     
 #        
-        self.widefield_dir_WS1=r'C:\Users\yustelab\Documents\Sam\WideField'
-        self.visstimsessions_dir_WS1=r'C:\Users\yustelab\Documents\Sam\VisualStim\MATLAB\Sessions'
-        self.eyecam_dir_WS2=r'C:\Users\rylab\Documents\Sam\EyeCamera'
-        self.stimdaq_dir_WS2=r'C:\Users\rylab\Documents\Sam\stim_scripts-master\behavior\NI_DAQ\output_data'
-        self.Prairieraw1=r'E:\Sam'
-        self.Prairieraw2=r'F:\Sam'
-        self.Prairieraw3=r'G:\Sam'
-        self.permanent=r'I:\Projects\LabNY\Imaging'
+        self.widefield_dir_WS1=str(Path(r'C:','Users','yustelab','Documents','Sam','WideField'))
+        self.visstimsessions_dir_WS1=str(Path(r'C:','Users','yustelab','Documents','Sam','VisualStim','MATLAB','Sessions'))
+        self.eyecam_dir_WS2=str(Path(r'C:','Users','rylab','Documents','Sam','EyeCamera'))
+        self.stimdaq_dir_WS2=str(Path(r'C:','Users','rylab','Documents','Sam','stim_scripts-master','behavior','NI_DAQ','output_data'))
+        self.Prairieraw1=str(Path(r'E:','Sam'))
+        self.Prairieraw2=str(Path(r'F:','Sam'))
+        self.Prairieraw3=str(Path(r'G:','Sam'))
+        linuxperm=r'/media/sp3660/Data Permanent 2/'
+        
+        self.permanent=str(Path(linuxperm,'Projects','LabNY','Imaging'))
         direchange='cd '
         self.Prairiedrives=['e:','f:','g:']
         priairiredrive1='e: & cd '
@@ -91,8 +93,10 @@ class PreImagingSession():
             file.writelines( data )
 
         self.main_dir=[self.widefield_dir_WS1, self.visstimsessions_dir_WS1, self.eyecam_dir_WS2, self.stimdaq_dir_WS2, self.Prairieraw1, self.Prairieraw2]
-        self.sshfolder=r'G:\Projects\TemPrairieSSH'
-        
+        # if windows
+        #     self.sshfolder=str(Path(r'G:','Projects','TemPrairieSSH'))
+        # elif linux:
+        self.sshfolder=str(Path('/','mnt','d994804b-8774-4ccf-8efb-700b59334be1','Projects','TemPrairieSSH'))
         
         
         self.Prairieraw=[self.Prairieraw1,self.Prairieraw2,self.Prairieraw3]
@@ -106,16 +110,16 @@ class PreImagingSession():
         self.copy_session_to_ssh()
         
         print('copy sessionto permanent folder'.upper())
-        print(f'Xcopy /E /I {os.path.join(self.sshfolder,self.sessiondate)} {os.path.join(self.permanent, self.session_year,self.sessiondate)}')
+        print( self.copyfolder+ f'{os.path.join(self.sshfolder,self.sessiondate)} "{os.path.join(self.permanent, self.session_year)}"')
         
         self.remove_session_from_computer()
         print('ssh '+ self.WS1_IP)
         print('ssh '+ self.WS2_IP)
-        print('scp -r wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{} G:\\Projects\\TemPrairieSSH'.format(self.sessiondate))
-        print(f'scp -r G:\\Projects\\TemPrairieSSH\\20220525Hakim\\Mice\\SPKU\\ToTrack wjyang@192.168.0.117:C:\\Users\\wjyang\\Documents\\Sam\\{self.sessiondate}\\Mice\\SPKU')
+        print( self.transfer+ 'wjyang@192.168.0.117:'+str(Path(r'C:','Users','wjyang','Documents','Sam',f'{self.sessiondate} '+ self.sshfolder)))
+        print( self.transfer+ str(Path(r'G:','Projects','TemPrairieSSH','20220525Hakim','Mice','SPKU','ToTrack'))+' wjyang@192.168.0.117:'+str(Path(r'C:','Users','wjyang','Documents','Sam',f'{self.sessiondate}','Mice','SPKU')))
         
         print('remove session from ssh folder'.upper())
-        print(f'rmdir /s {os.path.join(self.sshfolder,self.sessiondate)}')
+        print(self.removedir+f'{os.path.join(self.sshfolder,self.sessiondate)}')
 
         
 
@@ -155,13 +159,13 @@ class PreImagingSession():
         for mouse in self.mice:
             try:
             
-                shutil.copytree(os.path.join(self.session_dir, r'Mice\SP__'), os.path.join(self.session_dir, 'Mice',mouse), symlinks=False, ignore=None, ignore_dangling_symlinks=False, dirs_exist_ok=False)
+                shutil.copytree(os.path.join(self.session_dir, r'Mice' +os.sep+'SP__'), os.path.join(self.session_dir, 'Mice',mouse), symlinks=False, ignore=None, ignore_dangling_symlinks=False, dirs_exist_ok=False)
                 
             except:
                     print('Mouse Alredy done')
 
         try   :             
-            shutil.rmtree(os.path.join(self.session_dir, r'Mice\SP__'))
+            shutil.rmtree(os.path.join(self.session_dir, r'Mice'+os.sep+'SP__'))
         except:
                 print('Not mouse template')
         
@@ -181,7 +185,7 @@ class PreImagingSession():
 
         for tr in flat_list:
             print(tr)
-        print('echo')
+            # subprocess.run(["scp","r", tr[7:tr.find('user')],tr[tr.find('user'):]])
             
     def transfer_sessions(self):
         all_ips=[self.Prairie_IP, self.WS1_IP, self.WS2_IP]
@@ -216,7 +220,7 @@ class PreImagingSession():
     def remove_session_from_computer(self):
         
         
-        trasnfertoslowPrairie=self.copyfolder+os.path.join(self.Prairieraw1,self.sessiondate) +' '+ os.path.join(self.Prairieraw3,self.sessiondate)
+        trasnfertoslowPrairie=self.wcopyfolder+os.path.join(self.Prairieraw1,self.sessiondate) +' '+ os.path.join(self.Prairieraw3,self.sessiondate)
 
         
         Prairiedrivescd=[i+' & cd ' for i in self.Prairiedrives]
@@ -232,7 +236,7 @@ class PreImagingSession():
 
         
         
-        removePrairiesession=[self.removedir+os.path.join(i,self.sessiondate) for i in self.Prairieraw[:-1]]
+        removePrairiesession=[self.wremovedir+os.path.join(i,self.sessiondate) for i in self.Prairieraw[:-1]]
         
         for i in removePrairiesession:
             print(i)
@@ -319,18 +323,24 @@ class PreImagingSession():
 
 
 # Xcopy /E /I G:\Projects\TemPrairieSSH\20220223 F:\Projects\LabNY\Imaging\2022\20220223
-# '''
+# '''	
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20231201'
+    sessiondate='20240307'
     mice=['Test',
+        'SPRY',
         'SPRZ',
+        'SPSM',
+        'SPST',
+        'SPSU',
+        'SPSX',
+        'SPSZ',
         ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()
 
-
-sshpath = Path(r"G:\Projects\TemPrairieSSH")
+sshpath=Path('/','mnt','d994804b-8774-4ccf-8efb-700b59334be1','Projects','TemPrairieSSH')
+# sshpath = Path(r"G:\Projects\TemPrairieSSH")
 sessionsshpath=sshpath / sessiondate
 
 recursively_eliminate_empty_folders(sessionsshpath)

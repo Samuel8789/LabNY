@@ -328,6 +328,8 @@ class ResultsAnalysis():
         self.tomato_datasets={key:values for key,values in   self.acquisition_object.all_datasets.items() if 'Red' in key }
 
     def load_calcium_extractions(self):
+        
+
         self.caiman_extractions={key:dataset.most_updated_caiman for key,dataset in self.calcium_datasets.items()}
         for caiman_extr in  self.caiman_extractions.values(): caiman_extr.load_results_object()
         self.caiman_results={key:caiman_extr.CaimanResults_object for key,caiman_extr in self.caiman_extractions.items()}
@@ -549,7 +551,7 @@ class ResultsAnalysis():
                 pickle.dump(self.full_data, f, pickle.HIGHEST_PROTOCOL)
                 
     def check_full_data(self) :
-        self.full_data_list=glob.glob(self.data_analysis_path+'\\**full_data**', recursive=False)
+        self.full_data_list=glob.glob(self.data_analysis_path+os.sep+'**full_data**', recursive=False)
 
     def load_full_data(self):
         if self.full_data_list:

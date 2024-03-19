@@ -89,6 +89,8 @@ class ImageSequenceDataset:
             self.bidishift_object=BidiShiftManager( raw_dataset_object= self.raw_dataset_object, custom_start_end=True)
             
     def process_raw_dataset(self,forcing=False):
+        module_logger.info('processing raw dataset')
+
         try :
             open_directory(self.selected_dataset_mmap_path)
             if self.associated_aquisiton.subaq_object=='TestAquisition':
@@ -142,6 +144,7 @@ class ImageSequenceDataset:
 
     
     def full_process_raw_dataset(self):
+        module_logger.info('full processing raw dataset')
         try :
             if self.associated_aquisiton.subaq_object=='TestAquisition':
                 self.do_bidishift(force=True)
@@ -225,8 +228,9 @@ class ImageSequenceDataset:
     def load_motion_corrected_movie(self):
         self.mc_movie=cm.load(self.mc_onacid_path)
         
+  
         
-        
+
         
     def define_dataset_info(self):
         
@@ -520,7 +524,7 @@ class ImageSequenceDataset:
         self.deep_caiman=CaimanExtraction(mmaptoproces, temporary_path=self.selected_dataset_mmap_path, metadata_object=self.metadata, new_parameters=new_parameters, galois=True)
         
     def open_dataset_directory(self):
-        os.startfile(self.selected_dataset_mmap_path)
+        open_directory(self.selected_dataset_mmap_path)
 
     def open_raw_video_on_imagej(self):
         pass

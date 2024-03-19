@@ -110,7 +110,7 @@ class Aquisition:
                          }
         
         if raw_input_path and not non_imaging:
-            self.Prairireaqpath=os.path.split(glob.glob(raw_input_path +'\\**\\**.env', recursive=True)[0])[0]      
+            self.Prairireaqpath=os.path.split(glob.glob(raw_input_path +os.sep+'**'+os.sep+'**.env', recursive=True)[0])[0]      
             self.aquisition_path=os.path.split(self.Prairireaqpath)[0]
             self.aquisition_name= os.path.split(self.Prairireaqpath)[1]
             
@@ -174,7 +174,7 @@ class Aquisition:
             
             self.scanimage_raw_path=r'F:\Projects\LabNY\Imaging\2022\20220525Hakim\Mice\SPKU\FOV_1\Aq_1'
             
-            self.scanimagepath=os.path.split(glob.glob(scanimage_raw_path +'\\**\\**.csv', recursive=True)[0])[0]      
+            self.scanimagepath=os.path.split(glob.glob(scanimage_raw_path +os.sep+'**'+os.sep+'**.csv', recursive=True)[0])[0]      
             self.aquisition_path=os.path.split(self.scanimagepath)[0]
             self.aquisition_name= os.path.split(self.scanimagepath)[1]
             
@@ -330,7 +330,7 @@ class Aquisition:
            
         temp_path=os.path.split(os.path.split(aquisition_to_process)[0])[0]
         
-        aquisition_date=aquisition_to_process[temp_path.find('\SP')-13:temp_path.find('\SP')-5]
+        aquisition_date=aquisition_to_process[temp_path.find(os.sep+'SP')-13:temp_path.find(os.sep+'SP')-5]
         self.formated_aquisition_date=aquisition_date     
         
         self.session_path=os.path.join(self.mouse_object.mouse_slow_subproject_path, 'imaging', self.formated_aquisition_date) 
@@ -391,7 +391,7 @@ class Aquisition:
 
                     elif any('Volume' in file_name  for file_name in folder_selected_list_red if os.path.isdir(os.path.join(directory_red , file_name))):
                         last_cycle=len(folder_selected_list_red) + aq_info[9]
-                        PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+'\\**'))     
+                        PlaneNumber=len(glob.glob(os.path.join(directory_red,folder_selected_list_red[0])+os.sep+'**'))     
                         Multiplane=False
         
                     else:
@@ -412,7 +412,7 @@ class Aquisition:
                             
                     elif any('Volume' in file_name  for file_name in folder_selected_list_green if os.path.isdir(os.path.join(directory_green , file_name))):
                         last_cycle=len(folder_selected_list_green) + aq_info[10]
-                        PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+'\\**'))     
+                        PlaneNumber=len(glob.glob(os.path.join(directory_green,folder_selected_list_green[0])+os.sep+'**'))     
                     
                     else:
                        aq_info=check_channels_and_planes(directory_green, correction)
@@ -458,7 +458,7 @@ class Aquisition:
               # module_logger.info('Moving Files')   
               time.sleep(10)
               if correction:
-                  if glob.glob(self.Prairireaqpath+'\\**.tif', recursive=False):             
+                  if glob.glob(self.Prairireaqpath+os.sep+'**.tif', recursive=False):             
                       move_files(self.Prairireaqpath,ChannelPaths,PlanePaths, Multiplane,aq_info[-1] ) 
                   for channel_folder in ChannelPaths:
                       if os.path.isdir(channel_folder):
@@ -491,7 +491,7 @@ class Aquisition:
                              
                 Multiplane=aq_info[8]
                 if correction:
-                    if glob.glob(self.Prairireaqpath+'\\**.tif', recursive=False):             
+                    if glob.glob(self.Prairireaqpath+os.sep+'**.tif', recursive=False):             
                         move_files(self.Prairireaqpath,ChannelPaths,CyclesPaths, Multiplane,aq_info[-1] ) 
                     for channel_folder in ChannelPaths:
                         if os.path.isdir(channel_folder):
@@ -582,7 +582,7 @@ class Aquisition:
             for channels in self.plane_channel_paths.values():
                 for dataset_path in channels.values():
                     if os.path.isdir(dataset_path):
-                        if len(os.listdir(dataset_path))>0:
+                        if len(os.listdir(dataset_path))>1:
                             dataset_name= os.path.split(self.mouse_aquisition_path)[1] +'_'+ os.path.split(os.path.split(dataset_path)[0])[1] +'_'+ os.path.split(dataset_path)[1]
                             self.all_datasets[dataset_name]=ImageSequenceDataset(self,
                                                                       dataset_name,                                                               
@@ -604,7 +604,14 @@ class Aquisition:
 
 
     def get_all_database_info(self):
-        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]
+        
+        
+      
+        df=pd.DataFrame([self.mouse_imaging_session_object.mouse_object.data_managing_object.transform_databasepath_tolinux(i) for i in self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath'].values])
+        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[df.iloc[:,0]==self.mouse_aquisition_path]['ID'].iloc[0]
+
+        
+        # self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]
         
         # print(self.aq_ID)
 
@@ -614,9 +621,12 @@ class Aquisition:
             self.full_database_dictionary=self.mouse_imaging_session_object.mouse_object.Database_ref.ImagingDatabase_class.get_single_acquisition_database_info(self.aq_ID)
             self.acquisition_database_info= self.full_database_dictionary['Acq']
             self.imaging_database_info= self.full_database_dictionary['Imaging']
-            self.database_acq_raw_path=Path(self.acquisition_database_info.loc[0, 'AcquisitonRawPath']).resolve()
-            if glob.glob(str(self.database_acq_raw_path)+'\**'):
-                self.database_acq_raw_path= Path(glob.glob(str(self.database_acq_raw_path)+'\**')[0])
+            # self.database_acq_raw_path=Path(self.acquisition_database_info.loc[0, 'AcquisitonRawPath']).resolve()
+            self.database_acq_raw_path=Path(self.mouse_imaging_session_object.mouse_object.data_managing_object.transform_databasepath_tolinux(self.acquisition_database_info.loc[0, 'AcquisitonRawPath'])).resolve()
+
+            
+            if glob.glob(str(self.database_acq_raw_path)+os.sep+'**'):
+                self.database_acq_raw_path= Path(glob.glob(str(self.database_acq_raw_path)+os.sep+'**')[0])
             else:
                 self.database_acq_raw_path=None
                
@@ -637,11 +647,11 @@ class Aquisition:
 
     def read_reference_images(self):
         
-        self.reference_images_working_fullpaths=glob.glob(self.slow_storage_all_paths['ref images']+'\\**', recursive=False)
+        self.reference_images_working_fullpaths=glob.glob(self.slow_storage_all_paths['ref images']+os.sep+'**', recursive=False)
         
     
     def transfer_ref_images(self):
-        self.references_raw_files_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+'\\References\\**', recursive=False) if '.tif' in file  ]
+        self.references_raw_files_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+os.sep+'References'+os.sep+'**', recursive=False) if '.tif' in file  ]
         self.reference_images_working_fullpaths=[]
         for file in self.references_raw_files_full_path:
             if not os.path.isfile(os.path.join(self.slow_storage_all_paths['ref images'], os.path.split(file)[1])):
@@ -695,7 +705,7 @@ class Aquisition:
 
     # def transfer_raw_csv(self):
     #     self.voltage_recording_raw_file_transfered_path=self.slow_storage_all_paths['raw_volatge_csv']    
-    #     self.voltage_recording_raw_file_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+'\\**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
+    #     self.voltage_recording_raw_file_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+os.sep+'**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
     #     if self.voltage_recording_raw_file_full_path and not os.path.isfile(self.voltage_recording_raw_file_transfered_path):
     #         self.voltage_recording_raw_file_full_path=self.voltage_recording_raw_file_full_path[0]
     #         final_file_path=os.path.join(self.voltage_recording_raw_file_transfered_path,os.path.split(self.voltage_recording_raw_file_full_path)[1])
@@ -705,7 +715,7 @@ class Aquisition:
     # def process_raw_voltage_recording(self):
     #     self.read_voltage_signals()
        
-    #     self.voltage_recording_raw_file_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+'\\**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
+    #     self.voltage_recording_raw_file_full_path=[file for file in glob.glob( os.path.join(self.aquisition_path,self.aquisition_name)+os.sep+'**', recursive=False) if 'VoltageRecording' in file and '.csv' in file   ]
     #     if self.voltage_recording_raw_file_full_path:
     #         self.voltage_recording_raw_file_full_path=self.voltage_recording_raw_file_full_path[0]
     #         try:
@@ -783,7 +793,7 @@ class Aquisition:
         
     def read_face_camera(self):
         self.face_camera=None
-        if glob.glob(self.slow_storage_all_paths['eye camera']+'\\**', recursive=False):
+        if glob.glob(self.slow_storage_all_paths['eye camera']+os.sep+'**', recursive=False):
             self.face_camera=EyeVideo(self)
         else:
             pass
@@ -828,7 +838,7 @@ class Aquisition:
         self.read_working_vistim_info()     
         
     def read_working_vistim_info(self): 
-        self.all_vis_stim_mat_files=glob.glob(self.slow_storage_all_paths['visual stim']+'\\**.mat', recursive=False)
+        self.all_vis_stim_mat_files=glob.glob(self.slow_storage_all_paths['visual stim']+os.sep+'**.mat', recursive=False)
         
     def load_vis_stim_info(self):
         

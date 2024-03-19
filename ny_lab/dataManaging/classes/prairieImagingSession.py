@@ -44,7 +44,7 @@ class PrairieImagingSession():
 
             self.imaging_session_mice_path=os.path.join(self.imaging_session_raw_path,'Mice')
             self.imaging_session_calibration_path=os.path.join(self.imaging_session_raw_path, 'Calibrations')
-            self.session_imaged_mice_paths=glob.glob(self.imaging_session_mice_path+'\\*\\')
+            self.session_imaged_mice_paths=glob.glob(self.imaging_session_mice_path+os.sep+'*'+os.sep)
             self.cleaning_up_empty_mouse()
             # self.cleaning_up_calibrations()
             self.session_imaged_mice_codes=[mouse_path[-5:-1] for mouse_path in self.session_imaged_mice_paths if '_' not in mouse_path]

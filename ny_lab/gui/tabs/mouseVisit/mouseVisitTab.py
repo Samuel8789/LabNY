@@ -17,7 +17,7 @@ from ...utils import button_update_database
 from ....database.fun.guiFunctions.updateLitterInput import UpdateLitterInput
 from .widgetSelectStockCageMice import WidgetSelectStockCageMice
 from .widgetSelectMultiCage import WidgetSelectMultiCage
-
+import subprocess
 
 class MouseVisitTab(tk.Frame):
     def __init__(self, gui_object, gui_tab_control):
@@ -310,7 +310,9 @@ class MouseVisitTab(tk.Frame):
 #%% button funcrions
     def open_mouse_visits_button(self):
         
-        os.startfile(r'C:\Users\sp3660\Documents\Projects\LabNY\4. Mouse Managing\MouseVisits')
+        visitpath=r'/home/sp3660/Documents/Projects/LabNY/4. Mouse Managing/MouseVisits'
+        
+        subprocess.Popen(['xdg-open',visitpath])
 
         
         

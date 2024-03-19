@@ -21,12 +21,13 @@ import  matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.backend_bases import key_press_handler
 from matplotlib.figure import Figure
-from project_manager.ProjectManager import ProjectManager
+# from project_manager.ProjectManager import ProjectManager
 try :
     from .scrollbarFrame import ScrollbarFrame
 except:
     from scrollbarFrame import ScrollbarFrame
 import time
+import subprocess
 
 import numpy as np
 import shutil
@@ -436,8 +437,8 @@ class MouseDatasetsPanel(tk.Toplevel):
                     'IsVoltageRecording',
                     'MicronsPerPixelX',
                     'MicronsPerPixelY',
-                    'Xpositions',
-                    'Ypositions',
+                    'XPositions',
+                    'YPositions',
                     'Zoom',
                     'VoltageRecordingChannels',
                     'VoltageRecordingFrequency',
@@ -787,7 +788,9 @@ class MouseDatasetsPanel(tk.Toplevel):
             try:
                 if os.path.isfile(self.selected_dataset_to_copy_object.kalman_object.kalman_path):
                     print('trasnefering to desktop kalman')
-                    shutil.copyfile(self.selected_dataset_to_copy_object.kalman_object.kalman_path, os.path.join(r'C:\Users\sp3660\Desktop\DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.kalman_object.kalman_path)[1]))
+                    # shutil.copyfile(self.selected_dataset_to_copy_object.kalman_object.kalman_path, os.path.join(r'C:\Users\sp3660\Desktop\DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.kalman_object.kalman_path)[1]))
+                    shutil.copyfile(self.selected_dataset_to_copy_object.kalman_object.kalman_path, os.path.join(Path('//','home','sp3660','Desktop','DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.kalman_object.kalman_path)[1])))
+
                     print('kalman transfered')
 
                 else:
@@ -804,7 +807,9 @@ class MouseDatasetsPanel(tk.Toplevel):
                 if os.path.isfile(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path):
 
                     print('trasnefering to desktop caiman')
-                    shutil.copyfile(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path, os.path.join(r'C:\Users\sp3660\Desktop\DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path)[1]))
+                    # shutil.copyfile(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path, os.path.join(r'C:\Users\sp3660\Desktop\DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path)[1]))
+                    shutil.copyfile(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path, os.path.join(Path('//','home','sp3660','Desktop','DatabaseAddingTemporal',os.path.split(self.selected_dataset_to_copy_object.most_updated_caiman.caiman_path)[1])))
+
                     print('caiman transfered')
                 else:
                     print('no caiman')
@@ -844,19 +849,19 @@ class MouseDatasetsPanel(tk.Toplevel):
       
     def open_acquisition_directory_action(self):
         
-        os.startfile(self.selected_acquisition_object.mouse_aquisition_path)
+      subprocess.Popen(['xdg-open',self.selected_acquisition_object.mouse_aquisition_path])
         
     def open_slow_mouse_directory_action(self):
         
-        os.startfile( os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging', self.imaging_session_name))
+      subprocess.Popen(['xdg-open', os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging', self.imaging_session_name)])
                
     def open_raw_acquisition_directory_action(self):
         
-        os.startfile(self.selected_acquisition_object.acquisition_database_info['AcquisitonRawPath'][0])
+      subprocess.Popen(['xdg-open',self.selected_acquisition_object.acquisition_database_info['AcquisitonRawPath'][0]])
         
     def open_dataset_directory_action(self):
         
-        os.startfile(self.selected_dataset_to_copy_object.selected_dataset_mmap_path)
+      subprocess.Popen(['xdg-open',self.selected_dataset_to_copy_object.selected_dataset_mmap_path])
 
     def open_facecamera_button(self):
         pass
@@ -921,13 +926,13 @@ class MouseDatasetsPanel(tk.Toplevel):
         dats=[]
         if not self.selected_acquisition_object.voltage_signal_object.no_voltage_signals:
             if hasattr(self.selected_acquisition_object.voltage_signal_object.extraction_object, 'rectified_speed_array'):               
-                dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.rectified_speed_array['Prairire']['Locomotion'])
+                dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.rectified_speed_array['Prairie']['Locomotion'])
             else:
                dats.append(np.array([False]) )
                
             for signal in self.selected_acquisition_object.voltage_signal_object.voltage_signals_dictionary.keys():
                 if signal!= 'Time':
-                    dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.get_specific_signal(signal)['Prairire'][signal])
+                    dats.append(self.selected_acquisition_object.voltage_signal_object.extraction_object.get_specific_signal(signal)['Prairie'][signal])
 
             # for n, ax in  enumerate(self.frame2.frame2.axs):
             for n, dat in  enumerate(dats):
@@ -1081,19 +1086,24 @@ if __name__ == "__main__":
     import tkinter as tk
     from sys import platform
     import socket
+    sys.path.insert(0, r'/home/sp3660/Documents/Github/ProjectManager')
+
     from project_manager.ProjectManager import ProjectManager
     import urllib3
     import os
     import pandas as pd
 
 
+   
+    # SET GITHUB TOKEN PATH
     house_PC='DESKTOP-V1MT0U5'
     lab_PC='DESKTOP-OKLQSQS'
     small_laptop_ubuntu='samuel-XPS-13-9380'
     small_laptop_kali='samuel-XPS-13-9380'
     big_laptop_ubuntu='samuel-XPS-15-9560'
     big_laptop_arch='samuel-XPS-15-9560'
-
+    newlab='sp3660-YusteLab'
+    
     if platform == "win32":
         if socket.gethostname()==house_PC:
             githubtoken_path=r'C:\Users\Samuel\Documents\Github\GitHubToken.txt'
@@ -1108,13 +1118,16 @@ if __name__ == "__main__":
             githubtoken_path='/home/samuel/Documents/Github/GitHubToken.txt'
             # Path('/home/samuel/Documents/Github/GitHubToken.txt')
             print('TO DO')
-
-    ProjectManager=ProjectManager(githubtoken_path, computer, platform)
-    gui=0
-    lab=ProjectManager.initialize_a_project('LabNY', gui)   
-    lab.do_datamanaging()
-    datamanaging=lab.datamanaging
-    # for msession not in database
+        elif socket.gethostname()==newlab:
+            computer=newlab
+            githubtoken_path='/home/sp3660/Documents/Github/GitHubToken.txt'
+    
+        ProjectManager=ProjectManager(githubtoken_path, computer, platform)
+        gui=0
+        lab=ProjectManager.initialize_a_project('LabNY', gui)   
+        lab.do_datamanaging()
+        datamanaging=lab.datamanaging
+        # for msession not in database
  
  
 #%% opening the vis app

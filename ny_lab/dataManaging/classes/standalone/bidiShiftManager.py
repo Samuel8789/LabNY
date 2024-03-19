@@ -53,6 +53,8 @@ class BidiShiftManager:
         self.temporary_path=temporary_path
         self.shifted_movie=np.array([False])
         self.image_sequence=np.array([False])
+        self.meanmov=np.array([False])
+        self.m_mean=np.array([False])
         self.bidiphases=[]
         self.expanded_dataset_name=expanded_dataset_name
         self.dataset_object=dataset_object
@@ -80,6 +82,10 @@ class BidiShiftManager:
                 if self.custom_start_end:
                     module_logger.info('checking_custom_start_end')
                     self.read_custom_start_end()
+                    module_logger.info('checking_led_start_end')
+                    self.load_LED_tips()
+                module_logger.info('organizing names')
+
                 self.create_output_names_if_dont_exist()
 
                     # check if there is already a shifted file
@@ -161,8 +167,13 @@ class BidiShiftManager:
                     self.unload_shifted_movie()
                     self.unload_bidishifts()
                 
+                self.load_mean_mov()
+                self.save_mean_raw_movie_array()
+
         elif self.raw_dataset_object:
-            self.temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
+            # self.temporary_path=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
+            self.temporary_path=r'/home/sp3660/Desktop//TemporaryProcessing'
+
             pass
 
         else:
@@ -205,17 +216,54 @@ class BidiShiftManager:
             self.unload_bidishifts()
         
 #%% check what ther is in the directory     
-
-    def save_mean_raw_movie_array(self):
+    def load_mean_mov(self):
+        if  self.mean_movie_path and os.path.isfile(self.mean_movie_path):
+            self.meanmov=np.load(self.mean_movie_path)
+        else:
+            module_logger.info('no mean mov saved')    
+            
+        if self.meanmov.any():
+            if self.led_start_end_flag:
+                self.redo_mean_movie()
+            
+            
+    def redo_mean_movie(self): 
         
-        if self.image_sequence.any() and self.mean_movie_path:
+        if len(self.meanmov)== self.led_corrected_frame_end-self.led_corrected_frame_start:
+            os.remove(self.mean_movie_path)
+            movie =cm.load(glob.glob(os.path.join( self.dataset_object.associated_aquisiton.database_acq_raw_path, 'Ch2Green','plane1',"**Ch2**.tif")))
+            self.save_mean_raw_movie_array(redomov=movie)
+        
+        
+    def save_mean_raw_movie_array(self, redomov=np.array([False])):
+        
+        if self.m_mean.any() and self.mean_movie_path:
             if not os.path.isfile(self.mean_movie_path):
-                m_mean = self.image_sequence.mean(axis=(1, 2))
-                np.save(self.mean_movie_path,m_mean)
-        elif self.shifted_movie.any() and self.mean_movie_path:
-            if not os.path.isfile(self.mean_movie_path):
-                m_mean = self.shifted_movie.mean(axis=(1, 2))
-                np.save(self.mean_movie_path,m_mean)
+                np.save(self.mean_movie_path,self.m_mean)
+        else:
+            
+            if not self.led_start_end_flag:
+                if self.m_mean.any() and self.mean_movie_path:
+                    if not os.path.isfile(self.mean_movie_path):
+                        np.save(self.mean_movie_path,self.m_mean)
+                # elif self.shifted_movie.any() and self.mean_movie_path:
+                #     if not os.path.isfile(self.mean_movie_path):
+                #         m_mean = self.shifted_movie.mean(axis=(1, 2))
+                #         np.save(self.mean_movie_path,m_mean)
+            else:
+                if self.image_sequence.any() and self.mean_movie_path:
+                    if not os.path.isfile(self.mean_movie_path):
+        
+                        movie =cm.load(glob.glob(os.path.join( self.dataset_object.associated_aquisiton.database_acq_raw_path, 'Ch2Green','plane1',"**Ch2**.tif")))
+                        m_mean = movie.mean(axis=(1, 2))
+                        np.save(self.mean_movie_path,m_mean)
+                    
+                elif redomov.any() and self.mean_movie_path:
+                    m_mean = redomov.mean(axis=(1, 2))
+                    np.save(self.mean_movie_path,m_mean)
+                
+  
+                
 
     def read_custom_start_end(self):
         start_end_file=os.path.join(os.path.split(os.path.split(self.temporary_path)[0])[0],'Start_End.txt')
@@ -280,20 +328,23 @@ class BidiShiftManager:
     #     if not os.path.isfile(self.led_start_end_file):
     #         with open(self.led_start_end_file, 'w') as f:
     #             f.writelines((str( led_frame_start_end+pad1),'\n', str( led_frame_end_start-pad2)))
-                
+      
+
+          
     def manually_detect_led_synchs(self):
         
         if (not self.led_corrected_frame_start)  and (not self.led_corrected_frame_end):
 
-            m_mean = self.image_sequence.mean(axis=(1, 2))
-            scored=st.zscore(m_mean)
+        
+
+            scored=st.zscore(self.m_mean)
             dif=np.diff(scored)
             median=sg.medfilt(dif, kernel_size=1)
             rounded=np.round(median,decimals=2)
     
             
             f,axs=plt.subplots(2)
-            axs[0].plot(m_mean,'k')
+            axs[0].plot(self.m_mean,'k')
             axs[1].plot(scored,'r')
             axs[1].plot(median,'b')
             axs[1].plot(abs(rounded),'k')
@@ -315,8 +366,8 @@ class BidiShiftManager:
             # no_led_start=0
             # no_led_end=0
             
-            led_on_frames=np.where(m_mean>raw_fluorescence_threshold)[0]
-            movie_midpoint=int(np.floor(len(m_mean)/2))
+            led_on_frames=np.where(self.m_mean>raw_fluorescence_threshold)[0]
+            movie_midpoint=int(np.floor(len(self.m_mean)/2))
     
     
             if (not no_led_start) or (not no_led_end):
@@ -337,11 +388,11 @@ class BidiShiftManager:
                     
                     
                     f,axs=plt.subplots(1)
-                    axs.plot(extended_LED_frames,m_mean[extended_LED_frames],'k')
-                    axs.plot(prepad,m_mean[prepad],'r')
-                    axs.plot(postpad,m_mean[postpad],'y')
-                    axs.plot(led_on_frames_start_first,m_mean[led_on_frames_start_first],'mo')
-                    axs.plot(led_on_frames_start_last,m_mean[led_on_frames_start_last],'mo')
+                    axs.plot(extended_LED_frames,self.m_mean[extended_LED_frames],'k')
+                    axs.plot(prepad,self.m_mean[prepad],'r')
+                    axs.plot(postpad,self.m_mean[postpad],'y')
+                    axs.plot(led_on_frames_start_first,self.m_mean[led_on_frames_start_first],'mo')
+                    axs.plot(led_on_frames_start_last,self.m_mean[led_on_frames_start_last],'mo')
                     axs.set_xticks(extended_LED_frames)
                     axs.tick_params(direction='in' ,length=2,width=2)
 
@@ -377,11 +428,11 @@ class BidiShiftManager:
                     
                     
                     f,axs=plt.subplots(1)
-                    axs.plot(extended_LED_frames,m_mean[extended_LED_frames],'k')
-                    axs.plot(prepad,m_mean[prepad],'r')
-                    axs.plot(postpad,m_mean[postpad],'y')
-                    axs.plot(led_on_frames_end_first,m_mean[led_on_frames_end_first],'mo')
-                    axs.plot(led_on_frames_end_last,m_mean[led_on_frames_end_last],'mo')
+                    axs.plot(extended_LED_frames,self.m_mean[extended_LED_frames],'k')
+                    axs.plot(prepad,self.m_mean[prepad],'r')
+                    axs.plot(postpad,self.m_mean[postpad],'y')
+                    axs.plot(led_on_frames_end_first,self.m_mean[led_on_frames_end_first],'mo')
+                    axs.plot(led_on_frames_end_last,self.m_mean[led_on_frames_end_last],'mo')
                     axs.set_xticks(extended_LED_frames)
                     axs.tick_params(direction='in' ,length=2,width=2)
                     axs.set_xticklabels(axs.get_xticks(), rotation = 90)
@@ -407,12 +458,12 @@ class BidiShiftManager:
             if no_led_start:
                 movie_start_frame=0
             if no_led_end:
-                movie_end_frame=len(m_mean)
+                movie_end_frame=len(self.m_mean)
                 
             movie_range=np.arange(movie_start_frame,movie_end_frame)
             f,axs=plt.subplots(1)
-            axs.plot(m_mean,'k')
-            axs.plot(movie_range,m_mean[movie_range],'r')
+            axs.plot(self.m_mean,'k')
+            axs.plot(movie_range,self.m_mean[movie_range],'r')
             axs.set_xticklabels(axs.get_xticks(), rotation = 90)
             # mngr = plt.get_current_fig_manager()
             # mngr.window.setGeometry(50,100,2000, 1000)
@@ -443,8 +494,8 @@ class BidiShiftManager:
         self.bidiphase_full_file_path=None
         self.bidiphase_file_path=None
 
-        self.all_bidipahse_files=glob.glob(self.temporary_path+'\\**Bidiphases**.pkl')
-        # mmap_files=glob.glob(self.mmap_directory+'\\**.mmap')
+        self.all_bidipahse_files=glob.glob(self.temporary_path+os.sep+'**Bidiphases**.pkl')
+        # mmap_files=glob.glob(self.mmap_directory+os.sep+'**.mmap')
         self.bidiphase_custom_file_paths=[i for i in self.all_bidipahse_files if 'Bidiphases_custom' in i ]
         self.bidiphase_full_file_paths=[i for i in self.all_bidipahse_files if 'Bidiphases.' in i]
         
@@ -466,7 +517,7 @@ class BidiShiftManager:
         self.shifted_movie_custom_files_path=None
         self.shifted_movie_files_path=None
         self.shifted_movie_full_caiman_path=None
-        self.all_mmap_files=glob.glob(self.temporary_path+'\\**.mmap')
+        self.all_mmap_files=glob.glob(self.temporary_path+os.sep+'**.mmap')
         self.shifted_movie_files_paths=[i for i in self.all_mmap_files if 'Shifted_Movie_d1' in i ]
         self.shifted_movie_custom_files_paths=[i for i in self.all_mmap_files if 'Shifted_Movie_custom_start_end_d1' in i ]
 
@@ -491,12 +542,17 @@ class BidiShiftManager:
             self.eliminate_caiman_extra_from_mmap()
             # self.check_bidiphases_in_directory()
         elif self.dataset_full_file_mmap_path: 
-            first_frame_filename=os.path.split(glob.glob(self.dataset_image_sequence_path+'\\**.tif')[0])[1]
+            first_frame_filename=os.path.split(glob.glob(self.dataset_image_sequence_path+os.sep+'**.tif')[0])[1]
             self.good_filename=first_frame_filename[0:first_frame_filename.find('_Cycle')]
             # self.check_bidiphases_in_directory()
         elif self.dataset_image_sequence_path:
-            first_frame_filename=os.path.split(glob.glob(self.dataset_image_sequence_path+'\\**.tif')[0])[1]
+            first_frame_filename=os.path.split(glob.glob(self.dataset_image_sequence_path+os.sep+'**.tif')[0])[1]
             self.good_filename=first_frame_filename[0:first_frame_filename.find('_Cycle')]+'_'+self.dataset_object.plane
+            
+        elif self.temporary_path: # this is to solbve a problem when no mmap is inn the dataset folder but we are reading the dataset as i didnt force to finsih the mmap befor, no I do it throiugh the app
+            self.good_filename=os.path.split(os.path.split(os.path.split(os.path.split(self.temporary_path)[0])[0])[0])[1]
+            pass
+      
                         
     def eliminate_caiman_extra_from_mmap(self):
         # here detect if there is a raw mmap(legacy not done anymore, only save the shifted mmap)
@@ -515,6 +571,10 @@ class BidiShiftManager:
         pass
         
     def create_output_names_if_dont_exist(self):
+        self.bidiphase_file_path=None
+        self.shifted_movie_path=None
+        self.mean_movie_path=None
+
         
         if (not self.shifted_movie_full_caiman_path) or (not self.bidiphase_file_path):
             
@@ -561,7 +621,7 @@ class BidiShiftManager:
     def load_dataset_from_image_sequence(self):
 
         
-        image_sequence_paths=glob.glob(self.dataset_image_sequence_path+'\**.tif')
+        image_sequence_paths=sorted(glob.glob(self.dataset_image_sequence_path+os.sep+'**.tif'))
         
         module_logger.info('loading files')
         try:
@@ -588,7 +648,8 @@ class BidiShiftManager:
                     try:
                         self.image_sequence=cm.load(image_sequence_paths)
                         module_logger.info('Caiman load sequence properly loaded')
-    
+                        if len( self.image_sequence)==2*len(image_sequence_paths)-1:
+                           self.image_sequence=self.image_sequence[:len(image_sequence_paths),:,:]
                   
                     except:
                         try:
@@ -596,6 +657,10 @@ class BidiShiftManager:
                             module_logger.info('all files in single file')
                         except:
                             module_logger.exception('Check caiman loading, something wrong')
+                            
+                            
+            self.m_mean = self.image_sequence.mean(axis=(1, 2))
+            self.save_mean_raw_movie_array()
         except:                    
             module_logger.exception('No video loaded')
 
@@ -690,7 +755,6 @@ class BidiShiftManager:
             if not os.path.isfile(self.shifted_movie_path):
                 self.shifted_movie.save(self.shifted_movie_path ,to32=False)  
 
-        self.save_mean_raw_movie_array()
 
     def unload_shifted_movie(self):     
         module_logger.info('unloading bidishifted movies')
