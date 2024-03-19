@@ -310,7 +310,7 @@ class MouseVisitTab(tk.Frame):
 #%% button funcrions
     def open_mouse_visits_button(self):
         
-        visitpath=r'/home/sp3660/Documents/Projects/LabNY/4. Mouse Managing/MouseVisits'
+        visitpath=os.path.join(os.path.expanduser('~'),r'Documents/Projects/LabNY/4. Mouse Managing/MouseVisits')
         
         subprocess.Popen(['xdg-open',visitpath])
 

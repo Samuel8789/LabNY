@@ -29,10 +29,10 @@ try:
         get_ipython().run_line_magic('autoreload', '2')
 except NameError:
     pass
-
+import os
 import bokeh.plotting as bpl
 from pathlib import Path
-datasetpath=Path(r'/home/sp3660/Desktop/CaimanTemp/')
+datasetpath=Path(os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp/'))
 fname=datasetpath / '240308_SPSZ_FOV1_2z_30m_ShortDrift_LED_opto_1st_25x_920_51020_60745_with-000_plane2_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_41724.mmap'
 
 volume_period= 0.082796004/2

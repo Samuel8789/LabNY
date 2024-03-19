@@ -1086,7 +1086,7 @@ if __name__ == "__main__":
     import tkinter as tk
     from sys import platform
     import socket
-    sys.path.insert(0, r'/home/sp3660/Documents/Github/ProjectManager')
+    sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents/Github/ProjectManager'))
 
     from project_manager.ProjectManager import ProjectManager
     import urllib3
@@ -1120,7 +1120,7 @@ if __name__ == "__main__":
             print('TO DO')
         elif socket.gethostname()==newlab:
             computer=newlab
-            githubtoken_path='/home/sp3660/Documents/Github/GitHubToken.txt'
+            githubtoken_path=os.path.join(os.path.expanduser('~'),r'Documents/Github/GitHubToken.txt')
     
         ProjectManager=ProjectManager(githubtoken_path, computer, platform)
         gui=0

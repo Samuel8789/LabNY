@@ -155,7 +155,7 @@ def save_pdf(filename):
 #%% Load on acid and movie data
 
 # cnm = cnmf.online_cnmf.OnACID(path=hdf5_file_path)
-data = mat73.loadmat(r'/home/sp3660/Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi/Chandelier_ Calcium&Volatage/Chandelie_AS-003_20230610-102153_sort.mat')
+data = mat73.loadmat(os.path.join(os.path.expanduser('~'),r'Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi/Chandelier_ Calcium&Volatage/Chandelie_AS-003_20230610-102153_sort.mat'))
 accepted_list_sorter=data['proc']['comp_accepted'].astype(int)
 accepted_list_sorter_core=data['proc']['comp_accepted_core'].astype(int)
 # substract 1 from matlab indexes
@@ -177,7 +177,7 @@ plt.plot(raw[chandelier,1:])
 
 #%%       compute  
 #loading data and variables
-dirpath=r'/home/sp3660/Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi//Chandelier_ Calcium&Volatage'
+dirpath=os.path.join(os.path.expanduser('~'),r'Documents/Projects/LabNY/0. DataFigures/Data From Other People/From TziTzi//Chandelier_ Calcium&Volatage')
 dataname='Chandelie_AS-003_data.mat'
 full_data_path=os.path.join(dirpath,dataname)
 voltagedat='VoltageRecording_AS_003_ctr.csv'

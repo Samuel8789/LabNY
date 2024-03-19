@@ -15,7 +15,7 @@ import pandas as pd
 import sys
 from pathlib import Path
 import subprocess
-sys.path.insert(0, r"/home/sp3660/Documents/Github/LabNY/ny_lab/dataManaging/functions")
+sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents/Github/LabNY/ny_lab/dataManaging/functions'))
 from functionsDataOrganization import recursively_eliminate_empty_folders
 
 class PreImagingSession():
@@ -24,8 +24,8 @@ class PreImagingSession():
         
         self.mice=mice
         self.sessiondate=sessiondate
-        self.tempdir=r'/home/sp3660/Desktop/SessionTemplatesDirectories'
-        self.template=r'/home/sp3660/Desktop/ImagingSessionDate' 
+        self.tempdir=os.path.join(os.path.expanduser('~'),r'Desktop/SessionTemplatesDirectories')
+        self.template=os.path.join(os.path.expanduser('~'),r'Desktop/ImagingSessionDate' )
         self.transfer='scp -r '
         self.wremovedir='rmdir /s '
         self.wcopyfolder='Xcopy /E /I '

@@ -7,6 +7,7 @@ Created on Sun Jan 21 09:04:55 2024
 
 mnual caiman becaus eoif broken params
 """
+import os
 import matplotlib.pyplot as plt
 from pathlib import Path
 import caiman as cm
@@ -23,7 +24,7 @@ except NameError:
 
 
 from caiman.motion_correction import MotionCorrect
-datasetpath=Path(r'/home/sp3660/Desktop/CaimanTemp/')
+datasetpath=Path(os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp/'))
 fnames=str(datasetpath / '240308_SPSZ_FOV1_2z_30m_ShortDrift_LED_opto_1st_25x_920_51020_60745_with-000_plane2_Shifted_Movie_d1_256_d2_256_d3_1_order_F_frames_41724.mmap')
 
 

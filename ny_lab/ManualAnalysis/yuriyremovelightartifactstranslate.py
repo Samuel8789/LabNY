@@ -32,7 +32,7 @@ except NameError:
 import bokeh.plotting as bpl
 from pathlib import Path
 
-datasetpath=Path(r'/home/sp3660/Desktop/CaimanTemp/')
+datasetpath=Path(os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp/'))
 fname=datasetpath / '230813_SPRM_FOV1_1z_ShortDrift_LED_opto_25x_920_51020_63075_without-000-000_plane1_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_48841.mmap'
 
 

@@ -43,6 +43,7 @@ except:
 class ImageSequenceDataset:
     
     TEMP_DIR=r'C:\Users\sp3660\Desktop\TemporaryProcessing'
+    TEMP_DIR=os.path.join(os.path.expanduser('~'),r'Desktop/TemporaryProcessing')
 
     def __init__(self, aquisition_object=None, dataset_name=None, selected_dataset_raw_path=None, selected_dataset_mmap_path=None):
         
