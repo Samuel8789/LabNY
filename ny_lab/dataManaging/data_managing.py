@@ -364,6 +364,36 @@ class DataManaging():
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
         self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
         
+    def correct_linux_crazy_drives(self, path)   :
+        
+        if 'mnt' not in path:
+            level=3
+        else:
+            level=2
+
+        temp_path=self.nested_split(path,level)
+        print(temp_path)
+        corrected_path=[k for k in self.LabProjectObject.all_paths_for_this_system.keys() if temp_path in k]
+        if not corrected_path:
+           corrected_path=path
+        else:
+          corrected_path=corrected_path[0]+path[len(temp_path):]
+        print(corrected_path)
+
+ 
+        return corrected_path
+     
+    
+    def nested_split(self,path, level):
+        if path.count('/')==level:
+            split_path=path
+            return split_path
+        else:
+            split_path=os.path.split(path)[0]
+            return  self.nested_split(split_path,level)
+
+        
+    
     def transform_databasepath_tolinux(self,windows_path):    
         longpathstr=os.sep+os.sep+os.sep+'?'+os.sep+os.sep
         if not windows_path:
@@ -401,8 +431,9 @@ class DataManaging():
       
                 
             linux_path=newstem+windows_path[windows_path.find(drive)+2:].replace('\\','/')
+            
         else:
-            linux_path=windows_path
+            linux_path=self.correct_linux_crazy_drives(windows_path)
             
         return linux_path
 
