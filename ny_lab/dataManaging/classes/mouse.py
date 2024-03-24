@@ -32,7 +32,7 @@ class Mouse:
         self.raw_imaging_sessions_objects={}
 
         self.mouse_name=Mouse_Name
-        if Mouse_Name=='SPST':
+        if Mouse_Name=='SPSM':
             print('stop')
         module_logger.info('Loading Mouse ' +self.mouse_name)
 
@@ -52,8 +52,6 @@ class Mouse:
             self.mouse_slow_subproject_path =self.data_managing_object.transform_databasepath_tolinux( self.mouse_slow_subproject_path_db)
             self.mouse_working_subproject_path=self.data_managing_object.transform_databasepath_tolinux( self.mouse_working_subproject_path_db)
 
-            
-    
             create_dir_structure( self.mouse_slow_subproject_path , Mouse.level0_structure)
             create_dir_structure(os.path.join( self.mouse_slow_subproject_path ,'surgeries'), Mouse.surgeries_structure)
               
