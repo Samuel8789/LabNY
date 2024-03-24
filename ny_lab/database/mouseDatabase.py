@@ -213,7 +213,8 @@ class MouseDatabase():
         backuppath_dropbox=Path(self.LabProjectObject.all_paths_for_this_system['Dropbox'],'LabNY' ,'DatabaseBackups')
         backuppath_F=''
         if hasattr(self.LabProjectObject, 'data_paths_project'):
-            backuppath_F=Path(self.LabProjectObject.data_paths_project['Raw'],'DatabaseBackups')
+            if 'Raw' in self.LabProjectObject.data_paths_project:
+                backuppath_F=Path(self.LabProjectObject.data_paths_project['Raw'],'DatabaseBackups')
         
         
         
