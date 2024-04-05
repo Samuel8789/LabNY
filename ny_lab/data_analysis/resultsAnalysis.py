@@ -1962,7 +1962,10 @@ class ResultsAnalysis():
     def smooth_trace(self, trace,window):
         framenumber=len(trace)
         frac=window/framenumber
-        filtered = lowess(trace, np.arange(framenumber), frac=frac)
+        if all(np.isnan(trace)):
+            print('all nana doing lowes, change to 0')
+            trace=np.zeros_like(trace)
+        filtered = lowess(trace, np.arange(framenumber), frac=frac,missing='drop',)
         
         return filtered[:,1]  
             

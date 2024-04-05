@@ -33,7 +33,7 @@ import os
 import bokeh.plotting as bpl
 from pathlib import Path
 datasetpath=Path(os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp/'))
-fname=datasetpath / '240308_SPSX_FOV1_2z_30m_ShortDrift_LED_opto_1st_25x_920_51020_60745_with-000_plane1_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_41763.mmap'
+fname=datasetpath / '240308_SPSX_FOV1_2z_30m_ShortDrift_LED_opto_1st_25x_920_51020_60745_with-000_plane2_Shifted_Movie_MC_OnACID_d1_256_d2_256_d3_1_order_F_frames_41763.mmap'
 
 volume_period= 0.082796004/2
 halfsize=5
@@ -57,7 +57,7 @@ expected_comps = 500                                              # maximum numb
 dist_shape_update = True                                            # flag for updating shapes in a distributed way
 min_num_trial = 10                                                  # number of candidate components per frame     
 K = 2                                                           # initial number of components
-epochs = 1                                                     # number of passes over the data
+epochs = 3                                                  # number of passes over the data
 show_movie = False                                                  # show the movie with the results as the data gets processed
 
 params_dict = {'fnames': str(fname),
