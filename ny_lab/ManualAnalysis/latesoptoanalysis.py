@@ -1619,7 +1619,10 @@ trial_structure_sweep_trial_averaged,\
 cell_type,indexes= get_trial_structure(trial_structure,aq_all_info, chand=False,opto=False)
 
 aq_all_info['mean_Stim_decision']
-
+pre_time=aq_all_info['pre_time_df']
+post_time=aq_all_info['post_time_df']
+pre_frames=aq_all_info['pre_frames_df']
+post_frames=aq_all_info['post_frames_df']
 
 #%% find significantly activated non chand in opto blank trials
 pvalthr=0.05
@@ -1653,11 +1656,11 @@ for cell in significant_cells:
         ax.flatten()[i].axvline(x=ticks_toplot[np.argwhere(lab==0)[0][0]]) 
         if i>1:
             ax.flatten()[i].set_xlabel('Time(s)')
-        ax.flatten()[i].set_ylabel('Trials')
+        ax.flatten()[i].set_ylabel('Cells')
         ax.flatten()[i].set_aspect('equal')
         ax.flatten()[i].margins(x=0)
         ax.flatten()[i].set_title(k)
-    f.suptitle(f'Trial {cell_type} Responses/n Cell:{cell}', fontsize=16)
+    f.suptitle(f'Trial Control Responses/n Cell:{cell}', fontsize=16)
     plt.show()
     
 
