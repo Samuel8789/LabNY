@@ -13,6 +13,7 @@ import tkinter as Tkinter
 from distutils.dir_util import copy_tree
 import logging 
 from pathlib import Path
+from sys import platform
 
 
 module_logger  = logging.getLogger(__name__)
@@ -68,6 +69,7 @@ class DataManaging():
             self.read_all_imaging_sessions_from_directories() 
             # this checks all sessions in the F drive
             self.all_existing_sessions_database=[]
+            # self.update_mouse_slow_storages()
             self.read_all_imaging_sessions_from_database()
             # this checks all sessions in the the database dont build prairire imagibg sessions
             self.all_existing_sessions_database_objects={}
@@ -364,84 +366,12 @@ class DataManaging():
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
         self.all_existing_sessions_database=self.Database_ref.arbitrary_query_to_df(query_sessions).values.tolist()
         
-    def correct_linux_crazy_drives(self, path)   :
-        
-        if 'mnt' not in path:
-            level=3
-        else:
-            level=2
-
-        temp_path=self.nested_split(path,level)
-        print(temp_path)
-        corrected_path=[k for k in self.LabProjectObject.all_paths_for_this_system.keys() if temp_path in k]
-        if not corrected_path:
-           corrected_path=path
-        else:
-          corrected_path=corrected_path[0]+path[len(temp_path):]
-        print(corrected_path)
-
- 
-        return corrected_path
-     
-    
-    def nested_split(self,path, level):
-        if path.count('/')==level:
-            split_path=path
-            return split_path
-        else:
-            split_path=os.path.split(path)[0]
-            return  self.nested_split(split_path,level)
-
-        
-    
-    def transform_databasepath_tolinux(self,windows_path):    
-        longpathstr=os.sep+os.sep+os.sep+'?'+os.sep+os.sep
-        if not windows_path:
-            print('problem')
-        if ':' in windows_path:
-
-            if r'F:' in windows_path:
-                drive=r'F:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw']
-                
-            elif r'J:' in windows_path:
-                drive=r'j:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw']
-    
-            elif r'I:' in windows_path:
-                drive=r'I:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw2']
-                  
-            elif r'K:' in windows_path:
-                drive=r'K:' 
-                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
-                
-            elif r'C:' in windows_path:
-                drive=r'C:' 
-                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_1']
-            
-            elif r'G:' in windows_path:
-                drive=r'G:' 
-                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_2']
-            
-            elif r'D:' in windows_path:
-                drive=r'D:' 
-                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_interneurons_others']
-                    
-      
-                
-            linux_path=newstem+windows_path[windows_path.find(drive)+2:].replace('\\','/')
-            
-        else:
-            linux_path=self.correct_linux_crazy_drives(windows_path)
-            
-        return linux_path
-
+   
         
     def read_all_imaging_sessions_not_in_database(self):     
         
         
-        test=[self.transform_databasepath_tolinux(session[2] ) for session in self.all_existing_sessions_database]
+        test=[self.os_transform_databasepath(session[2] ) for session in self.all_existing_sessions_database]
 
         self.all_existing_unprocessed_sessions=[session for session in  self.all_existing_sessions.values() if session not in test]
         # this ignores jesus and hakim sessions any folder with name sin it
@@ -642,6 +572,103 @@ class DataManaging():
  
     
 #%% reading and updating all database imaging stroage paths  
+    def correct_linux_crazy_drives(self, path)   :
+        
+        if 'mnt' not in path:
+            level=3
+        else:
+            level=2
+   
+        temp_path=self.nested_split(path,level)
+        print(temp_path)
+        corrected_path=[k for k in self.LabProjectObject.all_paths_for_this_system.keys() if temp_path in k]
+        if not corrected_path:
+           corrected_path=path
+        else:
+          corrected_path=corrected_path[0]+path[len(temp_path):]
+        print(corrected_path)
+   
+   
+        return corrected_path
+     
+    
+    def nested_split(self,path, level):
+        if path.count('/')==level:
+            split_path=path
+            return split_path
+        else:
+            split_path=os.path.split(path)[0]
+            return  self.nested_split(split_path,level)
+   
+        
+    
+    def os_transform_databasepath(self, slow_path):  
+        
+        longpathstr=os.sep+os.sep+os.sep+'?'+os.sep+os.sep
+        if not slow_path:
+            print('problem')
+            
+        
+        if ':' in slow_path and platform == "linux" :
+   
+            if r'F:' in slow_path:
+                drive=r'F:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+                
+            elif r'J:' in slow_path:
+                drive=r'J:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+    
+            elif r'I:' in slow_path:
+                drive=r'I:' 
+                newstem=self.LabProjectObject.data_paths_roots['Raw2']
+                  
+            elif r'K:' in slow_path:
+                drive=r'K:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
+                
+            elif r'C:' in slow_path:
+                drive=r'C:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_1']
+            
+            elif r'G:' in slow_path:
+                drive=r'G:' 
+                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_2']
+            
+            elif r'D:' in slow_path:
+                drive=r'D:' 
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_interneurons_others']
+                    
+      
+                
+            correct_os_path=newstem+slow_path[slow_path.find(drive)+2:].replace('\\','/')
+            
+        elif 'media/' in slow_path and platform == "win32" :   
+            if 'Data Slow' in slow_path:
+                drive=r'Data Slow'
+                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
+   
+                
+            elif 'Data Permanent 2' in slow_path:
+                drive=r'Data Permanent 2'
+                newstem=self.LabProjectObject.data_paths_roots['Raw2']
+                
+                      
+            elif 'Data Permanent' in slow_path:
+                drive=r'Data Permanent'
+
+                newstem=self.LabProjectObject.data_paths_roots['Raw']
+                
+   
+            correct_os_path=Path(newstem+slow_path[slow_path.find(drive)+len(drive):].replace('/','\\'))
+            
+            
+        elif platform == "linux":
+            correct_os_path=self.correct_linux_crazy_drives(slow_path)
+        elif platform == "win32":
+            correct_os_path=slow_path
+ 
+        return correct_os_path
 
 
     def update_mouse_slow_storages(self):
@@ -653,64 +680,53 @@ class DataManaging():
                 """
         params=()
         all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
-        newdrive='D'
+        newdrive_int='D'
+        newdrive_chand='K'
+
         
         for mouse in all_mouse_info:
             mouse_expid=mouse[1]
             mouse_SlowStoragePath=mouse[2]
             mouse_WorkingStoragePath=mouse[3]
 
-            if ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations_' in mouse_SlowStoragePath):
-                newslowstorage=newdrive+mouse_SlowStoragePath[1:]
+            if ('Chandelier_' in mouse_SlowStoragePath) or ('Tigre_' in mouse_SlowStoragePath):
+                newslowstorage=newdrive_chand+mouse_SlowStoragePath[1:]
+                if 'media/' in mouse_SlowStoragePath:
+                    newslowstorage=str(self.os_transform_databasepath(mouse[2]))
+
                 query_mouse_slow_storage_update="""
                       UPDATE ExperimentalAnimals_table
                       SET SlowStoragePath=?
                       WHERE ID=?
                       """  
                 params=(newslowstorage, mouse_expid)
-                self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)    
+                if newslowstorage!=mouse_SlowStoragePath:
+                    self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)    
+                    print(f"experimental mouse {mouse[0]} path updated from {mouse_SlowStoragePath} to {newslowstorage}")
+                else:
+                    print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
+
+                
+            elif ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations_' in mouse_SlowStoragePath):
+                newslowstorage=newdrive_int+mouse_SlowStoragePath[1:]
+                if 'media/' in mouse_SlowStoragePath:
+                    newslowstorage=str(self.os_transform_databasepath(mouse[2]))
+                query_mouse_slow_storage_update="""
+                      UPDATE ExperimentalAnimals_table
+                      SET SlowStoragePath=?
+                      WHERE ID=?
+                      """  
+                params=(newslowstorage, mouse_expid)
+                if newslowstorage!=mouse_SlowStoragePath:
+                    self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)  
+                    print(f"experimental mouse {mouse[0]} path updated from {mouse_SlowStoragePath} to {newslowstorage}")
+                else:
+                    print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
+
+
                 
         self.update_all_imaging_data_paths()
         
-        
-    def create_linux_mouse_path(self, windows_path):
-        
-        if ':' in windows_path:
-
-            if r'F:' in windows_path:
-                drive=r'F:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw']
-                
-            elif r'J:' in windows_path:
-                drive=r'j:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw']
-    
-            elif r'I:' in windows_path:
-                drive=r'I:' 
-                newstem=self.LabProjectObject.data_paths_roots['Raw2']
-                  
-            elif r'K:' in windows_path:
-                drive=r'K:' 
-                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_chandelier_tigres']
-                
-            elif r'C:' in windows_path:
-                drive=r'C:' 
-                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_1']
-            
-            elif r'G:' in windows_path:
-                drive=r'G:' 
-                newstem=self.LabProjectObject.data_paths_roots['Analysis_Fast_2']
-            
-            elif r'D:' in windows_path:
-                drive=r'D:' 
-                newstem=self.LabProjectObject.data_paths_roots['Pre_proccessed_slow_interneurons_others']
-                
-            linux_path=newstem+windows_path[windows_path.find(drive)+2:].replace('\\','/')
-        else:
-            linux_path=windows_path
-            
-            return linux_path
-
     def update_all_imaging_data_paths(self) :
         print('Correcting database paths for projects')
         query_all_codes="""
@@ -723,12 +739,14 @@ class DataManaging():
         
         for mouse in all_mouse_info:
 
-            if mouse[0]=='SPQZ':
-                print("updating mouse paths" + mouse[0])
-                print(mouse[0])
+            # if mouse[0]=='SPQZ':
+            if mouse[0]:
+
+                
                 mouse_expid=mouse[1]
                 mouse_SlowStoragePath=mouse[2]
                 mouse_WorkingStoragePath=mouse[3]
+
     #%%
                 query_all_imaged_sessions="""
                         SELECT a.ID, a.SlowStoragePath, a.WorkingStoragePath, a.IsSlowStorage, a.IsWorkingStorage, a.MouseRawPath
@@ -739,7 +757,7 @@ class DataManaging():
                 imaged_mice_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_imaged_sessions,params).values.tolist()
                 
                 if imaged_mice_info:
-                    for imaged_mouse in imaged_mice_info:
+                    for imaged_mouse in  imaged_mice_info:
                         sessiondate=imaged_mouse[-1][imaged_mouse[-1].find('Mice')-9:imaged_mouse[-1].find('Mice')-1]
                         imaged_mouse_relative_path='imaging'+os.sep+sessiondate
                         new_slow_imaged_mice_path= os.path.join(mouse_SlowStoragePath , imaged_mouse_relative_path)
@@ -747,13 +765,22 @@ class DataManaging():
                         isSlowStorage=os.path.isdir(new_slow_imaged_mice_path)
                         isWorkingStorage=os.path.isdir(new_fast_imaged_mice_path)
               
-                        query_imaged_mice_paths_update="""
-                              UPDATE ImagedMice_table
-                              SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
-                              WHERE ID=?
-                              """  
-                        params=(new_slow_imaged_mice_path,new_fast_imaged_mice_path, isSlowStorage, isWorkingStorage, imaged_mouse[0])
-                        self.LabProjectObject.database.arbitrary_updating_record(query_imaged_mice_paths_update, params, commit=True)         
+                
+              
+                        if new_slow_imaged_mice_path!=imaged_mouse[1]:
+                            query_imaged_mice_paths_update="""
+                                  UPDATE ImagedMice_table
+                                  SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
+                                  WHERE ID=?
+                                  """  
+                            params=(new_slow_imaged_mice_path,new_fast_imaged_mice_path, isSlowStorage, isWorkingStorage, imaged_mouse[0])
+                            
+                            self.LabProjectObject.database.arbitrary_updating_record(query_imaged_mice_paths_update, params, commit=True)  
+                            print(f"experimental mouse {mouse[0]} path updating imaged mice from {imaged_mouse[1]}  to {new_slow_imaged_mice_path}")
+
+                        else:
+                            print(f"{mouse[0]} imaging Already same path, not updated")
+
         #%%
                         query_all_widefields="""
                             SELECT a.ID, a.SlowStoragePath, a.WorkingStoragePath, a.IsSlowPath, a.IsWorkingStorage, a.WideFieldFileName
@@ -763,22 +790,29 @@ class DataManaging():
                         params=(imaged_mouse[0],)
                         all_widefields_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_widefields,params).values.tolist()
                         if all_widefields_info:
-                            for widefield in all_widefields_info:                                
+                            for  widefield in all_widefields_info:                                
                                 widefield_relative_path='widefield image'+os.sep + widefield[-1]                               
                                 new_slow_widefield_path= os.path.join(new_slow_imaged_mice_path , widefield_relative_path)
                                 new_fast_widefield_path= os.path.join(new_fast_imaged_mice_path , widefield_relative_path)
                                 isSlowStorage=os.path.isfile(new_slow_widefield_path)
-                                isWorkingStorage=os.path.isfile(new_fast_widefield_path)  
-                          
-                                query_widefield_paths_update="""
-                                      UPDATE WideField_table
-                                        SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowPath=?, IsWorkingStorage=?
-                                        WHERE ID=?
-                                    """  
-                                          
-                                params=(new_slow_widefield_path,new_fast_widefield_path, isSlowStorage, isWorkingStorage, widefield[0])
-                                self.LabProjectObject.database.arbitrary_updating_record(query_widefield_paths_update, params, commit=True)
-          
+                                isWorkingStorage=os.path.isfile(new_fast_widefield_path) 
+                                
+                                if new_slow_widefield_path!=widefield[1]:
+    
+                                    query_widefield_paths_update="""
+                                          UPDATE WideField_table
+                                            SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowPath=?, IsWorkingStorage=?
+                                            WHERE ID=?
+                                        """  
+                                              
+                                    params=(new_slow_widefield_path,new_fast_widefield_path, isSlowStorage, isWorkingStorage, widefield[0])
+                                    self.LabProjectObject.database.arbitrary_updating_record(query_widefield_paths_update, params, commit=True)
+                                    print(f"experimental mouse {mouse[0]} path updating imaged mice from {widefield[1]}  to {new_slow_widefield_path}")
+
+                                else:
+                                    print(f"{mouse[0]} imaging Already same path, not updated")
+
+              
          #%%   
 
                         query_all_acquistions="""
@@ -790,7 +824,7 @@ class DataManaging():
                         all_acquisitons_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_acquistions,params).values.tolist()
       
                         if all_acquisitons_info:
-                            for aqc in all_acquisitons_info:
+                            for l,aqc in enumerate( all_acquisitons_info):
                                 query_imaging_name="""
                                 SELECT a.ID, a.ImagingFilename, a.RedFilter
                                 FROM Imaging_table a   
@@ -800,16 +834,14 @@ class DataManaging():
                                 imaging_name=self.LabProjectObject.database.arbitrary_query_to_df(query_imaging_name,params).values.tolist()
                                 if imaging_name:
                                     imaging_name=imaging_name[0]
-                                
-                                
-                                
+
                                     if not aqc[7]:
                                         if aqc[8]:
                                             acquisiton_relative_path= '0Coordinate acquisition'+os.sep + imaging_name[1]
                                         elif aqc[6]:
                                             acquisiton_relative_path= 'test aquisitions'+os.sep + imaging_name[1]
                                         elif aqc[9]:
-                                            fov_relative_path= 'data aquisitions\\{}'+os.sep.format(aqc[5][aqc[5].find('FOV_'):aqc[5].find('FOV_')+5])
+                                            fov_relative_path= "data aquisitions"+os.sep+f"{(aqc[5][aqc[5].find('FOV_'):aqc[5].find('FOV_')+5])}"+os.sep
                                             
                                             if aqc[10]:
                                                 acquisiton_relative_path= fov_relative_path+ 'SurfaceImage'+os.sep + imaging_name[1]
@@ -830,20 +862,25 @@ class DataManaging():
                                         acquisiton_relative_path='nonimaging acquisitions'+os.sep+ imaging_name[1]
 
                                 elif not imaging_name :
-                                    acquisiton_relative_path='nonimaging acquisitions\\Aq_1_NonImaging'    
+                                    acquisiton_relative_path='nonimaging acquisitions'+os.sep+'Aq_1_NonImaging'    
                                     
                                 new_slow_acquistion_path= os.path.join(new_slow_imaged_mice_path , acquisiton_relative_path)
                                 new_fast_acquisition_path= os.path.join(new_fast_imaged_mice_path , acquisiton_relative_path)
                                 isSlowStorage=os.path.isdir(new_slow_acquistion_path)
                                 isWorkingStorage=os.path.isdir(new_fast_acquisition_path) 
-                                
-                                query_acquistions_paths_update="""
-                                  UPDATE Acquisitions_table
-                                  SET SlowDiskPath=?, WorkingDiskPath=?, IsSlowDisk=?, IsWorkingDisk=?
-                                  WHERE ID=?
-                                  """  
-                                params=(new_slow_acquistion_path,new_fast_acquisition_path, isSlowStorage, isWorkingStorage, aqc[0])
-                                self.LabProjectObject.database.arbitrary_updating_record(query_acquistions_paths_update, params, commit=True)
+                                if new_slow_acquistion_path!=aqc[1]:
+                                    query_acquistions_paths_update="""
+                                      UPDATE Acquisitions_table
+                                      SET SlowDiskPath=?, WorkingDiskPath=?, IsSlowDisk=?, IsWorkingDisk=?
+                                      WHERE ID=?
+                                      """  
+                                    params=(new_slow_acquistion_path,new_fast_acquisition_path, isSlowStorage, isWorkingStorage, aqc[0])
+                                    self.LabProjectObject.database.arbitrary_updating_record(query_acquistions_paths_update, params, commit=True)
+                                    print(f"experimental mouse {mouse[0]} path updating imaged mice from {aqc[1]}  to {new_slow_acquistion_path}")
+
+                                else:
+                                    print(f"{mouse[0]} imaging Already same path, not updated")
+
              #%% 
                                 query_all_imaging="""
                                     SELECT a.ID, a.SlowStoragePath, a.WorkingStoragePath, a.IsSlowStorage, a.IsWorkingStorage
@@ -862,14 +899,19 @@ class DataManaging():
                                             new_fast_imaging_path=  os.path.join(new_fast_acquisition_path, 'planes\Plane1')
                                             isSlowStorage=os.path.isdir(new_slow_imaging_path)
                                             isWorkingStorage=os.path.isdir(new_fast_imaging_path)  
-                                  
-                                            query_imaging_paths_update="""
-                                                    UPDATE Imaging_table
-                                                    SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
-                                                    WHERE ID=?
-                                                    """  
-                                            params=(new_slow_imaging_path,new_fast_imaging_path, isSlowStorage, isWorkingStorage, imaging[0])
-                                            self.LabProjectObject.database.arbitrary_updating_record(query_imaging_paths_update, params, commit=True)            
+                                            if new_slow_imaging_path!=imaging[1]:
+                                                query_imaging_paths_update="""
+                                                        UPDATE Imaging_table
+                                                        SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
+                                                        WHERE ID=?
+                                                        """  
+                                                params=(new_slow_imaging_path,new_fast_imaging_path, isSlowStorage, isWorkingStorage, imaging[0])
+                                                self.LabProjectObject.database.arbitrary_updating_record(query_imaging_paths_update, params, commit=True)    
+                                                print(f"experimental mouse {mouse[0]} path updating imaged mice from {imaging[1]}  to {new_slow_imaging_path}")
+
+                                            else:
+                                                print(f"{mouse[0]} imaging Already same path, not updated")
+
                 #%%
                                 query_all_facecamera="""
                                     SELECT a.ID, a.SlowStoragePath, a.WorkingStoragePath, a.IsSlowStorage, a.IsWorkingStorage,a.VideoPath, a.EyeCameraFilename
@@ -893,16 +935,20 @@ class DataManaging():
                                         new_fast_facecamera_path= os.path.join(new_fast_acquisition_path , facecamera_relative_path)
                                         isSlowStorage=os.path.isfile('\\\\?'+os.sep+new_slow_facecamera_path)
                                         isWorkingStorage=os.path.isfile('\\\\?'+os.sep+new_fast_facecamera_path) 
-                                  
-                                        query_facecamera_paths_update="""
-                                             UPDATE FaceCamera_table
-                                            SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
-                                            WHERE ID=?
-                                            """  
-                                                  
-                                        params=(new_slow_facecamera_path,new_fast_facecamera_path, isSlowStorage, isWorkingStorage, face_camera[0])
-                                        self.LabProjectObject.database.arbitrary_updating_record(query_facecamera_paths_update, params, commit=True)            
-                          
+                                        if new_slow_facecamera_path!=face_camera[1]:
+                                            query_facecamera_paths_update="""
+                                                 UPDATE FaceCamera_table
+                                                SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
+                                                WHERE ID=?
+                                                """  
+                                                      
+                                            params=(new_slow_facecamera_path,new_fast_facecamera_path, isSlowStorage, isWorkingStorage, face_camera[0])
+                                            self.LabProjectObject.database.arbitrary_updating_record(query_facecamera_paths_update, params, commit=True) 
+                                            print(f"experimental mouse {mouse[0]} path updating imaged mice from {face_camera[1]}  to {new_slow_facecamera_path}")
+
+                                        else:
+                                            print(f"{mouse[0]} imaging Already same path, not updated")
+
                 
              #%%   
                                 query_all_visualstimulations="""
@@ -920,16 +966,20 @@ class DataManaging():
                                         new_fast_visstim_path= os.path.join(new_fast_acquisition_path , visual_stim_relative_path)
                                         isSlowStorage=os.path.isfile('\\\\?'+os.sep+new_slow_visstim_path)
                                         isWorkingStorage=os.path.isfile('\\\\?'+os.sep+new_fast_visstim_path) 
-                                  
-                                        query_visualstimulations_paths_update="""
-                                              UPDATE VisualStimulations_table
-                                                SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
-                                                WHERE ID=?
-                                                """   
-                                                  
-                                        params=(new_slow_visstim_path,new_fast_visstim_path, isSlowStorage, isWorkingStorage, visual_stim[0])
-                                        self.LabProjectObject.database.arbitrary_updating_record(query_visualstimulations_paths_update, params, commit=True)          
-                
+                                        if new_slow_visstim_path!=visual_stim[1]:
+
+                                            query_visualstimulations_paths_update="""
+                                                  UPDATE VisualStimulations_table
+                                                    SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
+                                                    WHERE ID=?
+                                                    """   
+                                                      
+                                            params=(new_slow_visstim_path,new_fast_visstim_path, isSlowStorage, isWorkingStorage, visual_stim[0])
+                                            self.LabProjectObject.database.arbitrary_updating_record(query_visualstimulations_paths_update, params, commit=True)      
+                                            print(f"experimental mouse {mouse[0]} path updating imaged mice from {visual_stim[1]}  to {new_slow_visstim_path}")
+
+                                        else:
+                                            print(f"{mouse[0]} imaging Already same path, not updated")
 
 #%% processing paririe imaging sessin raw folders 
     def load_raw_session(self, session_path):

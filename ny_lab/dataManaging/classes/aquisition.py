@@ -607,9 +607,11 @@ class Aquisition:
         
         
       
-        df=pd.DataFrame([self.mouse_imaging_session_object.mouse_object.data_managing_object.transform_databasepath_tolinux(i) for i in self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath'].values])
-        self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[df.iloc[:,0]==self.mouse_aquisition_path]['ID'].iloc[0]
-
+        df=pd.DataFrame([self.mouse_imaging_session_object.mouse_object.data_managing_object.os_transform_databasepath(i) for i in self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath'].values])
+        try:
+            self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[df.iloc[:,0]==self.mouse_aquisition_path]['ID'].iloc[0]
+        except:
+            print(self.aq_ID)
         
         # self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]
         
@@ -622,7 +624,7 @@ class Aquisition:
             self.acquisition_database_info= self.full_database_dictionary['Acq']
             self.imaging_database_info= self.full_database_dictionary['Imaging']
             # self.database_acq_raw_path=Path(self.acquisition_database_info.loc[0, 'AcquisitonRawPath']).resolve()
-            self.database_acq_raw_path=Path(self.mouse_imaging_session_object.mouse_object.data_managing_object.transform_databasepath_tolinux(self.acquisition_database_info.loc[0, 'AcquisitonRawPath'])).resolve()
+            self.database_acq_raw_path=Path(self.mouse_imaging_session_object.mouse_object.data_managing_object.os_transform_databasepath(self.acquisition_database_info.loc[0, 'AcquisitonRawPath'])).resolve()
 
             
             if glob.glob(str(self.database_acq_raw_path)+os.sep+'**'):

@@ -61,7 +61,7 @@ if __name__ == "__main__":
     from project_manager.ProjectManager import ProjectManager
     
     house_PC='DESKTOP-V1MT0U5'
-    lab_PC='DESKTOP-OKLQSQS'
+    lab_PC='DESKTOP-NBGKRCG'
     # small_laptop_ubuntu='samuel-XPS-13-9560'
     # small_laptop_kali='samuel-XPS-13-9560'
     big_laptop_ubuntu='samuel-XPS-15-9560'

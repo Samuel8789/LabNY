@@ -38,7 +38,7 @@ import scipy.stats as st
 from pylab import *
 import matplotlib
 import matplotlib.patches as patches
-import zetapy as pz
+# import zetapy as pz
 
 def plot_image_with_mean_and_std(data,  x_values=None, labels=None, line_index=None, use_std=True, 
                                  cmap='viridis', interpolation='nearest', aspect='auto', origin='upper', 
@@ -534,24 +534,56 @@ def process_dataset(experiment,aq_analysis,aq_all_info):
     
     return experiment,aq_analysis,aq_all_info,opto_grating,chands,non_chands,demixed,trial_dict,smoothing_window,scale,nr_samples,full_info         
 
+def save_temp_data(data_dict,datapath):
+    if not os.path.isfile(datapath):
+        with open(datapath, 'wb') as f:
+            # Pickle the 'data' dictionary using the highest protocol available.
+            pickle.dump(data_dict, f, pickle.HIGHEST_PROTOCOL)
+    return datapath
 
-#%% load data form optoanalysis cript
+def load_temp_data(temp_data_list,dataindex):
+    multiple_analysis={}
+    if temp_data_list:
+        selected_temp_data_path=temp_data_list[dataindex]
+        with open( selected_temp_data_path, 'rb') as file:
+            multiple_analysis= pickle.load(file)
+    return multiple_analysis
+
+def check_temp_data(tempprocessingpat,experimentalmousename) :
+    temp_data_list=[]
+    temp_data_list=glob.glob(tempprocessingpat+os.sep+f'**{experimentalmousename}', recursive=False)
+    
+    return temp_data_list
+#%% load data form optoanalysis script
+tempprocessingpat= Path(os.path.expanduser('~'))/ Path(r'Desktop/TempPythonObjects')
+
+
 
 i=0
-experiment=list(multiple_analysis.keys())[i]
-aq_analysis=[all_analysis[i]['analysis'] for i in range(len(all_analysis)) if all_analysis[i]['analysis'].acquisition_object.aquisition_name==experiment][0]
-aq_all_info=multiple_analysis[experiment]
+single_experiment=list(multiple_analysis.keys())[i]
+temp_data_list=check_temp_data(str(tempprocessingpat),single_experiment)
+dict_only_all_data=load_temp_data(temp_data_list,0)
+aq_analysis=[all_analysis[i]['analysis'] for i in range(len(all_analysis)) if all_analysis[i]['analysis'].acquisition_object.aquisition_name==single_experiment][0]
+aq_all_info=multiple_analysis[single_experiment]
+
 
 all_exp_data={}
-for i,(k, experiment) in enumerate(multiple_analysis.items()):
-    aq_analysis=[all_analysis[j]['analysis'] for j in range(len(all_analysis)) if all_analysis[j]['analysis'].acquisition_object.aquisition_name==k][0]
-    aq_all_info=experiment
-    all_exp_data[k]=process_dataset(experiment,aq_analysis,aq_all_info)
+if dict_only_all_data:
+    for i,(k, experiment) in enumerate(multiple_analysis.items()):
+        all_exp_data[k]=[experiment,aq_analysis,aq_all_info]+list(dict_only_all_data[i])
+    
+if not all_exp_data:
+    for i,(k, experiment) in enumerate(multiple_analysis.items()):
+        aq_analysis=[all_analysis[j]['analysis'] for j in range(len(all_analysis)) if all_analysis[j]['analysis'].acquisition_object.aquisition_name==k][0]
+        aq_all_info=experiment
+        all_exp_data[k]=process_dataset(experiment,aq_analysis,aq_all_info)
+        
+    
+    dict_only_all_data=[v[2:] for v in  all_exp_data.values()]
+    
+    save_temp_data(dict_only_all_data,tempprocessingpat /single_experiment)
 
 #%% analyzing chandelier responses multiple datasets
-xwindow=all_exp_data[k][-1][0][0]['sliced_time_vector']
-labels=np.arange(-aq_all_info['pre_time_df']/1000,aq_all_info['post_time_df']/1000+0.5,0.5)
-
 
 all_datasets={}
 all_mean_peaks={}
@@ -597,7 +629,14 @@ cell_act_full={}
 cell_mean_peaks={}
 cell_peak_thr={}
 
-for l in list(set(list(list(all_datasets.values())[0].keys())+list(list(all_datasets.values())[1].keys()))):
+
+    
+all_v=[]
+for i in all_datasets.values():
+    all_v=all_v+list(i.keys())
+stim_set=sorted(set(all_v), key=all_v.index)
+
+for l in stim_set:
     cell_act[l]=[]
     cell_act_full[l]=[]
 
@@ -616,41 +655,41 @@ for l in list(set(list(list(all_datasets.values())[0].keys())+list(list(all_data
             
     cell_peak_thr[l]=np.concatenate(cell_peak_thr[l],axis=0)       
     cell_mean_peaks[l]=np.concatenate(cell_mean_peaks[l],axis=0)  
-    if cell_act_full[l][0].shape[1]!=cell_act_full[l][1].shape[1]:
-       todo=np.argmin([cell_act_full[l][0].shape[1],cell_act_full[l][1].shape[1]])
-       tododo=np.empty(cell_act_full[l][todo].shape)
-       tododo[:]=np.nan
-       cell_act_full[l][ todo]=np.concatenate([cell_act_full[l][todo],tododo],axis=1)
+    if len( cell_act_full[l])>1:
+        if cell_act_full[l][0].shape[1]!=cell_act_full[l][1].shape[1]:
+           todo=np.argmin([cell_act_full[l][0].shape[1],cell_act_full[l][1].shape[1]])
+           tododo=np.empty(cell_act_full[l][todo].shape)
+           tododo[:]=np.nan
+           cell_act_full[l][todo]=np.concatenate([cell_act_full[l][todo],tododo],axis=1)
+    else:
+           cell_act_full=cell_act_full    
     
     cell_act_full[l]=np.concatenate(cell_act_full[l],axis=0)  
     cell_act[l]=np.concatenate(cell_act[l],axis=0)        
       
 
-#%%
+#%% sorting by orientation
 ori=[0,45,90,135]
+# get the sorting orders
 sorting_peaks=[np.flip(np.argsort(cell_mean_peaks['opto_blank'])),np.flip(np.argsort(cell_mean_peaks['control_blank'])),np.flip(np.argsort(cell_mean_peaks['opto_grating'])),np.flip(np.argsort(cell_mean_peaks['control_grating']))]
-
+# gather the data
 data=[cell_act['opto_blank'],cell_act['control_blank'],cell_act['opto_grating'],cell_act['control_grating']]
+# split in top and bottom
 top_chand_data=[cell_act_full['opto_blank'][sorting_peaks[0][0]],cell_act_full['control_blank'][sorting_peaks[0][0]],cell_act_full['opto_grating'][sorting_peaks[0][0]],cell_act_full['control_grating'][sorting_peaks[0][0]]]
 bottom_chand_data=[cell_act_full['opto_blank'][sorting_peaks[0][-1]],cell_act_full['control_blank'][sorting_peaks[0][-1]],cell_act_full['opto_grating'][sorting_peaks[0][-1]],cell_act_full['control_grating'][sorting_peaks[0][-1]]]
 
+# analyze based on orientationn responsivity
 mean_ori_grating=[np.nanmean(np.concatenate([cell_act_full[str(i)],cell_act_full[str(i+180)]],axis=1),axis=1) for i in ori ]
-
 full_ori_grating=[np.concatenate([cell_act_full[str(i)],cell_act_full[str(i+180)]],axis=1) for i in ori ]
 ori_top_chand_data=[j[sorting_peaks[0][0],:,:] for i,j in enumerate(full_ori_grating)]
 ori_bottom_chand_data=[j[sorting_peaks[0][-1],:,:] for i,j in enumerate(full_ori_grating)]
 
-
-
-
-
-
-
+# analyze based on global visual responsivity
 all_vis_stim=np.stack(mean_ori_grating).mean(axis=0)
 peaks=all_vis_stim[:,all_exp_data[k][2]['pre_frames_df']:].mean(axis=1)
 sorting_visual_responsiveness=np.flip(np.argsort([peaks])[0])
 
-#%%
+#%% find significance and sort
 data_sorted=[i[sorting_peaks[0]] for i in data]
 ori_data_sorted=[i[sorting_peaks[0]] for i in mean_ori_grating]
 all_vis_stim_data_sorted=[all_vis_stim[sorting_peaks[0]], cell_act['control_blank'][sorting_peaks[0]]]
@@ -674,40 +713,45 @@ sigdown=np.argsort(cell_mean_peaks['opto_blank'])[extrem_threhold_index_down]
 extrem_threhold_index=extrem_threhold>0
 data_sorted_extremes=[i[sorting_peaks[0]][extrem_threhold_index] for i in data]
 #%% zetapy test 
-trialdict=all_exp_data[k][7]
-vecTime=all_exp_data[k][1].full_data['imaging_data']['All_planes_rough']['Timestamps'][0]
-arrEventTimes=vecTime[trialdict['opto_blank']['start'].values]
-moddd=st.mode(np.ceil((trialdict['opto_blank']['end'].values-trialdict['opto_blank']['start'].values)/2).astype('int'))[0]
+# trialdict=all_exp_data[k][7]
+# vecTime=all_exp_data[k][1].full_data['imaging_data']['All_planes_rough']['Timestamps'][0]
+# arrEventTimes=vecTime[trialdict['opto_blank']['start'].values]
+# moddd=st.mode(np.ceil((trialdict['opto_blank']['end'].values-trialdict['opto_blank']['start'].values)/2).astype('int'))[0]
 
-arrEventTimesoff=vecTime[trialdict['opto_blank']['start'].values+moddd]
-allevventtimes=np.stack([arrEventTimes,arrEventTimesoff],axis=1)
+# arrEventTimesoff=vecTime[trialdict['opto_blank']['start'].values+moddd]
+# allevventtimes=np.stack([arrEventTimes,arrEventTimesoff],axis=1)
 
-all_cells_p_value=[]
-for cell in range(all_exp_data[k][6].shape[0]):
-    vecValue=all_exp_data[k][6][cell,:]
-    (ppz,pzdict)=pz.zetatstest(vecTime,vecValue,allevventtimes)
-    all_cells_p_value.append(ppz)
+# all_cells_p_value=[]
+# for cell in range(all_exp_data[k][6].shape[0]):
+#     vecValue=all_exp_data[k][6][cell,:]
+#     (ppz,pzdict)=pz.zetatstest(vecTime,vecValue,allevventtimes)
+#     all_cells_p_value.append(ppz)
     
     
     
-sig_cells=np.array(all_cells_p_value)<0.001
+# sig_cells=np.array(all_cells_p_value)<0.001
 
-baseline=all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]].mean(axis=1)
-trial1=all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]+25]
-trial1dff=(all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]+25]/baseline[:, np.newaxis])-1
+# baseline=all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]].mean(axis=1)
+# trial1=all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]+25]
+# trial1dff=(all_exp_data[k][6][~sig_cells,trialdict['opto_blank']['start'].values[0]-13:trialdict['opto_blank']['start'].values[0]+25]/baseline[:, np.newaxis])-1
 
-plt.imshow(trial1,aspect='auto')
-f,ax=plt.subplots()
-for i in range(trial1.shape[0]):
-    ax.plot(trial1[i,:])
+# plt.imshow(trial1,aspect='auto')
+# f,ax=plt.subplots()
+# for i in range(trial1.shape[0]):
+#     ax.plot(trial1[i,:])
 
 
 #%% sorted by optoreponses
 # trialaveraged opto treatments
+xwindow=all_exp_data[k][-1][0][0]['sliced_time_vector']
+labels=np.arange(-aq_all_info['pre_time_df']/1000,aq_all_info['post_time_df']/1000+0.5,0.5)
+data_sorted
+temppath=Path(r'C:\Users\sp3660\Desktop\TempPythonFigs')
+
 plot_image_with_mean_and_std(data_sorted, x_values=xwindow, labels=labels, use_std=True,
                              cmap='inferno', interpolation='nearest', aspect='auto', origin='upper',
                              vmin=-20, vmax=100,ylim=[-30, 100], alpha=None, fig_size=(20, 20),
-                             fig_title=f'shrtthregolded_down.pdf',raster_label='Cells',log=False)
+                             fig_title=temppath / Path(f'spsz__pyrdown.pdf'),raster_label='Cells',log=False)
 # trialaveraged orientations
 
 plot_image_with_mean_and_std(ori_data_sorted, x_values=xwindow, labels=labels, use_std=True,
