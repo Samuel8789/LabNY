@@ -29,7 +29,7 @@ class RunNYLab(Project):
         self.database=MouseDatabase(self.databasefile, self)   
         #load all mice info       
         self.all_mouse_info=self.database.allEXPERIMENTAL
-        if Project.computer=='DESKTOP-OKLQSQS':
+        if Project.computer=='DESKTOP-NBGKRCG' or 'DESKTOP-OKLQSQS':
             self.data_paths_names=['Raw','Pre_proccessed_slow_chandelier_tigres', 'Analysis_Fast_1', 'Analysis_Fast_2', 'Pre_proccessed_slow_interneurons_others', 'Raw2']    
                 
             self.data_paths_roots={}
@@ -101,7 +101,7 @@ class RunNYLab(Project):
         
         
         
-        if Project.computer=='DESKTOP-OKLQSQS':
+        if Project.computer=='DESKTOP-NBGKRCG' or 'DESKTOP-OKLQSQS':
             query_get_paths="""
                         SELECT *
                         FROM SavedPaths_table

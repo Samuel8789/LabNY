@@ -27,7 +27,7 @@ def move_all_files_from_source_to_dest(source,dest):
 
 def open_directory(foldername):
     systems = {
-        'nt': lambda foldername: os.startfile,
+        'nt': lambda foldername: os.startfile(foldername),
         'posix': lambda foldername: os.system('xdg-open "%s"' % foldername),
         'os2': lambda foldername: os.system('open "%s"' % foldername)
          }

@@ -19,6 +19,7 @@ from .widgetSelectStockCageMice import WidgetSelectStockCageMice
 from .widgetSelectMultiCage import WidgetSelectMultiCage
 import subprocess
 
+from ....dataManaging.functions.functionsDataOrganization  import open_directory
 class MouseVisitTab(tk.Frame):
     def __init__(self, gui_object, gui_tab_control):
         super().__init__(gui_tab_control)
@@ -310,9 +311,9 @@ class MouseVisitTab(tk.Frame):
 #%% button funcrions
     def open_mouse_visits_button(self):
         
-        visitpath=os.path.join(os.path.expanduser('~'),r'Documents/Projects/LabNY/4. Mouse Managing/MouseVisits')
+        visitpath=os.path.join(os.path.expanduser('~'),r'Documents'+os.sep+'Projects'+os.sep+'LabNY'+os.sep+'4. Mouse Managing'+os.sep+'MouseVisits')
         
-        subprocess.Popen(['xdg-open',visitpath])
+        open_directory(visitpath)
 
         
         

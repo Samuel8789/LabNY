@@ -49,8 +49,8 @@ class Mouse:
             self.mouse_working_subproject_path_db=self.all_mouse_inf.iloc[0]['WorkingStoragePath']
             
          
-            self.mouse_slow_subproject_path =self.data_managing_object.transform_databasepath_tolinux( self.mouse_slow_subproject_path_db)
-            self.mouse_working_subproject_path=self.data_managing_object.transform_databasepath_tolinux( self.mouse_working_subproject_path_db)
+            self.mouse_slow_subproject_path =self.data_managing_object.os_transform_databasepath( self.mouse_slow_subproject_path_db)
+            self.mouse_working_subproject_path=self.data_managing_object.os_transform_databasepath( self.mouse_working_subproject_path_db)
 
             create_dir_structure( self.mouse_slow_subproject_path , Mouse.level0_structure)
             create_dir_structure(os.path.join( self.mouse_slow_subproject_path ,'surgeries'), Mouse.surgeries_structure)

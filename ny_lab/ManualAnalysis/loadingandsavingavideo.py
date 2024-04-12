@@ -20,7 +20,7 @@ tiffilename=mmapfilepath.stem + '_'+acqdir[acqdir.find('planes'+os.sep+'Plane')+
 
 
 acqdir=os.path.join(os.path.expanduser('~'),r'Desktop/CaimanTemp')
-mmapfilepath=Path(glob.glob(acqdir+os.sep+'**ACID**.mmap')[0])
+mmapfilepath=Path(glob.glob(acqdir+os.sep+'*.mmap')[0])
 tiffilename=mmapfilepath.stem + '_'+'green.tiff'
 
 

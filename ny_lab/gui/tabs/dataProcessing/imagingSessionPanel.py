@@ -988,16 +988,22 @@ if __name__ == "__main__":
 
 
     house_PC='DESKTOP-V1MT0U5'
-    lab_PC='DESKTOP-OKLQSQS'
+    lab_PC='DESKTOP-NBGKRCG'
+    old_lab_PC='DESKTOP-OKLQSQS'
+
     small_laptop_ubuntu='samuel-XPS-13-9380'
     small_laptop_kali='samuel-XPS-13-9380'
     big_laptop_ubuntu='samuel-XPS-15-9560'
     big_laptop_arch='samuel-XPS-15-9560'
-
+    newlab='sp3660-YusteLab'
+    
     if platform == "win32":
         if socket.gethostname()==house_PC:
             githubtoken_path=r'C:\Users\Samuel\Documents\Github\GitHubToken.txt'
             computer=house_PC
+        elif socket.gethostname()==old_lab_PC:
+            githubtoken_path=r'C:\Users\sp3660\Documents\Github\GitHubToken.txt'
+            computer=old_lab_PC
         elif socket.gethostname()==lab_PC:
             githubtoken_path=r'C:\Users\sp3660\Documents\Github\GitHubToken.txt'
             computer=lab_PC

@@ -15,7 +15,7 @@ import pandas as pd
 import sys
 from pathlib import Path
 import subprocess
-sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents/Github/LabNY/ny_lab/dataManaging/functions'))
+sys.path.insert(0, os.path.join(os.path.expanduser('~'),r'Documents'+os.sep+'Github'+os.sep+'LabNY'+os.sep+'ny_lab'+os.sep+'dataManaging'+os.sep+'functions'))
 from functionsDataOrganization import recursively_eliminate_empty_folders
 
 class PreImagingSession():
@@ -24,8 +24,8 @@ class PreImagingSession():
         
         self.mice=mice
         self.sessiondate=sessiondate
-        self.tempdir=os.path.join(os.path.expanduser('~'),r'Desktop/SessionTemplatesDirectories')
-        self.template=os.path.join(os.path.expanduser('~'),r'Desktop/ImagingSessionDate' )
+        self.tempdir=os.path.join(os.path.expanduser('~'),r'Desktop'+os.sep+'SessionTemplatesDirectories')
+        self.template=os.path.join(os.path.expanduser('~'),r'Desktop'+os.sep+'ImagingSessionDate' )
         self.transfer='scp -r '
         self.wremovedir='rmdir /s '
         self.wcopyfolder='Xcopy /E /I '
@@ -66,13 +66,13 @@ class PreImagingSession():
 # scp -r /home/sp3660/Desktop/authorized_keys yustelab@128.59.247.96:C:\Users\yustelab\.ssh\
     
 #        
-        self.widefield_dir_WS1=str(Path(r'C:','Users','yustelab','Documents','Sam','WideField'))
-        self.visstimsessions_dir_WS1=str(Path(r'C:','Users','yustelab','Documents','Sam','VisualStim','MATLAB','Sessions'))
-        self.eyecam_dir_WS2=str(Path(r'C:','Users','rylab','Documents','Sam','EyeCamera'))
-        self.stimdaq_dir_WS2=str(Path(r'C:','Users','rylab','Documents','Sam','stim_scripts-master','behavior','NI_DAQ','output_data'))
-        self.Prairieraw1=str(Path(r'E:','Sam'))
-        self.Prairieraw2=str(Path(r'F:','Sam'))
-        self.Prairieraw3=str(Path(r'G:','Sam'))
+        self.widefield_dir_WS1=str(Path(r'C:'+os.sep+'Users','yustelab','Documents','Sam','WideField'))
+        self.visstimsessions_dir_WS1=str(Path(r'C:'+os.sep+'Users','yustelab','Documents','Sam','VisualStim','MATLAB','Sessions'))
+        self.eyecam_dir_WS2=str(Path(r'C:'+os.sep+'Users','rylab','Documents','Sam','EyeCamera'))
+        self.stimdaq_dir_WS2=str(Path(r'C:'+os.sep+'Users','rylab','Documents','Sam','stim_scripts-master','behavior','NI_DAQ','output_data'))
+        self.Prairieraw1=str(Path(r'E:'+os.sep+'Sam'))
+        self.Prairieraw2=str(Path(r'F:'+os.sep+'Sam'))
+        self.Prairieraw3=str(Path(r'G:'+os.sep+'Sam'))
         linuxperm=r'/media/sp3660/Data Permanent 2/'
         
         self.permanent=str(Path(linuxperm,'Projects','LabNY','Imaging'))
@@ -326,7 +326,7 @@ class PreImagingSession():
 # '''	
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20240307'
+    sessiondate='20240412'
     mice=['Test',
         'SPRY',
         'SPRZ',
