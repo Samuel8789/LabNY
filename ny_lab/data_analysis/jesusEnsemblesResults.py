@@ -809,7 +809,7 @@ class JesusEnsemblesResults():
         # fig = plt.figure(figsize=(6+(200*pixel_per_bar/dpi), 10), dpi=dpi)
         fig,ax=plt.subplots(figsize=(16,9))
         # im=ax.imshow(network, cmap='viridis', aspect='auto', vmax=np.max(network),
-        #     interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+        #     interpolation='nearest')
         im=ax.imshow(network, cmap='viridis', aspect='auto', vmax=np.max(network))
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
         ax.set_xlabel('Cell Number')
@@ -821,7 +821,7 @@ class JesusEnsemblesResults():
 
         fig,ax=plt.subplots(figsize=(16,9))
         im=ax.imshow(adjacency,  cmap='viridis', aspect='auto',vmax=np.max(adjacency),
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+            interpolation='nearest')
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
         ax.set_xlabel('Cell Number')
         fig.supylabel('Cell Number')
@@ -848,7 +848,7 @@ class JesusEnsemblesResults():
         
         fig,ax=plt.subplots(figsize=(16,9))
         im=ax.imshow(similarity,cmap='viridis', aspect='auto',vmax=np.max(similarity),
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+            interpolation='nearest')
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
         ax.set_xlabel('Ensemble Vector')
         fig.supylabel('Ensemble Vector')
@@ -858,7 +858,7 @@ class JesusEnsemblesResults():
 
         fig,ax=plt.subplots(figsize=(16,9))
         im=ax.imshow(t2,cmap='viridis', aspect='auto', vmax=np.max(similarity),
-            interpolation='nearest', norm=mpl.colors.Normalize(0, 1))
+            interpolation='nearest')
         fig.colorbar(im, ax=ax, orientation='vertical', fraction=.1)
         ax.set_xlabel('Ensemble Vector')
         fig.supylabel('Ensemble Vector')
