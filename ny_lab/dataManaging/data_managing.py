@@ -680,8 +680,8 @@ class DataManaging():
                 """
         params=()
         all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
-        newdrive_int='D'
-        newdrive_chand='K'
+        newdrive_int='J'
+        newdrive_chand='I'
 
         
         for mouse in all_mouse_info:
@@ -689,7 +689,7 @@ class DataManaging():
             mouse_SlowStoragePath=mouse[2]
             mouse_WorkingStoragePath=mouse[3]
 
-            if ('Chandelier_' in mouse_SlowStoragePath) or ('Tigre_' in mouse_SlowStoragePath):
+            if ('Chandelier_' in mouse_SlowStoragePath) or ('Tigre_' in mouse_SlowStoragePath) or ('INITIAl TESTS' in mouse_SlowStoragePath):
                 newslowstorage=newdrive_chand+mouse_SlowStoragePath[1:]
                 if 'media/' in mouse_SlowStoragePath:
                     newslowstorage=str(self.os_transform_databasepath(mouse[2]))
@@ -707,7 +707,7 @@ class DataManaging():
                     print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
 
                 
-            elif ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations_' in mouse_SlowStoragePath):
+            elif ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations' in mouse_SlowStoragePath):
                 newslowstorage=newdrive_int+mouse_SlowStoragePath[1:]
                 if 'media/' in mouse_SlowStoragePath:
                     newslowstorage=str(self.os_transform_databasepath(mouse[2]))
