@@ -704,7 +704,7 @@ ratios_df = pd.DataFrame(ratios)
 
 # Merge the ratios with the original results
 final_results_df = pd.merge(results_df, ratios_df, on='Cell')
-final_results_df.to_csv(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\metrics.csv')
+# final_results_df.to_csv(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\metrics.csv')
 #%% SELECT CELLS BASED ON SOME ARBIOTRY THREHOLD THAT ARE VISUAL STIMULS RESPONSIVE
 
 

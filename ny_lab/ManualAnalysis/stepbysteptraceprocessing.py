@@ -16,6 +16,7 @@ import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
 import numpy as np
+from pathlib import Path
 from PIL import Image
 import scipy
 import matplotlib.pyplot as plt
@@ -42,8 +43,17 @@ import matplotlib.patches as patches
 # import zetapy as pz
 matplotlib.use('Agg')
 import random
+from sys import platform
+if platform == "linux" or platform == "linux2":
+    basepath=Path(r'home/samuel/Dropbox/Projects/LabNY')
+elif platform == "win32":
+    basepath=Path(r'C:\Users\sp3660\Desktop')
+    
+    
+temppath=basepath / 'TempPythonFigs'
+tempprocessingpat= basepath / 'TempPythonObjects'
 
-temppath=Path(r'C:\Users\sp3660\Desktop\TempPythonFigs')
+
 def plot_image_with_mean_and_std(data,  x_values=None, labels=None, line_index=None, use_std=True, 
                                  cmap='viridis', interpolation='nearest', aspect='auto', origin='upper', 
                                  vmin=None, vmax=None,ylim=None, alpha=None, fig_size=(8, 6),
@@ -748,7 +758,6 @@ all_analysis # from to do latesoptoanalaysis it the analysis onbjects of all dat
 
 
 #%% load data form optoanalysis script
-tempprocessingpat= Path(os.path.expanduser('~'))/ Path(r'Desktop/TempPythonObjects')
 
 
 i=0
@@ -785,7 +794,7 @@ if not all_exp_data:
 all_datasets={}
 all_mean_peaks={}
 all_peak_thr={}
-base_substrac=0
+base_substrac=1
 if base_substrac:
     dtsts=1
 else:
@@ -824,9 +833,9 @@ for i,(l, experiment) in enumerate(all_exp_data.items()):
 #%% SELECT CELL TYPE TO ANALYZE
 cell_type=5
 
-if cell_type==5:
+if cell_type==4:
     cell_type_name='chandelier'
-elif cell_type==6:
+elif cell_type==5:
     cell_type_name='non_chandelier'
 
 
@@ -996,7 +1005,7 @@ labels=np.arange(-aq_all_info['pre_time_df']/1000,aq_all_info['post_time_df']/10
 data_sorted
 
 timestr = time.strftime("%Y%m%d-%H%M%S")
-
+#%%
 # trialaveraged opto
 
 plot_image_with_mean_and_std(opto_sorted, x_values=xwindow, labels=labels, use_std=True,
