@@ -45,7 +45,14 @@ import matplotlib
 
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
-
+if platform == "linux" or platform == "linux2":
+    basepath=Path(r'home/samuel/Dropbox/Projects/LabNY')
+elif platform == "win32":
+    basepath=Path(r'C:\Users\sp3660\Desktop')
+    
+    
+temppath=basepath / 'TempPythonFigs'
+tempprocessingpat= basepath / 'TempPythonObjects'
 
 #%% PROCESSING FUNCTIONS
 deriv=lambda x:np.diff(x,prepend=x[0] )
@@ -60,7 +67,7 @@ def save_temp_data(multiple_analysis,datapath):
             
 def check_temp_data(tempprocessingpat,experimentalmousename) :
     temp_data_list=[]
-    temp_data_list=glob.glob(tempprocessingpat+os.sep+f'**{experimentalmousename}', recursive=False)
+    temp_data_list=glob.glob(str(tempprocessingpat)+os.sep+f'**{experimentalmousename}', recursive=False)
     
     return temp_data_list
 
@@ -1162,18 +1169,26 @@ def plot_nono_opto_single_trials(transition_array,optocellindex_dict,activity_di
     trace_type=select_trace_type(substracted=substracted,smoothed=smoothed)
 
 #%% basic setup
-all_analysis=selected_analysis
-selected=all_analysis[0]
 multiple_analysis=None
-tempprocessingpat= os.path.join(os.path.expanduser('~'),r'Desktop/TempPythonObjects')
-experimentalmousename= selected['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name
 
-#check for mul.tiple mice
-mouse_loaded=sorted(list(set([i['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name for i in all_analysis])))
+
+if platform == "linux" or platform == "linux2":
+    mouse_loaded=['SPRZ', 'SPSM']
+    
+elif platform == "win32":
+    all_analysis=selected_analysis
+    selected=all_analysis[0]
+    experimentalmousename= selected['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name
+    #check for mul.tiple mice
+    mouse_loaded=sorted(list(set([i['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name for i in all_analysis])))
+    
 if len(mouse_loaded)>1:
     datapath=os.path.join(tempprocessingpat,'_'.join(mouse_loaded))
 else:
     datapath=os.path.join(tempprocessingpat,mouse_loaded[0])
+        
+        
+        
 dataindex=0
 selected_pre_time=500 #ms forr statistic purtposes
 selected_post_time=2000 #ms forr statistic purtposes

@@ -747,7 +747,7 @@ def load_temp_data(temp_data_list,dataindex):
 
 def check_temp_data(tempprocessingpat,experimentalmousename) :
     temp_data_list=[]
-    temp_data_list=glob.glob(tempprocessingpat+os.sep+f'**{experimentalmousename}**', recursive=False)
+    temp_data_list=glob.glob(str(tempprocessingpat)+os.sep+f'**{experimentalmousename}**', recursive=False)
     
     return temp_data_list
 
