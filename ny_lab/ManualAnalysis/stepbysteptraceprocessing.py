@@ -45,7 +45,7 @@ matplotlib.use('Agg')
 import random
 from sys import platform
 if platform == "linux" or platform == "linux2":
-    basepath=Path(r'home/samuel/Dropbox/Projects/LabNY')
+    basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY')
 elif platform == "win32":
     basepath=Path(r'C:\Users\sp3660\Desktop')
     
@@ -766,17 +766,25 @@ temp_data_list=check_temp_data(str(tempprocessingpat),single_experiment)
 # dict_only_all_data=load_temp_data(temp_data_list,3)
 dict_only_all_data=load_temp_data(temp_data_list,3)
 
-aq_analysis=[all_analysis[i]['analysis'] for i in range(len(all_analysis)) if all_analysis[i]['analysis'].acquisition_object.aquisition_name==single_experiment][0]
+
+if platform == "linux" or platform == "linux2":
+    aq_analysis=None
+elif platform == "win32":
+    aq_analysis=[all_analysis[i]['analysis'] for i in range(len(all_analysis)) if all_analysis[i]['analysis'].acquisition_object.aquisition_name==single_experiment][0]
 aq_all_info=multiple_analysis[single_experiment]
 
 
 all_exp_data={}
 if dict_only_all_data:
     for i,(k, experiment) in enumerate(multiple_analysis.items()):
-        aq_analysis=[all_analysis[j]['analysis'] for j in range(len(all_analysis)) if all_analysis[j]['analysis'].acquisition_object.aquisition_name==k][0]
+        if platform == "linux" or platform == "linux2":
+            aq_analysis=None
+        elif platform == "win32":
+
+            aq_analysis=[all_analysis[j]['analysis'] for j in range(len(all_analysis)) if all_analysis[j]['analysis'].acquisition_object.aquisition_name==k][0]
         aq_all_info=experiment
         all_exp_data[k]=[experiment,aq_analysis,aq_all_info]+list(dict_only_all_data[i])
- #%%   
+    
 if not all_exp_data:
     for i,(k, experiment) in enumerate(multiple_analysis.items()):
         

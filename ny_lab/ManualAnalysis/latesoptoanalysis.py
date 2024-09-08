@@ -42,11 +42,12 @@ import glob
 import scipy.stats as st
 from pylab import *
 import matplotlib
-
+from sys import platform
+from pathlib import Path
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
 if platform == "linux" or platform == "linux2":
-    basepath=Path(r'home/samuel/Dropbox/Projects/LabNY')
+    basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY')
 elif platform == "win32":
     basepath=Path(r'C:\Users\sp3660\Desktop')
     
@@ -1419,13 +1420,22 @@ if not multiple_analysis:
     datapath=save_temp_data(multiple_analysis,datapath)
 
 else:
-    for selected in all_analysis:  
-        analysis=selected['analysis']
-        visstimtranstionts=multiple_analysis[analysis.acquisition_object.aquisition_name]['visstimtranstionts']
+    
+    if platform == "linux" or platform == "linux2":
+         analysis=None
+         visstimtranstionts=None    
+         blank_opt=None
 
-        analysis.signals_object.extract_transitions_optodrift('VisStim', led_clipped=True, plot=False)
-        analysis.signals_object.downsample_optodrift_onsets()
-        blank_opt=multiple_analysis[analysis.acquisition_object.aquisition_name]['blank_opt']
+                
+    elif platform == "win32":
+        
+        for selected in all_analysis:  
+            analysis=selected['analysis']
+            visstimtranstionts=multiple_analysis[analysis.acquisition_object.aquisition_name]['visstimtranstionts']
+    
+            analysis.signals_object.extract_transitions_optodrift('VisStim', led_clipped=True, plot=False)
+            analysis.signals_object.downsample_optodrift_onsets()
+            blank_opt=multiple_analysis[analysis.acquisition_object.aquisition_name]['blank_opt']
     
 #%% manual play
 
