@@ -48,28 +48,28 @@ mc = MotionCorrect(fnames, dview=None, max_shifts=max_shifts,
                   border_nan=border_nan)
 
 mc.motion_correct(save_movie=True)
-# #%%
-# # load motion corrected movie
-# m_rig = cm.load(mc.mmap_file)
-# bord_px_rig = np.ceil(np.max(mc.shifts_rig)).astype(int)
-# #%% visualize templates
-# plt.figure(figsize = (20,10))
-# plt.imshow(mc.total_template_rig, cmap = 'gray');
+#%%
+# load motion corrected movie
+m_rig = cm.load(mc.mmap_file)
+bord_px_rig = np.ceil(np.max(mc.shifts_rig)).astype(int)
+#%% visualize templates
+plt.figure(figsize = (20,10))
+plt.imshow(mc.total_template_rig, cmap = 'gray');
 
-# #%% inspect moviec
-# m_rig.resize(1, 1, downsample_ratio).play(
-#     q_max=99.5, fr=30, magnification=2, bord_px = 0*bord_px_rig) # press q to exit
+#%% inspect moviec
+m_rig.resize(1, 1, downsample_ratio).play(
+    q_max=99.5, fr=30, magnification=2, bord_px = 0*bord_px_rig) # press q to exit
 
-# #%% plot rigid shifts
-# plt.close()
-# plt.figure(figsize = (20,10))
-# plt.plot(mc.shifts_rig)
-# plt.legend(['x shifts','y shifts'])
-# plt.xlabel('frames')
-# plt.ylabel('pixels');
+#%% plot rigid shifts
+plt.close()
+plt.figure(figsize = (20,10))
+plt.plot(mc.shifts_rig)
+plt.legend(['x shifts','y shifts'])
+plt.xlabel('frames')
+plt.ylabel('pixels');
 
 
-# #%% motion correct piecewise rigid
+#%% motion correct piecewise rigid
 # mc.pw_rigid = True  # turn the flag to True for pw-rigid motion correction
 # mc.template = mc.mmap_file  # use the template obtained before to save in computation (optional)
 
@@ -92,9 +92,9 @@ mc.motion_correct(save_movie=True)
 # plt.plot(mc.y_shifts_els)
 # plt.ylabel('y_shifts (pixels)')
 # plt.xlabel('frames')
-# #%% compute borders to exclude
-# bord_px_els = np.ceil(np.maximum(np.max(np.abs(mc.x_shifts_els)),
-#                                  np.max(np.abs(mc.y_shifts_els)))).astype(int)
+#%% compute borders to exclude
+bord_px_els = np.ceil(np.maximum(np.max(np.abs(mc.x_shifts_els)),
+                                  np.max(np.abs(mc.y_shifts_els)))).astype(int)
 
 
 

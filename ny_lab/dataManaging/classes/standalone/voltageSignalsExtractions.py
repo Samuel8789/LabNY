@@ -19,6 +19,8 @@ import numpy as np
 import pickle
 import glob
 import scipy.signal as sg
+import scipy.ndimage as ndi
+
 import gc
 # from TestPLot import SnappingCursor
 mpl.rcParams['axes.prop_cycle'] = mpl.cycler(color=["k", "r", "b"]) 
@@ -119,7 +121,7 @@ class VoltageSignalsExtractions():
                     module_logger.info('Detecting trsmisition in unaligne signals')
 
                     self.proces_synch_signals() 
-                    # this processesthe opto tirgger(signal if LED) and pockels (if 2p) oin the movie clipped 
+                    # this processesthe opto tirgger(signal if LED) and pockels (if 2p) on the movie clipped 
                     # seems to be stabe and easy
                     self.proces_opto_signals()
                     # this id pproblematis as the optodrift function uses final signals instead of signlas 
@@ -154,7 +156,7 @@ class VoltageSignalsExtractions():
 
                 
                 
-                # self.process_all_signals(self.vis_stim_protocol)
+                self.process_all_signals(self.vis_stim_protocol)
                 # self.plotting_paradigm_transitions()
                 # self.plotting_grating_transitions()
             else:
@@ -188,10 +190,10 @@ class VoltageSignalsExtractions():
         # plt.show(block = False)
         # plt.pause(1)
        
-        # raw_fluorescence_threshold = int(input('Shall I correct Voltages?: Yes:1, No:0 \n'))
+        raw_fluorescence_threshold = int(input('Shall I correct Voltages?: Yes:1, No:0 \n'))
         
-        # if raw_fluorescence_threshold==0:
-        #     self.correct_voltages=False
+        if raw_fluorescence_threshold==0:
+            self.correct_voltages=False
 
 
         
@@ -224,8 +226,11 @@ class VoltageSignalsExtractions():
          '_movie_three_frame_sliced_indexes.pkl',
          '_all_aligned_signals.pkl',
          '_voltage_signals_transitions.pkl',
-         '_optodrift_info.pkl'
-       
+         '_optodrift_info.pkl',
+         '_movie_one_trial_indexes.pkl', 
+         '_movie_two_trial_indexes.pkl', 
+         '_movie_three_both_trial_indexes.pkl', 
+
          ]
         indexes_full_file_names=[self.acquisition_name+i for i in filenames_suffixes]
         self.indexes_full_file_paths_to_save=[os.path.join(self.vis_stim_slow_storage_path,i) for i in indexes_full_file_names]
@@ -282,8 +287,11 @@ class VoltageSignalsExtractions():
         corrected_daq_signals={}
         orderedsignals=['LED','AcqTrig','VisStim', 'PhotoTrig', 'PhotoStim', 'Locomotion']
         if not set(['LED','AcqTrig','VisStim', 'PhotoTrig', 'PhotoStim', 'Locomotion'])==set(list(self.all_signals['Prairie'].keys())[:-1]):
-            orderedsignals=reversed(list(self.all_signals['Prairie'].keys())[:-1])
-
+            orderedsignals=list(reversed(list(self.all_signals['Prairie'].keys())[:-1]))
+            if 'LED' in orderedsignals:
+                orderedsignals.remove('LED')
+                orderedsignals.insert(0, 'LED')
+            
 
         for sig in orderedsignals: 
             
@@ -298,9 +306,10 @@ class VoltageSignalsExtractions():
                 ax[0].plot(daq_sig,'r',label='daq')
                 ax[0].plot(prairie_sig,'c',label='prairie')
                 ax[0].legend()
+                plt.show()
 
            
-            if sig!='Locomotion' and sig!='PhotoTrig' and sig!='PhotoStim':
+            if sig=='LED':
                 
                 transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
                 transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
@@ -315,40 +324,30 @@ class VoltageSignalsExtractions():
                     scaling_factor=np.nan
                     shift=np.nan
                     volt_delay=np.nan
+                    corrected_daq_signals[sig]=self.all_signals['Daq'][sig]
+                    print('signlas not aligned')
+
+                    
                        
 
                 alldelays[sig]=[volt_delay,scaling_factor]
                
-            elif sig=='Locomotion':
-            
-                mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] ) 
+            else:
+                try:
+                    mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] ) 
+                    corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
+
+                except ValueError as e:
+                    mode_delay=np.nan
+                    corrected_daq_signals[sig]=self.all_signals['Daq'][sig]
+                    print('signlas not aligned')
+
+
+                        
                 alldelays[sig]=[mode_delay,1]
-                corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
                 print(scaling_factor, shift, 'locomotion')
 
-
-                
-             #daq phototrigg sometimes oesnt record ghood sigbnal, have an optio to check that here, at the moment hjust use the mode delay   
-            elif sig=='PhotoTrig' or sig=='PhotoStim':
-                # transx=np.argwhere(np.diff(daq_sig)<-2).flatten()
-                # transy=np.argwhere(np.diff(prairie_sig)<-2).flatten()
-                # if transx.any() and transy.any():
-                #     scaling_factor = (transy[1]-transy[0])/(transx[1]-transx[0])
-                #     shift = np.round(transy[0] - (transx[0]*scaling_factor))
-                #     print(scaling_factor, shift)
-                #     volt_delay= int(abs(shift))
-                #     corrected_daq_signals[sig]=self.all_signals['Daq'][sig][volt_delay:].reset_index(drop=True)
-
-                # else:
-                #     scaling_factor=np.nan
-                #     shift=np.nan
-                #     volt_delay=np.nan
-                mode_delay=int(mode(np.array(list(zip(*list(alldelays.values())))[0]))[0] )  
-                corrected_daq_signals[sig]=self.all_signals['Daq'][sig][mode_delay:].reset_index(drop=True)
-                       
-                print(scaling_factor, shift, sig)
-
-                alldelays[sig]=[volt_delay,scaling_factor]
+            
                 
             if plot:
 
@@ -406,6 +405,7 @@ class VoltageSignalsExtractions():
                 self.clipped_timestamps=True
         else:
             self.all_planes_clipped_timestamps=self.all_planes_timestamps
+            self.clipped_timestamps=False
             
     def align_signals_based_on_LED(self):    
         module_logger.info('Aligning movie and voltages based on LED')
@@ -455,6 +455,8 @@ class VoltageSignalsExtractions():
         # tthis is the fundamental function to align the LED voltage signal to the LED movie artifact
         #the alignment loos for the led transition in both signalk with split transtiinm correction
         manualcorrect=False
+        not_led=False
+
         led_prairie=self.all_signals['Prairie_movie_length_clipped']['LED'].values
         mean_mov=sg.medfilt(np.squeeze(self.meanmov), kernel_size=1)
         # remove middle of the movie in case of led artifacts
@@ -494,6 +496,13 @@ class VoltageSignalsExtractions():
                     tr='up'
                     transitions[tracenames[i]][tr]=np.argwhere(np.diff(trace,prepend=mov[0])>thr).flatten()
 
+
+        # if there i no LED flash but ther is signal just align with 0 shift by selecting same timestampos as the signal
+        if not transitions['movie']['up'].any() or not transitions['movie']['down'].any():   
+            transitions['movie']['up']=np.array([np.argmin(np.abs(timestamps_video_milisecond- transitions['led']['up'][0])),np.argmin(np.abs(timestamps_video_milisecond- transitions['led']['up'][1]))])
+            transitions['movie']['down']=np.array([np.argmin(np.abs(timestamps_video_milisecond- transitions['led']['down'][0])),np.argmin(np.abs(timestamps_video_milisecond- transitions['led']['down'][1]))])
+            not_led=True
+
         if plot:
             f,ax=plt.subplots(2,sharex=True) 
             f.suptitle('THIS IS TO CHECK LED SIGNAL-MOVIE ALIGNMENT')
@@ -508,11 +517,11 @@ class VoltageSignalsExtractions():
                             ax[j].plot(timestamps[i][transitions[tracenames[i]][tran]],trace[transitions[tracenames[i]][tran]],'o')
             plt.show()
 
+
         transitions['movies_timestamps']={}
         for k,v in transitions['movie'].items():
             transitions['movies_timestamps'][k]=np.array([timestamps_video_milisecond[v][0], timestamps_video_milisecond[v][1] ])
             
-
       
    
         result = {}
@@ -528,6 +537,9 @@ class VoltageSignalsExtractions():
             shifts[i]['begining']=np.round(result[i]['led'][0] - (result[i]['movies_timestamps'][0]*scaling_factors[i]))
             shifts[i]['end']=np.round(result[i]['led'][1] - (result[i]['movies_timestamps'][1]*scaling_factors[i]))
             
+            if not_led:
+                shifts[i]['begining']=0
+                shifts[i]['end']=0
    
         inverted_shifts = {}
         for k1, subdict in shifts.items():
@@ -609,6 +621,8 @@ class VoltageSignalsExtractions():
             pad_val = scaled_trace[0]
             temp_padding = np.ones(abs(shift))*pad_val
             shifted_scaled_trace =np.concatenate([temp_padding,scaled_trace])
+        else:
+            shifted_scaled_trace=scaled_trace
             
         shifted_voltage_timestamps=np.arange(len(shifted_scaled_trace))
         
@@ -641,38 +655,40 @@ class VoltageSignalsExtractions():
       
         self.all_planes_clipped_timestamps_shifted={}
         for k in self.all_planes_clipped_timestamps.keys():
-            self.all_planes_clipped_timestamps_shifted[k]=self.all_planes_clipped_timestamps[k]-self.all_planes_clipped_timestamps[k][0]
+            self.all_planes_clipped_timestamps_shifted[k]=np.array(self.all_planes_clipped_timestamps[k])-self.all_planes_clipped_timestamps[k][0]
             
         keys_to_shift=[k for k in self.signal_transitions.keys()  if 'downsampled' in k]    
-            
+        if not self.start_frame:
+            self.start_frame=0
         test_dict={}
-        for k in keys_to_shift:
-           test_dict[k+'_LEDshifted']={}
-           v=self.signal_transitions[k]
-           for record,vv in v.items():
-                test_dict[k+'_LEDshifted'][record]={}
-                for tran_type, vvv in vv.items():
-                    test_dict[k+'_LEDshifted'][record][tran_type]=[]
+        if keys_to_shift:
+            for k in keys_to_shift:
+               test_dict[k+'_LEDshifted']={}
+               v=self.signal_transitions[k]
+               for record,vv in v.items():
+                    test_dict[k+'_LEDshifted'][record]={}
+                    for tran_type, vvv in vv.items():
+                        test_dict[k+'_LEDshifted'][record][tran_type]=[]
+        
+                        for i,tran in enumerate(vvv):
+                        
+                            test_dict[k+'_LEDshifted'][record][tran_type].append(tran-self.start_frame)
+                
+            self.signal_transitions.update(test_dict)
+            
+            self.led_clipped_signal_start=np.floor(self.all_planes_timestamps['Plane1'][self.start_frame]*1000).astype(int)
+            self.led_clipped_signal_end=np.ceil(self.all_planes_timestamps['Plane1'][self.end_frame-1]*1000).astype(int)
+            
+            self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted']={}
+            self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted']={}
     
-                    for i,tran in enumerate(vvv):
-                    
-                        test_dict[k+'_LEDshifted'][record][tran_type].append(tran-self.start_frame)
+            for sig,v in self.all_signals['Prairie_movie_length_clipped_aligned'].items():
+                if 'corrections' not in sig:
+                    self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][sig]=pd.DataFrame(v.values[self.led_clipped_signal_start:self.led_clipped_signal_end])
+                
             
-        self.signal_transitions.update(test_dict)
-        
-        self.led_clipped_signal_start=np.floor(self.all_planes_timestamps['Plane1'][self.start_frame]*1000).astype(int)
-        self.led_clipped_signal_end=np.ceil(self.all_planes_timestamps['Plane1'][self.end_frame-1]*1000).astype(int)
-        
-        self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted']={}
-        self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted']={}
-
-        for sig,v in self.all_signals['Prairie_movie_length_clipped_aligned'].items():
-            if 'corrections' not in sig:
-                self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][sig]=pd.DataFrame(v.values[self.led_clipped_signal_start:self.led_clipped_signal_end])
-            
-        
-                if sig in self.all_signals['Corrected_daq_movie_length_clipped_aligned']:
-                    self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][sig]=pd.DataFrame(self.all_signals['Corrected_daq_movie_length_clipped_aligned'][sig].values[self.led_clipped_signal_start:self.led_clipped_signal_end])
+                    if sig in self.all_signals['Corrected_daq_movie_length_clipped_aligned']:
+                        self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][sig]=pd.DataFrame(self.all_signals['Corrected_daq_movie_length_clipped_aligned'][sig].values[self.led_clipped_signal_start:self.led_clipped_signal_end])
 
 
     def load_full_processed_signals(self):
@@ -705,9 +721,8 @@ class VoltageSignalsExtractions():
                     if k==key:
                         key='Raw'
                     else:
-                        key=key[len(k)+1:]
 
-                    clustered_dict[k][key]=value
+                        clustered_dict[k][key]=value
                     
         self.signal_transitions=clustered_dict
  
@@ -871,62 +886,68 @@ class VoltageSignalsExtractions():
     
                 
         
-    def extract_transitions_from_signal(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False):
+    def extract_transitions_from_signal(self,signal_name,diff_thres=0.1, aligned=False, led_clipped=False,plot=False):
         
-        # if sig is acq trigger the ending should be clipped
         
-        if aligned: # this is for LED aligned moves
-            sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal_name].values.flatten()
-            sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned'][signal_name].values.flatten()
-            signal_name=signal_name+'_aligned'
+        if signal_name in self.all_signals['Prairie_movie_length_clipped'].keys():
+            # if sig is acq trigger the ending should be clipped
             
-        elif led_clipped: # this is for LED clipped moves
-            sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
-            sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
-            signal_name=signal_name+'_aligned_LEDshifted'
+            if aligned: # this is for LED aligned moves
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned'
+                
+            elif led_clipped: # this is for LED clipped moves
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped_aligned_LEDshifted'][signal_name].values.flatten()
+                signal_name=signal_name+'_aligned_LEDshifted'
+                
+            elif 'AcqTrig' in self.all_signals['Prairie_movie_length_clipped'].keys(): # this is for daq_prairie aligned and tail clipped
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped'][signal_name].values.flatten()
+            else:
+                sig_daq=self.all_signals['Corrected_daq_movie_length_clipped'][signal_name].values.flatten()
+                sig_prairie=self.all_signals['Prairie_movie_length_clipped'][signal_name].values.flatten()
+       
+            sig_prairie=(sig_prairie-np.min(sig_prairie))/(np.max(sig_prairie)-np.min(sig_prairie))
+            sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
             
-        else: # this is for daq_prairie aligned and tail clipped
-            sig_daq=self.all_signals['Corrected_daq_movie_length_clipped'][signal_name].values.flatten()
-            sig_prairie=self.all_signals['Prairie_movie_length_clipped'][signal_name].values.flatten()
-   
-        sig_prairie=(sig_prairie-np.min(sig_prairie))/(np.max(sig_prairie)-np.min(sig_prairie))
-        sig_daq=(sig_daq-np.min(sig_daq))/(np.max(sig_daq)-np.min(sig_daq))
-        
-        f,ax=plt.subplots()
-        ax.plot(sig_prairie,'r',label='prairie')
-        ax.plot(sig_daq,'c',label='daq')
-        f.suptitle(f'{signal_name}')
-        ax.legend()
-        plt.show()
-
-
-        
-        signal_prairie_filtered_rounded_corrected,\
-        signal_prairie_diff_filtered_rounded_corrected,\
-        signal_prairie_diff_filtered_rounded_corrected_rerounded,\
-        signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sig_prairie,kernel_size=1)
-        
-        signal_daq_filtered_rounded_corrected,\
-        signal_daq_diff_filtered_rounded_corrected,\
-        signal_daq_diff_filtered_rounded_corrected_rerounded,\
-        signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
-
-        
-        sigup_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)>0.8).flatten()                
-        sigup_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)>0.8).flatten()
-        sigdown_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)<-0.8).flatten()              
-        sigdown_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)<-0.8).flatten()
-
-
-        self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
-        
-        # for acq trig there should be up and down for daq and only down for prairie(prairire doesnt record the upvioltage trigger)
-        # for LED there should 2 up and 2 down fro both signals and with a saml diffewrnece of 1 frame maybe)
-        # for Photortige and else signal there should 20 up and 20 down fro both signals and with a saml diffewrnece of 1 frame maybe (60 and 60 if blanmk sweep opto )))
-        # for Photostim and else signal there should 20*optoreps general 400 at 20hx for both up odown prairire and daq This have artound 5 ms misgalignemn t but is not relevant we dont use them and in movie time the are clumped in dame frames
-        # for visstim only applys if no stim whgere ther is onl;y 2 transitions ofr the paradigm if not I had to add the vis stim protocol
-        
-        
+            if plot:
+                f,ax=plt.subplots()
+                ax.plot(sig_prairie,'r',label='prairie')
+                ax.plot(sig_daq,'c',label='daq')
+                f.suptitle(f'{signal_name}')
+                ax.legend()
+                plt.show()
+    
+    
+            
+            signal_prairie_filtered_rounded_corrected,\
+            signal_prairie_diff_filtered_rounded_corrected,\
+            signal_prairie_diff_filtered_rounded_corrected_rerounded,\
+            signal_prairie_errors_pairs = self.correct_voltage_split_transitions(sig_prairie,kernel_size=1)
+            
+            signal_daq_filtered_rounded_corrected,\
+            signal_daq_diff_filtered_rounded_corrected,\
+            signal_daq_diff_filtered_rounded_corrected_rerounded,\
+            signal_daq_errors_pairs = self.correct_voltage_split_transitions(sig_daq,kernel_size=1)
+    
+            
+            sigup_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)>0.8).flatten()                
+            sigup_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)>0.8).flatten()
+            sigdown_pra=np.argwhere(np.diff(signal_prairie_filtered_rounded_corrected)<-0.8).flatten()              
+            sigdown_daq=np.argwhere(np.diff(signal_daq_filtered_rounded_corrected)<-0.8).flatten()
+    
+    
+            self.signal_transitions[signal_name]={'Prairie':{'up':sigup_pra,'down':sigdown_pra},'daq':{'up':sigup_daq,'down':sigdown_daq}}
+            
+            # for acq trig there should be up and down for daq and only down for prairie(prairire doesnt record the upvioltage trigger)
+            # for LED there should 2 up and 2 down fro both signals and with a saml diffewrnece of 1 frame maybe)
+            # for Photortige and else signal there should 20 up and 20 down fro both signals and with a saml diffewrnece of 1 frame maybe (60 and 60 if blanmk sweep opto )))
+            # for Photostim and else signal there should 20*optoreps general 400 at 20hx for both up odown prairire and daq This have artound 5 ms misgalignemn t but is not relevant we dont use them and in movie time the are clumped in dame frames
+            # for visstim only applys if no stim whgere ther is onl;y 2 transitions ofr the paradigm if not I had to add the vis stim protocol
+            
+            
         
         
         
@@ -1489,31 +1510,62 @@ class VoltageSignalsExtractions():
 
         if not self.transitions_dictionary:
             
-   
-            self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-6.8).flatten()
-            # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-9).flatten()+1
-            self.start_transitions=np.delete(self.start_transitions, [9,10,11])
-            self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>6.8).flatten()  
-            # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>9.5).flatten()  +1
+            if self.acquisition_name=='220217_SPJZ_FOV1_AllenA_20x_920_52570_narrow_with-000':
+                self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-8).flatten()
+                self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>9.6).flatten()  
+                self.end_transitions=np.delete(self.end_transitions, 0)
+                self.start_transitions=np.delete(self.start_transitions, -1)
 
-            self.end_transitions=np.delete(self.end_transitions, 0)
-            #eliminate first 
-        
-            # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>5, self.dfdt_rounded_vis_stim['Prairie']['VisStim']<6.5)).flatten()+1
-            self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-0.3).flatten()[-1]+1
+
+                
+                self.transitions_dictionary={'first_drifting_set_first':self.start_transitions[0],
+                                            'first_drifting_set_last': self.end_transitions[0],
+                                            
+                                            'natural_movie_three_first_set_first':self.start_transitions[2],
+                                            'natural_movie_three_first_set_last':self.end_transitions[2],
+                                                                                       
+                                            'natural_movie_one_set_first':self.start_transitions[4],                                   
+                                            'natural_movie_one_set_last': self.end_transitions[4],
+                                                                                 
+                                            'second_drifting_set_first':self.start_transitions[6],
+                                            'second_drifting_set_last':self.end_transitions[6],
+                                            
+                                            'spont_first':self.start_transitions[7],
+                                            'spont_last':self.end_transitions[7],
+                                            
+                                            'natural_movie_three_second_set_first':self.start_transitions[8],
+                                            'natural_movie_three_second_set_last': self.end_transitions[8],
+                                            
+                                            'third_drifting_set_first':self.start_transitions[10],
+                                            'third_drifting_set_last':self.end_transitions[10],
+                                            }
+
+                
+            else:          
+                self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-6.8).flatten()
+                # self.start_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-9).flatten()+1
+                self.start_transitions=np.delete(self.start_transitions, [9,10,11])
+                self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>6.8).flatten()  
+                # self.end_transitions=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>9.5).flatten()  +1
+    
+                self.end_transitions=np.delete(self.end_transitions, 0)
+                #eliminate first 
             
-            fig, ax = plt.subplots(2, sharex=True)
-            line, = ax[0].plot(self.visualstim_array['Prairie']['VisStim']) 
-            line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairie']['VisStim']) 
-            # line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairie']['VisStim'],'r') 
-            # line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
-            # line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
-            
-            ax[0].plot(self.time_scale['Prairie'][self.start_transitions],self.visualstim_array['Prairie']['VisStim'][self.start_transitions],'rx') 
-            ax[1].plot(self.time_scale['Prairie'][self.start_transitions],self.dfdt_rounded_vis_stim['Prairie']['VisStim'][self.start_transitions],'rx') 
-            ax[0].plot(self.time_scale['Prairie'][self.end_transitions],self.visualstim_array['Prairie']['VisStim'][self.end_transitions],'go') 
-            ax[1].plot(self.time_scale['Prairie'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairie']['VisStim'][self.end_transitions],'go') 
-                      
+                # self.spont_start_transitions=np.argwhere(np.logical_and(self.dfdt_rounded_vis_stim['Prairie']['VisStim']>5, self.dfdt_rounded_vis_stim['Prairie']['VisStim']<6.5)).flatten()+1
+                self.last_down_transition=np.argwhere(self.dfdt_rounded_vis_stim['Prairie']['VisStim']<-0.3).flatten()[-1]+1
+                
+                fig, ax = plt.subplots(2, sharex=True)
+                line, = ax[0].plot(self.visualstim_array['Prairie']['VisStim']) 
+                line, = ax[1].plot(self.dfdt_rounded_vis_stim['Prairie']['VisStim']) 
+                # line, = ax[0].plot(self.process_signal(self.dfdt_rounded_vis_stim,'rectified')['Prairie']['VisStim'],'r') 
+                # line, = ax[2].plot(self.visualstim_array['Daq']['VisStim']) 
+                # line, = ax[3].plot(self.dfdt_rounded_vis_stim['Daq']['VisStim']) 
+                
+                ax[0].plot(self.time_scale['Prairie'][self.start_transitions],self.visualstim_array['Prairie']['VisStim'][self.start_transitions],'rx') 
+                ax[1].plot(self.time_scale['Prairie'][self.start_transitions],self.dfdt_rounded_vis_stim['Prairie']['VisStim'][self.start_transitions],'rx') 
+                ax[0].plot(self.time_scale['Prairie'][self.end_transitions],self.visualstim_array['Prairie']['VisStim'][self.end_transitions],'go') 
+                ax[1].plot(self.time_scale['Prairie'][self.end_transitions],self.dfdt_rounded_vis_stim['Prairie']['VisStim'][self.end_transitions],'go') 
+                          
             
             
             
@@ -1807,6 +1859,15 @@ class VoltageSignalsExtractions():
             self.natural_movie_two_set=self.rounded_vis_stim['Prairie']['VisStim'][self.transitions_dictionary['natural_movie_two_set_first']:self.transitions_dictionary['natural_movie_two_set_last']]
             self.spont1=self.rounded_vis_stim['Prairie']['VisStim'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
             self.spont2=self.rounded_vis_stim['Prairie']['VisStim'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
+            
+                 
+            self.first_noise_set=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['first_noise_set_first']:self.transitions_dictionary['first_noise_set_last']]
+            self.second_noise_set=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['second_noise_set_first']:self.transitions_dictionary['second_noise_set_last']]
+            self.third_noise_set=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['third_noise_set_first']:self.transitions_dictionary['third_noise_set_last']]
+            self.natural_movie_one_set=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['natural_movie_one_set_first']:self.transitions_dictionary['natural_movie_one_set_last']]
+            self.natural_movie_two_set=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['natural_movie_two_set_first']:self.transitions_dictionary['natural_movie_two_set_last']]
+            self.spont1=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['spont1_first']:self.transitions_dictionary['spont1_last']]
+            self.spont2=self.visualstim_array['Prairie']['VisStim'][self.transitions_dictionary['spont2_first']:self.transitions_dictionary['spont2_last']]     
                
     def slice_locomotion_by_paradigm (self):  
          
@@ -1847,67 +1908,225 @@ class VoltageSignalsExtractions():
     def get_movie_one_trial_structure(self):
          
         self.movie_one_frame_index_full_recording =np.zeros((1))
+        self.movie_one_frame_indexes_by_trial =np.zeros((1))
+        self.movie_one_trial_indexes_by_paradigm=np.zeros((1))
+
         self.load_movie_one_indexes()
-        if not (self.movie_one_frame_index_full_recording.any() and self.movie_one_frame_indexes_by_trial.any()):
-
-            fix, ax=plt.subplots(1)
-            ax.plot( self.natural_movie_one_set)
-            
-            
-            temp=np.diff(np.around(sg.medfilt(self.natural_movie_one_set, kernel_size=29),1))
-            temp2=np.around(temp,3)
-    
-            fix, ax=plt.subplots(1)
-            ax.plot(temp)
-            ax.plot(temp2)
-            self.movie_one_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.movie_one_errors_pairs = self.correct_voltage_split_transitions(self.natural_movie_one_set)
-            
-            initial_transitions_odd=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2, self.movie_one_diff_voltage_slice_filtered_rounded_corrected<2))
-            
-            
-            movie_trial_starts=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2 , self.movie_one_diff_voltage_slice_filtered_rounded_corrected>1)).flatten()
-            movie_trial_ends=np.argwhere(self.movie_one_diff_voltage_slice_filtered_rounded_corrected<-2).flatten()
-    
-            self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
-            
-            fix, ax=plt.subplots(1)
-            ax.plot( self.movie_one_diff_voltage_slice_filtered_rounded_corrected)
-            for i, start in enumerate(movie_trial_starts):
-                if i==9:
-                   movie_trial_starts=np.insert(movie_trial_starts,10,len(self.movie_one_diff_voltage_slice_filtered_rounded_corrected))
-                
-                movietrial=self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]]
-                ups=np.argwhere(movietrial==2).flatten()+start
-                down=np.argwhere(movietrial==-2).flatten()+start
         
+        if not any( [self.movie_one_trial_indexes_by_paradigm.any(),self.movie_one_frame_index_full_recording.any(),self.movie_one_frame_indexes_by_trial.any()]):
+            to_process=self.natural_movie_one_set
+            if self.acquisition_name=='220213_SPJZ_FOV1_AllenC_20x_940_52570_narrow_with-000':
+                #correct the bad voltage
+                rounded_trace,_,_,_ = self.correct_voltage_split_transitions(self.natural_movie_one_set,plot=True)
+
+
+                oldv=np.round(np.flip(np.arange(0,8.8,0.8)),3)
+                newv=np.append(np.round(np.flip(np.arange(5.5,10.5,0.5)),3),3)
                 
-                ups=np.insert(ups, 0, start)
-                down=np.insert(down, 0, movie_trial_ends[i])
-                if i!=9:
-                    down=np.append(down, movie_trial_starts[i+1])
-                else:
-                    down=np.append(down, movie_trial_starts[-1]-1)
-                    
-                   
-                self.movie_one_frame_indexes_by_trial[i,:,0]=ups
-                self.movie_one_frame_indexes_by_trial[i,:,1]=down
-    
-      
-                ax.plot(np.arange(start,movie_trial_starts[i+1]),self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]])
-                ax.plot( ups, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[ups],'bo')
-                ax.plot( down, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[down],'ko')
-    
-                framelengths= self.movie_one_frame_indexes_by_trial[i,:,1]- self.movie_one_frame_indexes_by_trial[i,:,0]
+
+                for i,j in zip(oldv,newv):
+                    fix, ax=plt.subplots(1)
+                    fix.suptitle(f'Natural movie 1 correcting {i} to {j}')
+                    ax.plot( rounded_trace,label='Volatage')
+                    rounded_trace[rounded_trace==i]=j
+                    print(i)
+                    print(j)
+
+                    ax.plot( rounded_trace,label='New Volatage')
+                    ax.legend()
+                    plt.show()
 
 
-
-            self.correct_movie_one_indexes_for_full_movie()
-     
-    
-            self.save_movie_one_indexes()  
-        else:
-            pass
+  
+                temp=np.diff(rounded_trace)
+                temp2=np.around(temp,3)
             
+                fix, ax=plt.subplots(1)
+                fix.suptitle('Natural movie 1')
+                ax.plot( rounded_trace,label='Volatage')
+                # ax.plot(temp,label='Diff')
+                ax.plot(temp2,label='Rounded DIff')
+                
+                ax.legend()
+                plt.show()
+                to_process=rounded_trace
+                startprocess=copy.deepcopy(to_process)
+                startprocess[to_process<5.1]=0
+            
+                self.movie_one_trial_indexes_by_paradigm=sg.find_peaks(np.diff(startprocess),height=5)[0]
+                self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
+
+                self.correct_movie_one_indexes_for_full_movie()
+
+                self.save_movie_one_indexes()  
+                
+            elif self.acquisition_name=='220214_SPJZ_FOV1_AllenB_20x_980_52570_narrow_with-000':
+                
+                #correct the bad voltage
+                rounded_trace,_,_,_ = self.correct_voltage_split_transitions(self.natural_movie_one_set,plot=True)
+
+
+                oldv=[0]
+                newv=[1]
+                
+
+                for i,j in zip(oldv,newv):
+                    fix, ax=plt.subplots(1)
+                    fix.suptitle(f'Natural movie 1 correcting {i} to {j}')
+                    ax.plot( rounded_trace,label='Volatage')
+                    rounded_trace[rounded_trace==i]=j
+                    print(i)
+                    print(j)
+
+                    ax.plot( rounded_trace,label='New Volatage')
+                    ax.legend()
+                    plt.show()
+
+
+  
+                temp=np.diff(rounded_trace)
+                temp2=np.around(temp,3)
+            
+                fix, ax=plt.subplots(1)
+                fix.suptitle('Natural movie 1')
+                ax.plot( rounded_trace,label='Volatage')
+                # ax.plot(temp,label='Diff')
+                ax.plot(temp2,label='Rounded DIff')
+                
+                ax.legend()
+                plt.show()
+                to_process=rounded_trace
+                startprocess=copy.deepcopy(to_process)
+                startprocess[to_process<3.5]=0
+            
+                self.movie_one_trial_indexes_by_paradigm=sg.find_peaks(np.diff(startprocess),height=3.5)[0]
+                self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
+
+                self.correct_movie_one_indexes_for_full_movie()
+
+                self.save_movie_one_indexes()  
+                
+            elif self.acquisition_name=='220217_SPJZ_FOV1_AllenA_20x_920_52570_narrow_with-000':
+                 
+                 #correct the bad voltage
+                 rounded_trace,_,_,_ = self.correct_voltage_split_transitions(self.natural_movie_one_set,plot=True)
+            
+            
+                 oldv=[0]
+                 newv=[1]
+                 
+            
+                 for i,j in zip(oldv,newv):
+                     fix, ax=plt.subplots(1)
+                     fix.suptitle(f'Natural movie 1 correcting {i} to {j}')
+                     ax.plot( rounded_trace,label='Volatage')
+                     rounded_trace[rounded_trace==i]=j
+                     print(i)
+                     print(j)
+            
+                     ax.plot( rounded_trace,label='New Volatage')
+                     ax.legend()
+                     plt.show()
+            
+            
+            
+                 temp=np.diff(rounded_trace)
+                 temp2=np.around(temp,3)
+             
+                 fix, ax=plt.subplots(1)
+                 fix.suptitle('Natural movie 1')
+                 ax.plot( rounded_trace,label='Volatage')
+                 # ax.plot(temp,label='Diff')
+                 ax.plot(temp2,label='Rounded DIff')
+                 
+                 ax.legend()
+                 plt.show()
+                 to_process=rounded_trace
+                 startprocess=copy.deepcopy(to_process)
+                 startprocess[to_process<3.5]=0
+             
+                 self.movie_one_trial_indexes_by_paradigm=sg.find_peaks(np.diff(startprocess),height=3.5)[0]
+                 self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
+            
+                 self.correct_movie_one_indexes_for_full_movie()
+            
+                 self.save_movie_one_indexes()  
+            
+                                
+
+            else:
+                temp=np.diff(np.around(sg.medfilt(self.natural_movie_one_set, kernel_size=29),1))
+                temp2=np.around(temp,3)
+                temp2[np.abs(temp2)==2]=0
+    
+                fix, ax=plt.subplots(1)
+                fix.suptitle('Natural movie 1')
+                ax.plot( self.natural_movie_one_set,label='Volatage')
+                # ax.plot(temp,label='Diff')
+                ax.plot(temp2,label='Rounded DIff')
+              
+    
+                ax.legend()
+                plt.show()
+                self.movie_one_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected,self.movie_one_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.movie_one_errors_pairs = self.correct_voltage_split_transitions(to_process,plot=True)
+    
+                initial_transitions_odd=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2, self.movie_one_diff_voltage_slice_filtered_rounded_corrected<2))
+                
+                
+                movie_trial_starts=np.argwhere(np.logical_and(self.movie_one_diff_voltage_slice_filtered_rounded_corrected!=2 , self.movie_one_diff_voltage_slice_filtered_rounded_corrected>1)).flatten()
+                movie_trial_ends=np.argwhere(self.movie_one_diff_voltage_slice_filtered_rounded_corrected<-2).flatten()
+        
+                self.movie_one_frame_indexes_by_trial=np.zeros([10,900,2])
+                
+                fix, ax=plt.subplots(1)
+                fix.suptitle('Natural movie 1')
+                ax.plot( self.movie_one_diff_voltage_slice_filtered_rounded_corrected)
+                for i, start in enumerate(movie_trial_starts):
+                    if i==9:
+                       movie_trial_starts=np.insert(movie_trial_starts,10,len(self.movie_one_diff_voltage_slice_filtered_rounded_corrected))
+                    
+                    movietrial=self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]]
+                    ups=np.argwhere(movietrial==2).flatten()+start
+                    down=np.argwhere(movietrial==-2).flatten()+start
+            
+                    
+                    ups=np.insert(ups, 0, start)
+                    down=np.insert(down, 0, movie_trial_ends[i])
+                    if i!=9:
+                        down=np.append(down, movie_trial_starts[i+1])
+                    else:
+                        down=np.append(down, movie_trial_starts[-1]-1)
+                        
+                       
+                    self.movie_one_frame_indexes_by_trial[i,:,0]=ups
+                    self.movie_one_frame_indexes_by_trial[i,:,1]=down
+        
+          
+                    # ax.plot(np.arange(start,movie_trial_starts[i+1]),self.movie_one_diff_voltage_slice_filtered_rounded_corrected[start:movie_trial_starts[i+1]])
+                    ax.plot( ups, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[ups],'bo',label='ups')
+                    ax.plot( down, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[down],'ko',label='downs')
+                    ax.plot( movie_trial_starts, self.movie_one_diff_voltage_slice_filtered_rounded_corrected[movie_trial_starts],'ko',label='Movie Starts')
+    
+                    ax.legend()
+        
+                    framelengths= self.movie_one_frame_indexes_by_trial[i,:,1]- self.movie_one_frame_indexes_by_trial[i,:,0]
+    
+    
+                plt.show()
+    
+                self.correct_movie_one_indexes_for_full_movie()
+        
+                self.save_movie_one_indexes()  
+            
+        else:
+            fig,axo=plt.subplots()
+            fig.suptitle('Movie 1')
+            axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
+            axo.plot(self.movie_one_frame_index_full_recording[:,0,0], self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,0,0]],'rx',label='Ups')
+            axo.plot(self.movie_one_frame_index_full_recording[:,0,1], self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,0,1]],'bo',label='Downs')
+
+            plt.show()
+           
             
         # import scipy.io as spio
         # import caiman as cm
@@ -1926,13 +2145,19 @@ class VoltageSignalsExtractions():
         
         self.movie_one_frame_index_full_recording = self.movie_one_frame_indexes_by_trial+self.transitions_dictionary['natural_movie_one_set_first']
         self.movie_one_frame_index_full_recording=self.movie_one_frame_index_full_recording.astype('uint32')
-        movie_one_frame_indexes_by_trial=self.movie_one_frame_indexes_by_trial
-        
+        self.movie_one_trial_full_recording= self.movie_one_trial_indexes_by_paradigm+self.transitions_dictionary['natural_movie_one_set_first']
+        self.movie_one_trial_full_recording=self.movie_one_trial_full_recording.astype('uint32')
+
 
         fig,axo=plt.subplots()
+        fig.suptitle('Natural movie 1 corrected')
+
         axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
-        axo.plot(self.movie_one_frame_index_full_recording[:,:,0].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,:,0].flatten()],'rx')
-        axo.plot(self.movie_one_frame_index_full_recording[:,:,1].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,:,1].flatten()],'bo')
+        axo.plot(self.movie_one_frame_index_full_recording[:,:,0].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,:,0].flatten()],'rx',label='ups')
+        axo.plot(self.movie_one_frame_index_full_recording[:,:,1].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_frame_index_full_recording[:,:,1].flatten()],'bo',label='downs')
+        axo.plot(self.movie_one_trial_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.movie_one_trial_full_recording],'co',label='trials')
+
+        plt.show()
 
 
 #%% ALLEN C PROCESSING                      
@@ -1947,13 +2172,77 @@ class VoltageSignalsExtractions():
 
     def get_movie_two_trial_structure(self):
          
-        self.movie_two_on_index_full_recording =np.zeros((1))
-        self.movie_two_off_index_full_recording=np.zeros((1))
-        self.load_movie_two_indexes()
+        self.movie_two_frame_index_full_recording =np.zeros((1))
+        self.movie_two_frame_indexes_by_trial =np.zeros((1))
+        self.movie_two_trial_indexes_by_paradigm=np.zeros((1))
 
+        self.load_movie_two_indexes()
+        
+        if not any( [self.movie_two_trial_indexes_by_paradigm.any(),self.movie_two_frame_index_full_recording.any(),self.movie_two_frame_indexes_by_trial.any()]):
+            to_process=self.natural_movie_two_set
+            if self.acquisition_name=='220213_SPJZ_FOV1_AllenC_20x_940_52570_narrow_with-000':
+                #correct the bad voltage
+                rounded_trace,_,_,_ = self.correct_voltage_split_transitions(self.natural_movie_two_set,plot=True)
+    
+               
+                oldv=np.round(np.flip(np.arange(0,8.8,0.8)),3)
+                newv=np.append(np.round(np.flip(np.arange(5.5,10.5,0.5)),3),3)
+                
+               
+                for i,j in zip(oldv,newv):
+                    fix, ax=plt.subplots(1)
+                    fix.suptitle(f'Natural movie 1 correcting {i} to {j}')
+                    ax.plot( rounded_trace,label='Volatage')
+                    rounded_trace[rounded_trace==i]=j
+                    print(i)
+                    print(j)
+               
+                    ax.plot( rounded_trace,label='New Volatage')
+                    ax.legend()
+                    plt.show()
+               
+               
+               
+                temp=np.diff(rounded_trace)
+                temp2=np.around(temp,3)
+               
+                fix, ax=plt.subplots(1)
+                fix.suptitle('Natural movie 1')
+                ax.plot( rounded_trace,label='Volatage')
+                # ax.plot(temp,label='Diff')
+                ax.plot(temp2,label='Rounded DIff')
+                
+                ax.legend()
+                plt.show()
+                to_process=rounded_trace
+                startprocess=copy.deepcopy(to_process)
+                startprocess[to_process<5.1]=0
+               
+                self.movie_two_trial_indexes_by_paradigm=sg.find_peaks(np.diff(startprocess),height=5)[0]
+                self.movie_two_frame_indexes_by_trial=np.zeros([10,900,2])
+               
+                self.correct_movie_two_indexes_for_full_movie()
+               
+                self.save_movie_two_indexes()  
    
-        if 'C':
-            self.combined_movie_twos_raw=np.concatenate(self.second_movie_two_set )
+    
+    def correct_movie_two_indexes_for_full_movie(self):
+        
+        self.movie_two_frame_index_full_recording = self.movie_two_frame_indexes_by_trial+self.transitions_dictionary['natural_movie_two_set_first']
+        self.movie_two_frame_index_full_recording=self.movie_two_frame_index_full_recording.astype('uint32')
+        self.movie_two_trial_full_recording= self.movie_two_trial_indexes_by_paradigm+self.transitions_dictionary['natural_movie_two_set_first']
+        self.movie_two_trial_full_recording=self.movie_two_trial_full_recording.astype('uint32')
+    
+    
+        fig,axo=plt.subplots()
+        fig.suptitle('Natural movie 1 corrected')
+    
+        axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
+        axo.plot(self.movie_two_frame_index_full_recording[:,:,0].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_two_frame_index_full_recording[:,:,0].flatten()],'rx',label='ups')
+        axo.plot(self.movie_two_frame_index_full_recording[:,:,1].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_two_frame_index_full_recording[:,:,1].flatten()],'bo',label='downs')
+        axo.plot(self.movie_two_trial_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.movie_two_trial_full_recording],'co',label='trials')
+    
+        plt.show()
 
 #%% ALLEN B PROCESSING
         
@@ -1968,15 +2257,20 @@ class VoltageSignalsExtractions():
         
         if not (self.static_grat_even_index_full_recording.any() and self.static_grat_odd_index_full_recording.any()):
             fix, ax=plt.subplots(1)
+            fix.suptitle('Static gratings sliced together')
             ax.plot(self.combined_static_raw)
-            
+            plt.show()
+
             temp=np.diff(np.around(sg.medfilt(self.combined_static_raw, kernel_size=29),1))
             temp2=np.around(temp,3)
             static_transition_indexes1=[np.argwhere(temp== voltage) for voltage in trial_voltages]
             static_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in trial_voltages]
             fix, ax=plt.subplots(1)
+            fix.suptitle('Static gratings dff')
+
             ax.plot(temp)
             ax.plot(temp2)
+            plt.show()
             self.static_voltage_slice_filtered_rounded_corrected,self.static_diff_voltage_slice_filtered_rounded_corrected,self.static_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.static_errors_pairs = self.correct_voltage_split_transitions(self.combined_static_raw)
             
             initial_transitions_odd=np.argwhere(np.logical_and(self.static_diff_voltage_slice_filtered_rounded_corrected>0.8 , self.static_diff_voltage_slice_filtered_rounded_corrected<2))
@@ -1994,12 +2288,14 @@ class VoltageSignalsExtractions():
 
             
             fig,ax=plt.subplots()
+            fix.suptitle('Static gratings')
+
             ax.plot(self.static_voltage_slice_filtered_rounded_corrected)  
             ax.plot(self.static_even_transition_indexes,self.static_voltage_slice_filtered_rounded_corrected[self.static_even_transition_indexes],'ro')
             ax.plot(self.static_odd_transition_indexes,self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes],'gx')
             ax.plot(self.static_odd_transition_indexes[960],self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes[960]],'yo')
             ax.plot(self.static_odd_transition_indexes[1920],self.static_voltage_slice_filtered_rounded_corrected[self.static_odd_transition_indexes[1920]],'yo')
-
+            plt.show()
 
     
     
@@ -2011,9 +2307,11 @@ class VoltageSignalsExtractions():
             self.save_static_indexes()
         else:
             fig,axo=plt.subplots()
+            fig.suptitle('Static gratings')
             axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
             axo.plot(self.static_grat_even_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.static_grat_even_index_full_recording],'rx')
             axo.plot(self.static_grat_odd_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.static_grat_odd_index_full_recording],'bo')
+            plt.show()
 
     def get_natural_images_trial_structure(self):
         trial_voltages=[2,-2]
@@ -2027,15 +2325,20 @@ class VoltageSignalsExtractions():
         
         if not (self.natural_image_even_index_full_recording.any() and self.natural_image_odd_index_full_recording.any()):
             fix, ax=plt.subplots(1)
+            fix.suptitle('Natural Images')
+
             ax.plot(self.combined_images_raw)
-            
+            plr.show()
             temp=np.diff(np.around(sg.medfilt(self.combined_images_raw, kernel_size=29),1))
             temp2=np.around(temp,3)
             static_transition_indexes1=[np.argwhere(temp== voltage) for voltage in trial_voltages]
             static_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in trial_voltages]
             fix, ax=plt.subplots(1)
+            fix.suptitle('Natural Images dff')
+
             ax.plot(temp)
             ax.plot(temp2)
+            plt.show()
             self.images_voltage_slice_filtered_rounded_corrected,self.images_diff_voltage_slice_filtered_rounded_corrected,self.images_diff_voltage_slice_filtered_rounded_corrected_rerounded,self.images_errors_pairs = self.correct_voltage_split_transitions(self.combined_images_raw)
             
             initial_transitions_odd=np.argwhere(np.logical_and(self.images_diff_voltage_slice_filtered_rounded_corrected>0.8 , self.images_diff_voltage_slice_filtered_rounded_corrected<2))
@@ -2053,10 +2356,12 @@ class VoltageSignalsExtractions():
             
             
             fig,ax=plt.subplots()
+            fix.suptitle('Natural Images ')
+
             ax.plot(self.images_voltage_slice_filtered_rounded_corrected)  
             ax.plot(self.natural_image_even_transition_indexes,self.images_voltage_slice_filtered_rounded_corrected[self.natural_image_even_transition_indexes],'ro')
             ax.plot(self.natural_image_odd_transition_indexes,self.images_voltage_slice_filtered_rounded_corrected[self.natural_image_odd_transition_indexes],'gx')
-         
+            plt.show()
     
     
             self.correct_image_indexes_for_full_movie()
@@ -2066,9 +2371,12 @@ class VoltageSignalsExtractions():
             self.save_images_indexes()
         else:
             fig,axo=plt.subplots()
+            fig.suptitle('Natural Images ')
+
             axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
             axo.plot(self.natural_image_even_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.natural_image_even_index_full_recording],'rx')
             axo.plot(self.natural_image_odd_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.natural_image_odd_index_full_recording],'bo')
+            plt.show()
 
     def correct_static_indexes_for_full_movie(self):
         first_length=self.first_static_set.shape[0]
@@ -2096,9 +2404,12 @@ class VoltageSignalsExtractions():
         
 
         fig,axo=plt.subplots()
+        fig.suptitle('Static gratings corrected')
+
         axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
         axo.plot(self.static_grat_even_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.static_grat_even_index_full_recording],'rx')
         axo.plot(self.static_grat_odd_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.static_grat_odd_index_full_recording],'bo')
+        plt.show()
 
     def correct_image_indexes_for_full_movie(self):
         first_length=self.first_images_set.shape[0]
@@ -2126,31 +2437,116 @@ class VoltageSignalsExtractions():
         
     
         fig,axo=plt.subplots()
+        fig.suptitle('Natural Images corrected ')
+
         axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
         axo.plot(self.natural_image_even_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.natural_image_even_index_full_recording],'rx')
         axo.plot(self.natural_image_odd_index_full_recording, self.rounded_vis_stim['Prairie']['VisStim'][self.natural_image_odd_index_full_recording],'bo')
-            
+        plt.show()
             
         
 #%% ALLEN A PROCESSING
     def get_movie_three_trial_structure(self):
-        
-        self.movie_three_on_index_full_recording =np.zeros((1))
-        self.movie_three_off_index_full_recording=np.zeros((1))
+
+        self.movie_three_frame_index_full_recording =np.zeros((2,1)).astype('int')
+        self.movie_three_frame_indexes_by_trial =np.zeros((2,1)).astype('int')
+        self.movie_three_trial_indexes_by_paradigm=np.zeros((2,5)).astype('int')
+
         self.load_movie_three_indexes()
-        self.combined_movie_threes_raw=np.concatenate((self.natural_movie_three_first_set, self.natural_movie_three_second_set))
         
+        self.natural_movie_three_first_set
+        self.natural_movie_three_second_set
+        
+        if not any( [self.movie_three_trial_indexes_by_paradigm.any(),self.movie_three_frame_index_full_recording.any(),self.movie_three_frame_indexes_by_trial.any()]):
+            
+            all_startprocess=[] 
+            for to_process in [ self.natural_movie_three_first_set, self.natural_movie_three_second_set]:
+                if self.acquisition_name=='220217_SPJZ_FOV1_AllenA_20x_920_52570_narrow_with-000':
+                    #correct the bad voltage
+                    rounded_trace,_,_,_ = self.correct_voltage_split_transitions(to_process,plot=False)
+        
+                   
+                    oldv=[0]
+                    newv=[1]
+                    
+                  
+                    for i,j in zip(oldv,newv):
+                        fix, ax=plt.subplots(1)
+                        fix.suptitle(f'Natural movie 1 correcting {i} to {j}')
+                        ax.plot( rounded_trace,label='Volatage')
+                        rounded_trace[rounded_trace==i]=j
+                        print(i)
+                        print(j)
+                   
+                        ax.plot( rounded_trace,label='New Volatage')
+                        ax.legend()
+                        plt.show()
+                   
+                   
+                   
+                    temp=np.diff(rounded_trace)
+                    temp2=np.around(temp,3)
+                   
+                    fix, ax=plt.subplots(1)
+                    fix.suptitle('Natural movie 1')
+                    ax.plot( rounded_trace,label='Volatage')
+                    # ax.plot(temp,label='Diff')
+                    ax.plot(temp2,label='Rounded DIff')
+                    
+                    ax.legend()
+                    plt.show()
+                    to_process=rounded_trace
+                    startprocess=copy.deepcopy(to_process)
+                    startprocess[to_process<3.5]=0
+                    
+                    fix, ax=plt.subplots(1)
+                    fix.suptitle('Natural movie 1')
+                    ax.plot( rounded_trace,label='Volatage')
+                    ax.plot(startprocess,label='Cleaned')
+                    ax.legend()
+                    plt.show()
+                    all_startprocess.append(startprocess)
+                    
+            for i,para in enumerate(all_startprocess):
+                self.movie_three_trial_indexes_by_paradigm[i,:]=sg.find_peaks(np.diff(para),height=3.1)[0]
+            self.movie_three_frame_indexes_by_trial=np.zeros([2,10,900,2])
+           
+            self.correct_movie_three_indexes_for_full_movie()
+           
+            self.save_movie_three_indexes()  
+   
+            
+    def correct_movie_three_indexes_for_full_movie(self):
+        self.movie_three_frame_index_full_recording = np.zeros_like(self.movie_three_frame_indexes_by_trial).astype('uint32')
+        self.movie_three_trial_full_recording= np.zeros_like(self.movie_three_trial_indexes_by_paradigm).astype('uint32')
+        
+        
+        for st, na in enumerate(   ['natural_movie_three_first_set_first','natural_movie_three_second_set_first']):
+        
+            self.movie_three_frame_index_full_recording[st,:,:,:] = self.movie_three_frame_indexes_by_trial[st,:,:,:] +self.transitions_dictionary[na]
+            self.movie_three_trial_full_recording[st,:]= self.movie_three_trial_indexes_by_paradigm[st,:]+self.transitions_dictionary[na]
 
 
-    def correct_voltage_split_transitions(self, voltage_slice, kernel_size=29):
+        fig,axo=plt.subplots()
+        fig.suptitle('Natural movie 3 corrected')
+
+        axo.plot(self.rounded_vis_stim['Prairie']['VisStim'])
+        # axo.plot(self.movie_three_frame_index_full_recording[:,:,0].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_three_frame_index_full_recording[:,:,0].flatten()],'rx',label='ups')
+        # axo.plot(self.movie_three_frame_index_full_recording[:,:,1].flatten(), self.rounded_vis_stim['Prairie']['VisStim'][self.movie_three_frame_index_full_recording[:,:,1].flatten()],'bo',label='downs')
+        axo.plot(self.movie_three_trial_full_recording[0,:], self.rounded_vis_stim['Prairie']['VisStim'][self.movie_three_trial_full_recording][0,:],'co',label='trials')
+        axo.plot(self.movie_three_trial_full_recording[1,:], self.rounded_vis_stim['Prairie']['VisStim'][self.movie_three_trial_full_recording][0,:],'co',label='trials')
+        plt.show()
+
+
+    def correct_voltage_split_transitions(self, voltage_slice, kernel_size=29,plot=False, decimals=1):
         # this is for transition that were split betwen 2 samples, I always get the inital transition to the sample with at tleast some 
         # voltage as voltages is send after the image and for the end transition i get the also the first as the image has chnaged before voltage change
         voltage_slice_filtered=sg.medfilt(voltage_slice, kernel_size=kernel_size)
-        voltage_slice_filtered_rounded=np.around(voltage_slice_filtered, 1)
+        voltage_slice_filtered_rounded=np.around(voltage_slice_filtered, decimals)
         voltage_slice_filtered_rounded_corrected=np.copy(voltage_slice_filtered_rounded)
 
         diff_voltage_slice_filtered_rounded= np.diff(voltage_slice_filtered_rounded)
-        diff_voltage_slice_filtered_rounded_rerounded =np.around(diff_voltage_slice_filtered_rounded, 1)
+        diff_voltage_slice_filtered_rounded_rerounded =np.around(diff_voltage_slice_filtered_rounded, decimals)
 
         #correcting  voltage transitions betwen samples
         errors_pairs=[]
@@ -2164,22 +2560,23 @@ class VoltageSignalsExtractions():
                 
                 
         diff_voltage_slice_filtered_rounded_corrected = np.diff(voltage_slice_filtered_rounded_corrected)
-        diff_voltage_slice_filtered_rounded_corrected_rerounded =np.around(diff_voltage_slice_filtered_rounded_corrected, 1)    
+        diff_voltage_slice_filtered_rounded_corrected_rerounded =np.around(diff_voltage_slice_filtered_rounded_corrected, decimals)    
         transitions_list=[voltage_slice_filtered_rounded,diff_voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected_rerounded, errors_pairs]
-        # self.check_split_transitions(voltage_slice,transitions_list)
+        if plot:
+            self.check_split_transitions(voltage_slice,transitions_list)
         return  voltage_slice_filtered_rounded_corrected,\
                 diff_voltage_slice_filtered_rounded_corrected,\
                 diff_voltage_slice_filtered_rounded_corrected_rerounded, \
                 errors_pairs
 
         
-    def check_split_transitions(self,voltage_slice,transitions_list): 
+    def check_split_transitions(self,voltage_slice,transitions_list,decimals=1): 
         voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected, diff_voltage_slice_filtered_rounded_corrected_rerounded, errors_pairs=transitions_list
         voltage_slice_filtered=sg.medfilt(voltage_slice, kernel_size=1)
-        voltage_slice_filtered_rounded=np.around(voltage_slice_filtered, 1)
+        voltage_slice_filtered_rounded=np.around(voltage_slice_filtered, decimals)
         voltage_slice_filtered_rounded_corrected=np.copy(voltage_slice_filtered_rounded)
         diff_voltage_slice_filtered_rounded= np.diff(voltage_slice_filtered_rounded)
-        diff_voltage_slice_filtered_rounded_rerounded =np.around(diff_voltage_slice_filtered_rounded, 1)
+        diff_voltage_slice_filtered_rounded_rerounded =np.around(diff_voltage_slice_filtered_rounded, decimals)
         
         f,ax=plt.subplots(2,sharex=True)
         ax[0].plot(voltage_slice,label='Raw')
@@ -2222,6 +2619,7 @@ class VoltageSignalsExtractions():
 
         self.tuning_stim_on_index_full_recording =np.zeros((1))
         self.tuning_stim_off_index_full_recording=np.zeros((1))
+
         self.load_drifting_grating_indexes()
         
         # concatenati drifitng gratings
@@ -2230,33 +2628,130 @@ class VoltageSignalsExtractions():
         
         if not (self.tuning_stim_on_index_full_recording.any() and self.tuning_stim_off_index_full_recording.any()):
 
-            # round and first derivative two methods
+            
+            if self.acquisition_name=='220217_SPJZ_FOV1_AllenA_20x_920_52570_narrow_with-000':
+                             
+                
+                voltages=np.append(np.arange(4,5,0.025),9.5)
+                filtered_and_round,_,_,_=self.correct_voltage_split_transitions(self.combined_gratings_raw,kernel_size=29,decimals=3)
+                onsetsonly=copy.deepcopy(filtered_and_round)
+                onsetsonly[onsetsonly<3.1]=0
 
-            temp=np.diff(np.around(sg.medfilt(self.combined_gratings_raw, kernel_size=29),1))
-            temp2=np.around(temp,3)
-            drifting_transition_indexes1=[np.argwhere(temp== voltage) for voltage in self.orientations_and_blank_sweep]
-            drifting_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in self.orientations_and_blank_sweep]
-            fix, ax=plt.subplots(1)
-            ax.plot(temp)
-            ax.plot(temp2)
+                dif=np.diff(onsetsonly)
+                starts=sg.find_peaks(-dif,height=3)[0]
+                             
+                
+                fix, ax=plt.subplots(1)
+                ax.plot(filtered_and_round)
+                # ax.plot(self.combined_gratings_raw)
+                # ax.plot(dif)
+                # ax.plot(onsetsonly)
+                for y in starts:
+                    # ax.plot(y,dif[y],'cx')
+                    ax.plot(y,filtered_and_round[y],'co')
+
+
+                for y in voltages:
+                    ax.axhline(y = y,color='cyan') 
+                    
+                    
+                onsets=np.zeros_like(starts)   
+                offsets=np.zeros_like(starts)   
+                identities=np.zeros_like(starts)   
+                plt.close('all')
+                for i,trial in  enumerate(starts):
+                    # f,ax=plt.subplots()
+                    # ax.plot(np.abs(np.diff(filtered_and_round[trial+1:trial+3200])))
+                    peaks=sg.find_peaks(np.abs(np.diff(filtered_and_round[trial+1:trial+1200])),height=0.25)[0]+trial+1
+                    offpeaks=sg.find_peaks(np.abs(np.diff(filtered_and_round[trial+1:trial+3200])),height=0.25)[0]+trial+1
+
+                    if peaks.any():
+                        onsets[i]=peaks[0]
+                        if np.abs(np.abs(np.diff(filtered_and_round[trial+1:trial+3200]))[offpeaks[-3]-trial-1]-np.abs(np.diff(filtered_and_round[trial+1:trial+3200]))[offpeaks[-4]-trial-1])<0.1:
+                            offsets[i]=offpeaks[-2]
+                        else:
+                            offsets[i]=offpeaks[-3]
+                            
+                        identities[i]= np.argmin(np.abs([onsetsonly[trial]-vol for vol in voltages]))+1
+                    else:
+                        onsets[i]=  trial+onsets[i-1]-starts[i-1]
+                        offsets[i]= trial+offsets[i-1]-starts[i-1]
+
+                        identities[i]=0
+                        
+                   
+                fix, ax=plt.subplots(1)
+                ax.plot(filtered_and_round)
+
+                for y in starts:
+                    ax.plot(y,filtered_and_round[y],'co')
+                    
+                for y in onsets:
+                    ax.plot(y,filtered_and_round[y],'cx')
+                
+                for y in offsets:
+                    ax.plot(y,filtered_and_round[y],'mx')
+                
+                
+                self.drifting_on_transition_indexes=np.zeros([40,15]).astype('int')
+                self.drifting_off_transition_indexes=np.zeros([40,15]).astype('int')
+                self.blank_on_transition_indexes=np.empty([0]).astype('int')
+                self.blank_off_transition_indexes=np.empty([0]).astype('int')
+
+                
+                reps=np.zeros([40]).astype('int')
+                for i,j in enumerate(identities):
+                    if j!=0:
+                        self.drifting_on_transition_indexes[j-1, reps[j-1]]=onsets[i]
+                        self.drifting_off_transition_indexes[j-1, reps[j-1]]=offsets[i]
+                        reps[j-1]=reps[j-1]+1
+
+                    else:
+                        self.blank_on_transition_indexes=np.append(self.blank_on_transition_indexes,onsets[i])
+                        self.blank_off_transition_indexes=np.append(self.blank_off_transition_indexes,offsets[i])
+
+
+                self.blank_on_transition_indexes=np.expand_dims(self.blank_on_transition_indexes,1)
+                self.blank_off_transition_indexes=np.expand_dims(self.blank_off_transition_indexes,1)
+
+   
+
+                
 
             
-            # this will correct transtions over multiple frame to the corresponding first frame that has a change of voltage(all voltage signals appear after screen flip)
-            
-            self.drifting_voltage_slice_filtered_rounded_corrected,\
-            self.drifting_diff_voltage_slice_filtered_rounded_corrected,\
-            self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,\
-            self.drifting_errors_pairs=self.correct_voltage_split_transitions(self.combined_gratings_raw)
+            else:
+                
+                # round and first derivative two methods
+               
+                temp=np.diff(np.around(sg.medfilt(self.combined_gratings_raw, kernel_size=29),1))
 
-            all_on_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() for voltage in self.orientations_and_blank_sweep]
-            all_on_transition_indexes2=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded== voltage) for voltage in self.orientations_and_blank_sweep]
-            all_off_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== -voltage).squeeze()  for voltage in self.orientations_and_blank_sweep]
-            all_off_transition_indexes2=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded== -voltage) for voltage in self.orientations_and_blank_sweep]
-            self.drifting_on_transition_indexes=np.vstack( all_on_transition_indexes[0:len(self.orientations)])+1
-            self.drifting_off_transition_indexes=np.vstack( all_off_transition_indexes[0:len(self.orientations)])+1
-            self.blank_on_transition_indexes=np.vstack( all_on_transition_indexes[-1])+1
-            self.blank_off_transition_indexes=np.vstack( all_off_transition_indexes[-1])+1
-            
+                temp2=np.around(temp,3)
+                drifting_transition_indexes1=[np.argwhere(temp== voltage) for voltage in self.orientations_and_blank_sweep]
+                drifting_transition_indexes2=[np.argwhere(temp2== voltage) for voltage in self.orientations_and_blank_sweep]
+                fix, ax=plt.subplots(1)
+                ax.plot(temp)
+                # ax.plot(temp2)
+                for y in np.arange(4,5.1,0.1):
+                    ax.axhline(y = y,color='cyan') 
+    
+    
+                
+                # this will correct transtions over multiple frame to the corresponding first frame that has a change of voltage(all voltage signals appear after screen flip)
+                
+                self.drifting_voltage_slice_filtered_rounded_corrected,\
+                self.drifting_diff_voltage_slice_filtered_rounded_corrected,\
+                self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded,\
+                self.drifting_errors_pairs=self.correct_voltage_split_transitions(self.combined_gratings_raw)
+    
+                all_on_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== voltage).squeeze() for voltage in self.orientations_and_blank_sweep]
+                all_on_transition_indexes2=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded== voltage) for voltage in self.orientations_and_blank_sweep]
+                all_off_transition_indexes=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected== -voltage).squeeze()  for voltage in self.orientations_and_blank_sweep]
+                all_off_transition_indexes2=[np.argwhere(self.drifting_diff_voltage_slice_filtered_rounded_corrected_rerounded== -voltage) for voltage in self.orientations_and_blank_sweep]
+                self.drifting_on_transition_indexes=np.vstack( all_on_transition_indexes[0:len(self.orientations)])+1
+                self.drifting_off_transition_indexes=np.vstack( all_off_transition_indexes[0:len(self.orientations)])+1
+                self.blank_on_transition_indexes=np.vstack( all_on_transition_indexes[-1])+1
+                self.blank_off_transition_indexes=np.vstack( all_off_transition_indexes[-1])+1
+                
             oritoplot=40
             maxplots=8
             figures=5
@@ -2265,13 +2760,13 @@ class VoltageSignalsExtractions():
                 fig,axa=plt.subplots(len(indexes), sharex=True)
                 for i in  range(len(indexes)) :  
                     for j  in  range(15) :  
-                        axa[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_on_transition_indexes[indexes[i],j]-600:self.drifting_off_transition_indexes[indexes[i],j]+600])
+                        axa[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_on_transition_indexes[indexes[i],j]-600:self.drifting_off_transition_indexes[indexes[i],j]+600],'r')
                         
          
                 fig,axo=plt.subplots(len(indexes), sharex=True)
                 for i in  range(len(indexes)) :  
                     for j  in  range(15) :  
-                        axo[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_off_transition_indexes[indexes[i],j]-2000:self.drifting_off_transition_indexes[indexes[i],j]+2000])
+                        axo[i].plot(self.drifting_voltage_slice_filtered_rounded_corrected[self.drifting_off_transition_indexes[indexes[i],j]-2000:self.drifting_off_transition_indexes[indexes[i],j]+2000],'b')
 
 
 
@@ -2301,8 +2796,8 @@ class VoltageSignalsExtractions():
             self.correct_grating_indexes_for_full_movie()
 
             self.save_drifting_grating_indexes()
-            
-        # self.create_full_recording_grating_binary_matrix()
+                
+            # self.create_full_recording_grating_binary_matrix()
 
 
 
@@ -2334,10 +2829,10 @@ class VoltageSignalsExtractions():
         self.blank_sweep_off_index_full_recording = vfunc(self.blank_off_transition_indexes, first_length, second_length,  mivies_indexes[0], mivies_indexes[2], mivies_indexes[4])
         
 
-        oritoplot=20
+        oritoplot=40
         fig,axo=plt.subplots(oritoplot, sharex=(True))
         for k, j in enumerate(range(oritoplot)):
-            for i  in  range(15) :  
+            for i  in  range(10) :  
                 axo[k].plot(self.rounded_vis_stim['Prairie']['VisStim'][self.tuning_stim_on_index_full_recording[j,i]-600:self.tuning_stim_off_index_full_recording[j,i]+600])
                 
      
@@ -2564,7 +3059,10 @@ class VoltageSignalsExtractions():
             with open(self.indexes_full_file_paths_to_save[18], 'rb') as f:
                 self.movie_one_frame_indexes_by_trial=pickle.load(f)
                 
-   
+                             
+        if os.path.isfile(self.indexes_full_file_paths_to_save[26]):
+            with open(self.indexes_full_file_paths_to_save[26], 'rb') as f:
+                self.movie_one_trial_full_recording=pickle.load(f)
         
     
     def save_movie_one_indexes(self):
@@ -2575,6 +3073,42 @@ class VoltageSignalsExtractions():
 
         with open(self.indexes_full_file_paths_to_save[18], 'wb') as f:
             pickle.dump(self.movie_one_frame_indexes_by_trial, f, pickle.HIGHEST_PROTOCOL)
+            
+        with open(self.indexes_full_file_paths_to_save[26], 'wb') as f:
+            pickle.dump(self.movie_one_trial_full_recording, f, pickle.HIGHEST_PROTOCOL)
+            
+            
+        
+    def load_movie_two_indexes(self):
+        
+        
+        if os.path.isfile(self.indexes_full_file_paths_to_save[19]):
+            with open(self.indexes_full_file_paths_to_save[19], 'rb') as f:
+                self.movie_two_frame_index_full_recording=pickle.load(f)
+                
+                
+                                
+        if os.path.isfile(self.indexes_full_file_paths_to_save[20]):
+            with open(self.indexes_full_file_paths_to_save[20], 'rb') as f:
+                self.movie_two_frame_indexes_by_trial=pickle.load(f)
+                
+                             
+        if os.path.isfile(self.indexes_full_file_paths_to_save[27]):
+            with open(self.indexes_full_file_paths_to_save[27], 'rb') as f:
+                self.movie_two_trial_full_recording=pickle.load(f)
+        
+    
+    def save_movie_two_indexes(self):
+        
+        
+        with open( self.indexes_full_file_paths_to_save[19], 'wb') as f:
+            pickle.dump(self.movie_two_frame_index_full_recording, f, pickle.HIGHEST_PROTOCOL)
+
+        with open(self.indexes_full_file_paths_to_save[20], 'wb') as f:
+            pickle.dump(self.movie_two_frame_indexes_by_trial, f, pickle.HIGHEST_PROTOCOL)
+            
+        with open(self.indexes_full_file_paths_to_save[27], 'wb') as f:
+            pickle.dump(self.movie_two_trial_full_recording, f, pickle.HIGHEST_PROTOCOL)
             
     def load_movie_three_indexes(self):
         
@@ -2589,6 +3123,11 @@ class VoltageSignalsExtractions():
             with open(self.indexes_full_file_paths_to_save[22], 'rb') as f:
                 self.movie_three_frame_indexes_by_trial=pickle.load(f)
                 
+                             
+                             
+        if os.path.isfile(self.indexes_full_file_paths_to_save[28]):
+            with open(self.indexes_full_file_paths_to_save[28], 'rb') as f:
+                self.movie_three_trial_full_recording=pickle.load(f)
    
         
     
@@ -2600,6 +3139,9 @@ class VoltageSignalsExtractions():
 
         with open(self.indexes_full_file_paths_to_save[22], 'wb') as f:
             pickle.dump(self.movie_three_frame_indexes_by_trial, f, pickle.HIGHEST_PROTOCOL)
+            
+        with open(self.indexes_full_file_paths_to_save[28], 'wb') as f:
+            pickle.dump(self.movie_three_trial_full_recording, f, pickle.HIGHEST_PROTOCOL)
 
   
     
@@ -2732,9 +3274,9 @@ class VoltageSignalsExtractions():
         n=2        
         indexes=list(self.transitions_dictionary.values())
         for i in range(0, len(indexes)-n+1, n):
-            axs.plot(indexes[i], self.rounded_vis_stim['Prairie']['VisStim'][indexes[i]],symbol_list[i-int(i/2)],  color=color_list[i%2])
-            axs.plot(indexes[i+1], self.rounded_vis_stim['Prairie']['VisStim'][indexes[i+1]],symbol_list[i-int(i/2)],  color=color_list[(i+1)%2])
-
+            axs.plot(indexes[i], self.rounded_vis_stim['Prairie']['VisStim'][indexes[i]],symbol_list[i-int(i/2)],  color=color_list[i%2],label='Start')
+            axs.plot(indexes[i+1], self.rounded_vis_stim['Prairie']['VisStim'][indexes[i+1]],symbol_list[i-int(i/2)],  color=color_list[(i+1)%2],label='End')
+        axs.legend()
 
         fig, axs = plt.subplots(len(datasets_to_plot))
         fig.suptitle('VisStim Paradigm Transitions')

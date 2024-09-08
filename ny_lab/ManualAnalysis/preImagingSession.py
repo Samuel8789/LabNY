@@ -73,7 +73,7 @@ class PreImagingSession():
         self.Prairieraw1=str(Path(r'E:'+os.sep+'Sam'))
         self.Prairieraw2=str(Path(r'F:'+os.sep+'Sam'))
         self.Prairieraw3=str(Path(r'G:'+os.sep+'Sam'))
-        linuxperm=r'/media/sp3660/Data Permanent 2/'
+        linuxperm=r'E:\\'
         
         self.permanent=str(Path(linuxperm,'Projects','LabNY','Imaging'))
         direchange='cd '
@@ -96,7 +96,7 @@ class PreImagingSession():
         # if windows
         #     self.sshfolder=str(Path(r'G:','Projects','TemPrairieSSH'))
         # elif linux:
-        self.sshfolder=str(Path('/','mnt','d994804b-8774-4ccf-8efb-700b59334be1','Projects','TemPrairieSSH'))
+        self.sshfolder=str(Path('F:\Projects\LabNY\TemPrairieSSH'))
         
         
         self.Prairieraw=[self.Prairieraw1,self.Prairieraw2,self.Prairieraw3]
@@ -326,20 +326,15 @@ class PreImagingSession():
 # '''	
 if __name__ == "__main__":
     # execute only if run as a script
-    sessiondate='20240412'
+    sessiondate='20240621'
     mice=['Test',
-        'SPRY',
-        'SPRZ',
-        'SPSM',
-        'SPST',
-        'SPSU',
         'SPSX',
         'SPSZ',
         ]
     pressesion=PreImagingSession(sessiondate, mice)    
     # pressesion.copy_ssh_to_permanent_dir()
 
-sshpath=Path('/','mnt','d994804b-8774-4ccf-8efb-700b59334be1','Projects','TemPrairieSSH')
+sshpath=Path('F:\Projects\LabNY\TemPrairieSSH')
 # sshpath = Path(r"G:\Projects\TemPrairieSSH")
 sessionsshpath=sshpath / sessiondate
 

@@ -611,7 +611,7 @@ class Aquisition:
         try:
             self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[df.iloc[:,0]==self.mouse_aquisition_path]['ID'].iloc[0]
         except:
-            print(self.aq_ID)
+            print('error loading Acquisitoin info:'+self.mouse_aquisition_path)
         
         # self.aq_ID=self.mouse_imaging_session_object.database_acquisitions.loc[self.mouse_imaging_session_object.database_acquisitions['SlowDiskPath']==self.mouse_aquisition_path]['ID'].iloc[0]
         

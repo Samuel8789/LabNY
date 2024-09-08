@@ -213,7 +213,9 @@ class CaimanResults():
         self.convolved_MCMC=np.zeros(1)
         self.binarized_MCMC=np.zeros(1)
         self.mcmc= self.data['proc']['deconv']['MCMC']
-        self.mcmc_good_components=[cell[0] for cell in np.array(self.mcmc['S'])[self.accepted_indexes_sorter] if cell[0] is not None]
+        
+        
+        self.mcmc_good_components=[cell[0] for cell in np.array([self.mcmc['S'][i] for i in self.accepted_indexes_sorter.tolist()]) if cell[0] is not None]
         if self.mcmc_good_components:
             self.MCMC_matrix=np.zeros(1)
             self.MCMC_matrix=np.array(self.mcmc_good_components).squeeze().astype('float64')

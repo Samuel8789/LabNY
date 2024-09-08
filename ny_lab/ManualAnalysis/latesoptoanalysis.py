@@ -254,44 +254,31 @@ def get_response(analysis,full_data,mean_sweep_response,pval ):
             
     return response
 
-def get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=1000,post_time=2000):
+def get_stimulus_table(analysis,visstimtranstionts,blank_opt):
 
-   #ms
-    pre_frames=np.ceil(pre_time/analysis.milisecond_period).astype(int)
-    post_frames=np.ceil(post_time/analysis.milisecond_period).astype(int)
-    
-    
-    
-    grating_number=visstimtranstionts.shape[0]
+
+    # grating_number=visstimtranstionts.shape[0]
     grating_repetitions=visstimtranstionts.shape[1]*visstimtranstionts.shape[2]
     blnaksweepreps=4*visstimtranstionts.shape[1]
     angles=np.linspace(0,360,9)[:-1]
-    angle_numbers=len(angles)
+    # angle_numbers=len(angles)
     frequencies=np.array([2])
-    frequency_numbers=len(frequencies)
+    # frequency_numbers=len(frequencies)
     angles_xv, frequencies_yv = np.meshgrid(angles,frequencies)
     anglevalues = np.reshape(np.arange(1,9), (1, 8))
     
     all_rows=[]
     for ori in range(1,9):
-
         angled=angles_xv[:,np.where(anglevalues==ori)[1][0]][0]
         freq=float(frequencies[np.where(anglevalues==ori)[0][0]])
-        
         indexes=list(zip(np.reshape(visstimtranstionts[ori-1,:,:,0],(1,grating_repetitions)),         np.reshape(visstimtranstionts[ori-1,:,:,1],(1,grating_repetitions))))[0]
-              
-        
         for i in range(grating_repetitions):
             opto=np.float32(0)
 
             if ori==analysis.acquisition_object.visstimdict['opto']['randomoptograting'] and i % 2 == 0:
-                opto=np.float32(1)
-            
-        
+                opto=np.float32(1)       
             all_rows.append((np.float32(freq),np.float32(angled), np.float32(0),opto,np.int32(indexes[0][i]), np.int32(indexes[1][i]) ))
-          
-
-          
+             
     blankindexes=list(zip(np.reshape(analysis.signals_object.optodrift_info['Blank']['ArrayFinal_downsampled_LED_clipped'],(1,blnaksweepreps)), np.reshape(analysis.signals_object.optodrift_info['Blank']['ArrayFinalOffset_downsampled_LED_clipped'],(1,blnaksweepreps))))[0]
     for i in range(blnaksweepreps):
         opto=np.float32(0)
@@ -307,7 +294,7 @@ def get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=1000,post_
     analysis.full_data['visstim_info']['OptoDrift']={}
     analysis.full_data['visstim_info']['OptoDrift']['stimulus_table']=sorted_df
     
-    return sorted_df,pre_frames,post_frames,pre_time,post_time
+    return sorted_df
 
 def get_sweep_response(analysis,
                        full_data,
@@ -339,9 +326,10 @@ def get_sweep_response(analysis,
     mean_frames=np.ceil(meanstimtime/analysis.milisecond_period).astype(int)
     stratframe=np.ceil((pre_time+mean_start)/analysis.milisecond_period).astype(int)
     
-    
+    pre_frames=np.ceil(pre_time/analysis.milisecond_period).astype(int)
+    post_frames=np.ceil(post_time/analysis.milisecond_period).astype(int)
 
-    sorted_df,pre_frames,post_frames,pre_time,post_time=get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=500, post_time=2000)
+    sorted_df=get_stimulus_table(analysis,visstimtranstionts,blank_opt)
     
     def do_mean(x,stratframe=13,mean_frames=13):
         # print(f'{stratframe}:{ stratframe+mean_frames}')
@@ -1181,7 +1169,7 @@ tempprocessingpat= os.path.join(os.path.expanduser('~'),r'Desktop/TempPythonObje
 experimentalmousename= selected['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name
 
 #check for mul.tiple mice
-mouse_loaded=list(set([i['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name for i in all_analysis]))
+mouse_loaded=sorted(list(set([i['analysis'].acquisition_object.mouse_imaging_session_object.mouse_object.mouse_name for i in all_analysis])))
 if len(mouse_loaded)>1:
     datapath=os.path.join(tempprocessingpat,'_'.join(mouse_loaded))
 else:
@@ -1190,7 +1178,7 @@ dataindex=0
 selected_pre_time=500 #ms forr statistic purtposes
 selected_post_time=2000 #ms forr statistic purtposes
 
-mean_Stim_decision_idx=2
+mean_Stim_decision_idx=0
 mean_Stim_decision=['full','half','remove_led']
 
 if mean_Stim_decision[mean_Stim_decision_idx]=='full':
@@ -1344,11 +1332,15 @@ if not multiple_analysis:
         peak=get_peak(full_data,response,sweep_response,mean_sweep_response)
         print('allen sweep response done')
 
-    
-        sorted_df,pre_frames,post_frames,pre_time,post_time=get_stimulus_table(analysis,visstimtranstionts,blank_opt,pre_time=selected_pre_time, post_time=selected_post_time)
+        pre_frames=np.ceil(selected_pre_time/analysis.milisecond_period).astype(int)
+        post_frames=np.ceil(selected_post_time/analysis.milisecond_period).astype(int)
+        pretime=selected_pre_time/1000 # in seconds
+        posttime=selected_post_time/1000 # in seconds
+        
+        
+        sorted_df=get_stimulus_table(analysis,visstimtranstionts,blank_opt)
         transition_array=create_opto_transitions_array(analysis,stimulated_cells_number,nTrials,opto_repetitions,led_opt,blank_opt)
-        pretime=selected_pre_time/1000
-        posttime=selected_post_time/1000
+   
         print('doing my sweep response')
         activity_dict= slice_by_optotrial(analysis,stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=False)
         scaled_activity_dict= slice_by_optotrial(analysis,stimulated_cells_number,pretime,posttime,fr,transition_array,traces_dict,gratingcontrol,use_scaled=True)   

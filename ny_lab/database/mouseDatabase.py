@@ -1327,6 +1327,8 @@ class MouseDatabase():
             parenstIDs=((maleID,)+femalesID)
             #update male
             
+      
+            
             for parentcode in parenstIDs:
             
                 query_update_mouse=""" UPDATE MICE_table
@@ -1379,6 +1381,12 @@ class MouseDatabase():
         mice_IDs=mice_info_df['ID'].tolist()
         mice_Lab_numbers=mice_info_df['Lab_Number'].tolist()
         
+        if action_type==8 and len(mice_IDs)!=len(mice):
+            query_male_info="SELECT ID, Lab_number FROM MICE_table WHERE Lab_number=?" 
+            params=(int(mice[0]),)
+            male_ID=self.arbitrary_query_to_df(query_male_info, params).iloc[0,0]
+            mice_IDs=[male_ID]+mice_IDs
+        
         if action_type==1:
             params=(cage_end,)
             mice_info_df=self.arbitrary_query_to_df(query_mice_info,params)
@@ -1394,6 +1402,15 @@ class MouseDatabase():
             
         else:
             mice_number=len(mice_IDs)
+            
+         
+        if action_type==8 and len(mice_IDs)!=len(mice):
+            query_male_info="SELECT ID, Lab_number FROM MICE_table WHERE Lab_number=?" 
+            params=(int(mice[0]),)
+            male_ID=self.arbitrary_query_to_df(query_male_info, params).iloc[0,0]
+            mice_IDs=[male_ID]+mice_IDs    
+            mice_number=len(mice_IDs)
+            
             
         dif=5-mice_number   
         for i in range(dif):

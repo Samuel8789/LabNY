@@ -15,22 +15,19 @@ proc.comp_accepted = proc.comp_accepted_core;
 
 %%  average of top peaks
 %f_cs_update_log(app, 'Computing SNR and time constants...');
-proc.peaks_to_ave = 5;      % for SNR and and peaks computation
-proc.peak_bin_size = 3;     % in sec, for firinf stability
 
-bin_size = floor((proc.peak_bin_size * double(ops.init_params_caiman.data.fr))/2);
+data = est.C + est.YrA;
 
-proc.peaks_ave = zeros(proc.num_cells,1);
-temp_peaks = zeros(proc.peaks_to_ave,1);
-for n_cell = 1:proc.num_cells
-    temp_C = est.C(n_cell,:);
-    for n_peak = 1:proc.peaks_to_ave     
-        [temp_peaks(n_peak), m_ind] = max(temp_C);
-        temp_C(max(m_ind-bin_size,1): min(m_ind+bin_size,proc.num_frames)) = 0;
-    end
-    %figure; plot(temp_C); title(num2str(n_peak))
-    proc.peaks_ave(n_cell) = mean(temp_peaks);
-end
+params.peaks_to_ave = 5;      % for SNR and and peaks computation
+params.peak_bin_zero_size = 10;     % in sec, for firing stability
+params.peak_bin_sig_size = .4;        % sec take median around peak
+params.fr = ops.init_params_caiman.data.fr;
+
+proc.peaks_ave = f_cs_compute_peaks_ave(data, params);
+
+proc.peaks_to_ave = params.peaks_to_ave;
+proc.peak_bin_zero_size = params.peak_bin_zero_size;
+proc.peak_bin_sig_size = params.peak_bin_sig_size;
 
 %%  number of missing values (zeros) in traces
 proc.num_zeros = zeros(proc.num_cells,1);
@@ -40,7 +37,11 @@ for n_cell = 1:proc.num_cells
 end
 
 %%  noise and time constants
-proc.noise = zeros(proc.num_cells,1);
+traces1 = est.YrA + est.C;
+
+proc.noise = GetSn(traces1);
+proc.skewness = skewness(traces1, [], 2);
+
 proc.gAR1 = zeros(proc.num_cells,1);
 proc.gAR2 = zeros(proc.num_cells,2);
 proc.tauAR1 = zeros(proc.num_cells,1);
@@ -48,11 +49,11 @@ proc.tauAR2 = zeros(proc.num_cells,2);
 
 dt = 1/double(ops.init_params_caiman.data.fr);
 
+
 for n_cell = 1:proc.num_cells
-    temp_cell = est.YrA(n_cell,:) + est.C(n_cell,:);
+    temp_cell = traces1(n_cell,:);
     %peak = max(temp_cell)-base;
-    proc.noise(n_cell) = GetSn(temp_cell);
-    
+
     proc.gAR1(n_cell) = estimate_time_constant(temp_cell, 1, proc.noise(n_cell));
     proc.gAR2(n_cell,:) = estimate_time_constant(temp_cell, 2, proc.noise(n_cell));
     
@@ -65,6 +66,6 @@ end
 proc.SNR2_vals = double(proc.peaks_ave./proc.noise);
 
 %%
-proc.firing_stab_vals = f_cs_compute_firing_stability(est, proc, ops);
+proc.firing_stab_vals = f_cs_compute_firing_stability(est.S, params);
 
 end

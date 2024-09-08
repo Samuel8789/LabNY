@@ -283,6 +283,9 @@ class ResultsAnalysis():
             
             self.full_data_path_name='_'.join([self.aquisition_id, timestr,'full_data.pkl'])  
             self.pyr_int_identif_path_name='_'.join([self.aquisition_id, timestr,'pyr_int_identification.pkl'])  
+            self.all_planes_timestamps= copy.deepcopy(self.acquisition_object.metadata_object.timestamps)
+            self.all_planes_clipped_timestamps=copy.deepcopy(self.all_planes_timestamps)
+            
             
         elif self.data_analysis_path:
             self.data_paths={key:os.path.join(self.data_analysis_path,val) for key,val in name_dict.items()}
@@ -565,8 +568,7 @@ class ResultsAnalysis():
 #%% calcium data managing
     def extract_calcium_traces(self):
         self.pyr_int_identification={}
-        self.all_planes_timestamps= copy.deepcopy(self.acquisition_object.metadata_object.timestamps)
-        self.all_planes_clipped_timestamps=copy.deepcopy(self.all_planes_timestamps)
+
         self.clipped_timestamps=False
         if self.start_frame or self.end_frame:
             for key,val in  self.all_planes_timestamps.items():
@@ -660,7 +662,7 @@ class ResultsAnalysis():
         self.mov_timestamps_seconds={'raw':np.array(self.all_planes_timestamps['Plane1']), # from metadata
                         'clipped':self.full_data['imaging_data']['Plane1']['Timestamps'][0], # clipped to start frame
                         'shifted':self.all_planes_clipped_timestamps_shifted['Plane1'], #substracting first timstamp to clipped
-                        'shifted_recalculated':self.full_data['imaging_data']['Plane1']['Timestamps'][1] # by taking shifted and doin linspace with imaging para,meters
+                        'shifted_recalculated':self.full_data['imaging_data']['Plane1']['Timestamps'][1] # by taking shifted and doin linspace with imaging parameters
                         }
     
         self.full_data['imaging_data']['mov_timestamps_seconds']=self.mov_timestamps_seconds
@@ -848,7 +850,8 @@ class ResultsAnalysis():
             self.full_data['visstim_info']['Paradigm_Indexes']={key:(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - index/1000)).argmin() for key, index in self.signals_object.transitions_dictionary.items()}
             
             frame_starts=np.zeros([10,900])  
-            frame_ends=np.zeros([10,900])                                          
+            frame_ends=np.zeros([10,900])  
+            trial_starts=np.zeros([10])                                     
                                         
             it = np.nditer(self.signals_object.movie_one_frame_index_full_recording[:,:,0], flags=['multi_index'])                              
             for x in it:                
@@ -857,21 +860,26 @@ class ResultsAnalysis():
             it = np.nditer(self.signals_object.movie_one_frame_index_full_recording[:,:,1], flags=['multi_index'])                              
             for y in it:                
                 frame_ends[it.multi_index]=np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -y/voltagerate).argmin()
+                
+            for i,z in enumerate(self.signals_object.movie_one_trial_full_recording):
+                trial_starts[i]= np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -z/voltagerate).argmin()
             
             self.full_data['visstim_info']['Full']={ 'Resampled_sliced_speed':self.resample(self.signals_object.rectified_speed_array['Prairie']['Locomotion'], factor=self.milisecond_period, kind='linear').squeeze(),
                                                     'Resampled_sliced_visstim':self.resample(self.signals_object.rounded_vis_stim['Prairie']['VisStim'], factor=self.milisecond_period, kind='linear').squeeze(),
                }
             self.full_data['visstim_info']['Movie1']={'Frame_Starts':frame_starts,
-                                                      'Frame_Ends':frame_ends,                                                    
+                                                      'Frame_Ends':frame_ends,   
+                                                      'Trial_Starts':trial_starts,                                                    
                                                       'Resampled_sliced_speed':self.resample(self.signals_object.natural_movie_one_set_speed, factor=self.milisecond_period, kind='linear').squeeze(),
                                                       'Resampled_sliced_visstim':self.resample(self.signals_object.natural_movie_one_set, factor=self.milisecond_period, kind='linear').squeeze(),
                                                         }
      
             
-            self.full_data['visstim_info']['Spontaneous']={}
-            self.full_data['visstim_info']['Spontaneous']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont_last']] ,), columns =['start', 'end'])
+          
     
             if self.signals_object.vis_stim_protocol =='AllenA':
+                self.full_data['visstim_info']['Spontaneous']={}
+                self.full_data['visstim_info']['Spontaneous']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont_last']] ,), columns =['start', 'end'])
             
                 self.full_data['visstim_info']['Drifting_Gratings']={'Indexes':{'Drift_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_on_index_full_recording]),
                                                                                 'Drift_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.tuning_stim_off_index_full_recording]),
@@ -900,25 +908,49 @@ class ResultsAnalysis():
                                                             }
               
             elif self.signals_object.vis_stim_protocol =='AllenC':
-            
-                self.full_data['visstim_info']['Sparse_Noise']={'Indexes':{'Noise_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_on_transition_indexes]),
-                                                                           'Noise_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_off_transition_indexes]),
-                                                                                },
-                                                          'Binary_Maytrix':'',
-                                                          'Ref_matrix':'',
+                self.full_data['visstim_info']['Spontaneous1']={}
+                self.full_data['visstim_info']['Spontaneous2']={}
+
+                self.full_data['visstim_info']['Spontaneous1']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont1_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont1_last']] ,), columns =['start', 'end'])
+                self.full_data['visstim_info']['Spontaneous2']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont2_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont2_last']] ,), columns =['start', 'end'])
+           
+                # self.full_data['visstim_info']['Sparse_Noise']={'Indexes':{'Noise_on':np.vstack([[(np.abs( self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_on_transition_indexes]),
+                #                                                            'Noise_off':np.vstack([[(np.abs(self.full_data['imaging_data']['Plane1']['Timestamps'][0] - rep/voltagerate)).argmin()   for rep in ori] for ori in self.signals_object.noise_off_transition_indexes]),
+                #                                                                 },
+                #                                           'Binary_Maytrix':'',
+                #                                           'Ref_matrix':'',
                                                           
-                                                          'Resampled_sliced_speed':self.resample(np.concatenate((self.signals_object.first_noise_set, self.signals_object.second_noise_set, self.signals_object.third_noise_set)), factor=self.milisecond_period, kind='linear').squeeze(),
-                                                          'Resampled_sliced_visstim':self.resample(np.concatenate((self.signals_object.first_noise_set, self.signals_object.second_noise_set, self.signals_object.third_noise_set)), factor=self.milisecond_period, kind='linear').squeeze()
+                #                                           'Resampled_sliced_speed':self.resample(np.concatenate((self.signals_object.first_noise_set, self.signals_object.second_noise_set, self.signals_object.third_noise_set)), factor=self.milisecond_period, kind='linear').squeeze(),
+                #                                           'Resampled_sliced_visstim':self.resample(np.concatenate((self.signals_object.first_noise_set, self.signals_object.second_noise_set, self.signals_object.third_noise_set)), factor=self.milisecond_period, kind='linear').squeeze()
                                                           
                                                           
-                                                          }
+                #                                           }
+                     
+                frame_starts=np.zeros([10,900])  
+                frame_ends=np.zeros([10,900])  
+                trial_starts=np.zeros([10])                                     
+                                            
+                it = np.nditer(self.signals_object.movie_two_frame_index_full_recording[:,:,0], flags=['multi_index'])                              
+                for x in it:                
+                    frame_starts[it.multi_index]=np.abs(np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -x/voltagerate).argmin()
+                      
+                it = np.nditer(self.signals_object.movie_two_frame_index_full_recording[:,:,1], flags=['multi_index'])                              
+                for y in it:                
+                    frame_ends[it.multi_index]=np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -y/voltagerate).argmin()
+                    
+                for i,z in enumerate(self.signals_object.movie_two_trial_full_recording):
+                    trial_starts[i]= np.abs( np.array(self.full_data['imaging_data']['Plane1']['Timestamps'][0]) -z/voltagerate).argmin()
                 
-                
-                self.full_data['visstim_info']['Movie2']={'Indexes':'',
-                                                          'Binary_Maytrix':''
+                self.full_data['visstim_info']['Movie2']={'Frame_Starts':frame_starts,
+                                                          'Frame_Ends':frame_ends,   
+                                                          'Trial_Starts':trial_starts,                                                    
+                                                          'Resampled_sliced_speed':self.resample(self.signals_object.natural_movie_two_set_speed, factor=self.milisecond_period, kind='linear').squeeze(),
+                                                          'Resampled_sliced_visstim':self.resample(self.signals_object.natural_movie_two_set, factor=self.milisecond_period, kind='linear').squeeze(),
                                                             }
                 
             elif self.signals_object.vis_stim_protocol =='AllenB':    
+                self.full_data['visstim_info']['Spontaneous']={}
+                self.full_data['visstim_info']['Spontaneous']['stimulus_table']= pd.DataFrame( ([self.full_data['visstim_info']['Paradigm_Indexes']['spont_first'],self.full_data['visstim_info']['Paradigm_Indexes']['spont_last']] ,), columns =['start', 'end'])
                 all_static_grating_onsets=np.sort(np.append(self.signals_object.static_grat_even_index_full_recording,self.signals_object.static_grat_odd_index_full_recording))
                 all_natural_images_onsets=np.sort(np.append(self.signals_object.natural_image_even_index_full_recording,self.signals_object.natural_image_odd_index_full_recording))
             

@@ -83,6 +83,7 @@ class DataManaging():
             
             # this builds all prairie imaging sessions based on the database list
             module_logger.info('Building Mouse Objects')
+
             self.all_non_imaged_mice_objects={}
             self.all_imaged_mice_objects={}
             self.build_all_mice_objects_from_database()
@@ -359,8 +360,8 @@ class DataManaging():
         
         
         self.all_existing_sessions={session[len(session)-8:]:session for session in glob.glob( self.data_paths_data['Raw']+multidirwild, recursive=False)}
-        self.all_existing_sessions2={session[len(session)-8:]:session for session in glob.glob( self.data_paths_data['Raw2']+multidirwild, recursive=False)}
-        self.all_existing_sessions.update(self.all_existing_sessions2)
+        # self.all_existing_sessions2={session[len(session)-8:]:session for session in glob.glob( self.data_paths_data['Raw2']+multidirwild, recursive=False)}
+        # self.all_existing_sessions.update(self.all_existing_sessions2)
  
     def read_all_imaging_sessions_from_database(self): 
         query_sessions="SELECT ID, ImagingDate, ImagingSessionRawPath FROM ImagingSessions_table"
@@ -580,13 +581,13 @@ class DataManaging():
             level=2
    
         temp_path=self.nested_split(path,level)
-        print(temp_path)
+        print('correcting_linux_craxzy_drive: '+temp_path)
         corrected_path=[k for k in self.LabProjectObject.all_paths_for_this_system.keys() if temp_path in k]
         if not corrected_path:
            corrected_path=path
         else:
           corrected_path=corrected_path[0]+path[len(temp_path):]
-        print(corrected_path)
+        print('correcting_linux_craxzy_drive: '+corrected_path)
    
    
         return corrected_path
@@ -662,11 +663,15 @@ class DataManaging():
    
             correct_os_path=Path(newstem+slow_path[slow_path.find(drive)+len(drive):].replace('/','\\'))
             
+        elif('home' in slow_path or 'mnt' in slow_path or 'Users' in slow_path) and platform == "win32" : 
             
+            correct_os_path=slow_path[slow_path.find('Projects'):]
+                
         elif platform == "linux":
             correct_os_path=self.correct_linux_crazy_drives(slow_path)
         elif platform == "win32":
             correct_os_path=slow_path
+            
  
         return correct_os_path
 
@@ -682,6 +687,7 @@ class DataManaging():
         all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
         newdrive_int='J'
         newdrive_chand='I'
+        new_fast_drive='F'
 
         
         for mouse in all_mouse_info:
@@ -689,39 +695,54 @@ class DataManaging():
             mouse_SlowStoragePath=mouse[2]
             mouse_WorkingStoragePath=mouse[3]
 
-            if ('Chandelier_' in mouse_SlowStoragePath) or ('Tigre_' in mouse_SlowStoragePath) or ('INITIAl TESTS' in mouse_SlowStoragePath):
-                newslowstorage=newdrive_chand+mouse_SlowStoragePath[1:]
-                if 'media/' in mouse_SlowStoragePath:
-                    newslowstorage=str(self.os_transform_databasepath(mouse[2]))
-
-                query_mouse_slow_storage_update="""
-                      UPDATE ExperimentalAnimals_table
-                      SET SlowStoragePath=?
-                      WHERE ID=?
-                      """  
-                params=(newslowstorage, mouse_expid)
-                if newslowstorage!=mouse_SlowStoragePath:
-                    self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)    
-                    print(f"experimental mouse {mouse[0]} path updated from {mouse_SlowStoragePath} to {newslowstorage}")
-                else:
-                    print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
-
-                
+            if ('Chandelier_' in mouse_SlowStoragePath) or ('Tigre_' in mouse_SlowStoragePath) or ('INITIAL TESTS' in mouse_SlowStoragePath):
+                new_drive=newdrive_chand
+                         
             elif ('Interneuron_' in mouse_SlowStoragePath) or ('Collaborations' in mouse_SlowStoragePath):
-                newslowstorage=newdrive_int+mouse_SlowStoragePath[1:]
-                if 'media/' in mouse_SlowStoragePath:
-                    newslowstorage=str(self.os_transform_databasepath(mouse[2]))
-                query_mouse_slow_storage_update="""
-                      UPDATE ExperimentalAnimals_table
-                      SET SlowStoragePath=?
-                      WHERE ID=?
-                      """  
-                params=(newslowstorage, mouse_expid)
-                if newslowstorage!=mouse_SlowStoragePath:
-                    self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)  
-                    print(f"experimental mouse {mouse[0]} path updated from {mouse_SlowStoragePath} to {newslowstorage}")
-                else:
-                    print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
+                new_drive=newdrive_int
+                
+              
+
+          
+
+            
+            if 'home' in mouse_SlowStoragePath or 'mnt' in mouse_SlowStoragePath :
+                temp_slow=str(self.os_transform_databasepath(mouse_SlowStoragePath))
+                newslowstorage=new_drive+':'+os.sep+temp_slow
+
+            else:
+                newslowstorage=new_drive+mouse_SlowStoragePath[1:]
+                
+            if 'home' in mouse_WorkingStoragePath or 'mnt' in mouse_WorkingStoragePath or 'Users' in mouse_WorkingStoragePath:
+                temp_fast=str(self.os_transform_databasepath(mouse_WorkingStoragePath))
+                newfaststorage=new_drive+':'+os.sep+temp_fast
+
+            else:
+                newfaststorage=new_fast_drive+mouse_WorkingStoragePath[1:]
+            
+            if ('Working_Mice' in mouse_SlowStoragePath):    
+                newslowstorage=mouse_SlowStoragePath[:mouse_SlowStoragePath.find('Working_Mice')]+'Full_Mice_Pre_Processed_Data'+os.sep+mouse_SlowStoragePath[mouse_SlowStoragePath.find('Mice_Projects'):]
+                newfaststorage= new_fast_drive+mouse_SlowStoragePath[1:]
+
+            if '/' in mouse_SlowStoragePath:
+                 newslowstorage = mouse_SlowStoragePath.replace('/', '\\')
+                 newfaststorage = mouse_WorkingStoragePath.replace('/', '\\')
+
+            query_mouse_slow_storage_update="""
+                  UPDATE ExperimentalAnimals_table
+                  SET SlowStoragePath=?, WorkingStoragePath=?
+                  WHERE ID=?
+                  """  
+            params=(newslowstorage,newfaststorage, mouse_expid)
+            if newslowstorage!=mouse_SlowStoragePath or newfaststorage!=mouse_WorkingStoragePath :
+                self.LabProjectObject.database.arbitrary_updating_record(query_mouse_slow_storage_update, params, commit=True)  
+                print(f"experimental mouse {mouse[0]} path updated from {mouse_SlowStoragePath} to {newslowstorage}")
+                print(f"experimental mouse {mouse[0]} path updated from {mouse_WorkingStoragePath} to {newfaststorage}")
+
+            else:
+                print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_SlowStoragePath} to {newslowstorage}")
+                print(f"experimental mouse {mouse[0]} path ALREADY updated from {mouse_WorkingStoragePath} to {newfaststorage}")
+
 
 
                 
@@ -767,7 +788,7 @@ class DataManaging():
               
                 
               
-                        if new_slow_imaged_mice_path!=imaged_mouse[1]:
+                        if new_slow_imaged_mice_path!=imaged_mouse[1] or new_fast_imaged_mice_path!=imaged_mouse[2]:
                             query_imaged_mice_paths_update="""
                                   UPDATE ImagedMice_table
                                   SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
@@ -797,7 +818,7 @@ class DataManaging():
                                 isSlowStorage=os.path.isfile(new_slow_widefield_path)
                                 isWorkingStorage=os.path.isfile(new_fast_widefield_path) 
                                 
-                                if new_slow_widefield_path!=widefield[1]:
+                                if new_slow_widefield_path!=widefield[1] or new_fast_widefield_path!=widefield[2]:
     
                                     query_widefield_paths_update="""
                                           UPDATE WideField_table
@@ -868,7 +889,7 @@ class DataManaging():
                                 new_fast_acquisition_path= os.path.join(new_fast_imaged_mice_path , acquisiton_relative_path)
                                 isSlowStorage=os.path.isdir(new_slow_acquistion_path)
                                 isWorkingStorage=os.path.isdir(new_fast_acquisition_path) 
-                                if new_slow_acquistion_path!=aqc[1]:
+                                if new_slow_acquistion_path!=aqc[1] or new_fast_acquisition_path!=aqc[2]:
                                     query_acquistions_paths_update="""
                                       UPDATE Acquisitions_table
                                       SET SlowDiskPath=?, WorkingDiskPath=?, IsSlowDisk=?, IsWorkingDisk=?
@@ -899,7 +920,7 @@ class DataManaging():
                                             new_fast_imaging_path=  os.path.join(new_fast_acquisition_path, 'planes\Plane1')
                                             isSlowStorage=os.path.isdir(new_slow_imaging_path)
                                             isWorkingStorage=os.path.isdir(new_fast_imaging_path)  
-                                            if new_slow_imaging_path!=imaging[1]:
+                                            if new_slow_imaging_path!=imaging[1] or new_fast_imaging_path!=imaging[2]:
                                                 query_imaging_paths_update="""
                                                         UPDATE Imaging_table
                                                         SET SlowStoragePath=?, WorkingStoragePath=?, IsSlowStorage=?, IsWorkingStorage=?
@@ -908,6 +929,7 @@ class DataManaging():
                                                 params=(new_slow_imaging_path,new_fast_imaging_path, isSlowStorage, isWorkingStorage, imaging[0])
                                                 self.LabProjectObject.database.arbitrary_updating_record(query_imaging_paths_update, params, commit=True)    
                                                 print(f"experimental mouse {mouse[0]} path updating imaged mice from {imaging[1]}  to {new_slow_imaging_path}")
+                                                print(f"experimental mouse {mouse[0]} path updating imaged mice from {imaging[2]}  to {new_fast_imaging_path}")
 
                                             else:
                                                 print(f"{mouse[0]} imaging Already same path, not updated")
@@ -980,6 +1002,202 @@ class DataManaging():
 
                                         else:
                                             print(f"{mouse[0]} imaging Already same path, not updated")
+
+
+    def read_path_correct_path(self,val,pth):
+        old_putative_path=self.os_transform_databasepath(pth)
+        if str(old_putative_path)[0]!='\\':
+            old_letter=str(old_putative_path)[0]
+        else:
+            old_letter=str(old_putative_path)[4]
+
+        if old_letter=='G' or old_letter=='F'  or old_letter=='I':
+            
+            if str(old_putative_path)[0]!='\\':
+                new_path=val+str(old_putative_path)[1:]
+            else:
+                new_path=val+str(old_putative_path)[5:]
+            
+        else:
+           new_path=old_putative_path
+           
+        return new_path
+
+
+    def update_drive_letter_of_permanent_paths(self):
+        
+        val = input("Select New Drive Letter: ")
+        print('Correcting Permanent Drive Letter')
+        query_all_codes="""
+                SELECT a.Code,a.ID
+                FROM ExperimentalAnimals_table a   
+                WHERE Project!=6 
+                """
+        params=()
+        all_mouse_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_codes,params).values.tolist()
+        
+        for mouse in all_mouse_info:
+            if mouse[0]:
+
+
+                mouse_expid=mouse[1]
+                query_all_imaged_sessions="""
+                        SELECT a.ID, a.MouseRawPath, a.SessionID
+                        FROM ImagedMice_table a   
+                        WHERE ExpID=?
+                        """
+                params=(mouse_expid,)
+                imaged_mice_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_imaged_sessions,params).values.tolist()
+                
+               
+                
+                
+                if imaged_mice_info:
+                    for mouse_session in imaged_mice_info:     
+                        
+                        
+                        # update imaged mice table
+                        new_session_path=self.read_path_correct_path(val,mouse_session[1])
+                        query_imaged_mice_paths_update="""
+                              UPDATE ImagedMice_table
+                              SET MouseRawPath=?
+                              WHERE ID=?
+                              """  
+                        params=(new_session_path,mouse_session[0])
+                        self.LabProjectObject.database.arbitrary_updating_record(query_imaged_mice_paths_update, params, commit=False)  
+                      
+                        query_all_acquistions="""
+                                SELECT a.ID, a.AcquisitonRawPath
+                                FROM Acquisitions_table a   
+                                WHERE ImagedMouseID=?
+                                """
+                        params=(mouse_session[0],)
+                        all_acquisitons_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_acquistions,params).values.tolist()
+                        if all_acquisitons_info:
+                            for aqc in all_acquisitons_info:
+                             
+                                #update imaging tab;le
+                                query_all_imaging="""
+                                    SELECT a.ID, a.ImagingFullFilePath
+                                    FROM Imaging_table a   
+                                    WHERE AcquisitionID=?
+                                    """
+                                params=(aqc[0],)
+                                all_imagings_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_imaging,params).values.tolist()
+                                if all_imagings_info:
+                                    for imaging in all_imagings_info:  
+                                        new_imaging_path=self.read_path_correct_path(val,imaging[1])
+                                        query_imaging_paths_update="""
+                                              UPDATE Imaging_table
+                                              SET ImagingFullFilePath=?
+                                              WHERE AcquisitionID=?
+                                              """  
+                                        params=(new_imaging_path,aqc[0])
+                                        self.LabProjectObject.database.arbitrary_updating_record(query_imaging_paths_update, params, commit=False)  
+                                        
+                                
+                                #update facecam table
+                                query_all_facecamera="""
+                                    SELECT a.ID, a.VideoPath
+                                    FROM FaceCamera_table a   
+                                    WHERE AcquisitionID=?
+                                    """
+                                params=(aqc[0],)
+                                all_facecameras_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_facecamera,params).values.tolist()
+                                if all_facecameras_info:
+                                    for face_camera in all_facecameras_info:
+                                        
+                                        new_fc_path=self.read_path_correct_path(val,face_camera[1])
+                                        query_facecam_update="""
+                                              UPDATE FaceCamera_table
+                                              SET VideoPath=?
+                                              WHERE AcquisitionID=?
+                                              """  
+                                        params=(new_fc_path,aqc[0])
+                                        self.LabProjectObject.database.arbitrary_updating_record(query_facecam_update, params, commit=False)  
+                                        
+                                        
+                                #update visualstim table
+                                query_all_visualstimulations="""
+                                    SELECT a.ID, a.VisStimLogPath
+                                    FROM VisualStimulations_table a   
+                                    WHERE AcquisitionID=?
+                                    """
+                                params=(aqc[0],)
+                                all_visualstimulations_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_visualstimulations,params).values.tolist()
+                                if all_visualstimulations_info:
+                                    for visual_stim in all_visualstimulations_info:                                                                                 
+                                        new_vs_path=self.read_path_correct_path(val,visual_stim[1])
+                                        query_visstim_update="""
+                                              UPDATE VisualStimulations_table
+                                              SET VisStimLogPath=?
+                                              WHERE AcquisitionID=?
+                                              """  
+                                        params=(new_vs_path,aqc[0])
+                                        self.LabProjectObject.database.arbitrary_updating_record(query_visstim_update, params, commit=False)  
+                                
+                                #update acq table
+                                new_aq_path=self.read_path_correct_path(val,aqc[1])
+                                query_acq_update="""
+                                      UPDATE Acquisitions_table
+                                      SET AcquisitonRawPath=?
+                                      WHERE ID=?
+                                      """  
+                                params=(new_aq_path,aqc[0])
+                                self.LabProjectObject.database.arbitrary_updating_record(query_acq_update, params, commit=True)  
+                        
+                        
+                        
+                          
+                        # update the path of the session, this will unnecesarily be repaetd for al mouse of the session
+                        query_paririe_session="""
+                                SELECT a.ID, a.ImagingSessionRawPath, a.CalibrationsRawPath,a.PowerCalPath, a.MechanicalZStackPath,a.ETLCalibrationsPath, a.AlignmentCalibrationsPath,a.MiceRawPath
+                                FROM ImagingSessions_table a   
+                                WHERE ID=?
+                                """
+                        params=(mouse_session[2],)
+                        image_session_info=self.LabProjectObject.database.arbitrary_query_to_df(query_paririe_session,params).values.tolist()
+                        all_paths=image_session_info[0][1:]
+                        all_new_paths=[]
+                        for pth in all_paths:
+                            all_new_paths.append(self.read_path_correct_path(val,pth))
+                            
+                        query_image_session_paths_update="""
+                              UPDATE ImagingSessions_table
+                              SET ImagingSessionRawPath=?, CalibrationsRawPath=?,PowerCalPath=?, MechanicalZStackPath=?,ETLCalibrationsPath=?, AlignmentCalibrationsPath=?,MiceRawPath=?
+                              WHERE ID=?
+                              """  
+                        params=tuple(all_new_paths+[mouse_session[2]])
+                        self.LabProjectObject.database.arbitrary_updating_record(query_image_session_paths_update, params, commit=False)  
+                        
+                        # update the path of the widefield
+                        query_all_widefields="""
+                            SELECT a.ID, a.WideFieldImagePath
+                            FROM WideField_table a   
+                            WHERE ImagedMouseID=?
+                            """
+                        params=(mouse_session[0],)
+                        all_widefields_info=self.LabProjectObject.database.arbitrary_query_to_df(query_all_widefields,params).values.tolist()                 
+                        if all_widefields_info:
+                            for wf_info in all_widefields_info:  
+                                new_wf_path=self.read_path_correct_path(val,wf_info[1])
+                                query_widefield_paths_update="""
+                                      UPDATE WideField_table
+                                      SET WideFieldImagePath=?
+                                      WHERE ImagedMouseID=?
+                                    """                                    
+                                params=(new_wf_path, mouse_session[0])
+                                self.LabProjectObject.database.arbitrary_updating_record(query_widefield_paths_update, params, commit=True)
+                
+                
+                        
+                
+                # self.LabProjectObject.data_paths_roots['Raw2']
+                # self.LabProjectObject.data_paths_roots['Raw']
+
+
+
+    
 
 #%% processing paririe imaging sessin raw folders 
     def load_raw_session(self, session_path):

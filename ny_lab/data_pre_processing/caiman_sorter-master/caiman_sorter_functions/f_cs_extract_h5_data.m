@@ -35,24 +35,17 @@ if add_disc
         est.A = [est_good.A, est_bad.A];
         est.contours = [est_good.contours; est_bad.contours];
         est.C = [est_good.C; est_bad.C];
-%         if iscell(est_bad.F_dff)
-%             if strcmp(est.idx_components{1}, 'NoneType')
-%                 est.F_dff = [est_good.F_dff; zeros(size(est_bad.C))];
-%             end
-%         else
-%             est.F_dff = [est_good.F_dff; est_bad.F_dff];
-%         end
-        % this is my modifictaion for classical caimna
-        if ~iscell(est_bad.F_dff)
-            if isempty(est_bad.idx_components)
+        if iscell(est_bad.F_dff)
+            if strcmp(est_bad.F_dff, 'NoneType')
+                est.F_dff = [est_good.F_dff; zeros(size(est_bad.C))];
+            end
+        elseif ischar(est_bad.F_dff)
+            if strcmp(est_bad.F_dff, 'NoneType') || strcmp(est_bad.F_dff', 'NoneType')
                 est.F_dff = [est_good.F_dff; zeros(size(est_bad.C))];
             end
         else
             est.F_dff = [est_good.F_dff; est_bad.F_dff];
         end
-        
-        
-        
         est.R = [est_good.R; est_bad.R];
         est.S = [est_good.S; est_bad.S];
         est.YrA = [est_good.YrA; est_bad.YrA];
@@ -76,7 +69,6 @@ end
 
 %% extact params
 
-
 init_params = struct;
 for n_pg = 1:numel(hinfo.Groups(2).Groups)
     [~, g_name, ~] = fileparts(hinfo.Groups(2).Groups(n_pg).Name);
@@ -97,4 +89,6 @@ eval_params.rval_thresh =        double(h5read(file_loc, '/params/quality/rval_t
 est.eval_params_caiman = eval_params;
 est.init_params_caiman = init_params;
 est.extraction_error_log = error_log;
+est.num_cells_original = size(est.C,1);
+est.num_cells_mod = est.num_cells_original;
 end

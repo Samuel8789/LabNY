@@ -64,7 +64,9 @@ class new_window_plan_injections(tk.Toplevel):
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==10)| 
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==21)|
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==27)|
+                                                                                                              (self.gui.MouseDat.allVirusstock['ID']==30)|
                                                                                                               (self.gui.MouseDat.allVirusstock['ID']==17)][['VirusCode', 'VirusName']].values.tolist()]
+        
         self.virus4_names=[virus_name[0]+': '+virus_name[1] for virus_name in self.gui.MouseDat.allVirusstock[(self.gui.MouseDat.allVirusstock['ID']==17)][['VirusCode', 'VirusName']].values.tolist()]
         
         
@@ -130,12 +132,12 @@ class new_window_plan_injections(tk.Toplevel):
  
 
     def plan_injection_button(self):
-            self.vir1code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir1.get()[3:]]['VirusCode'].tolist()
+            self.vir1code=[self.vir1.get()[:self.vir1.get().find(':')]]
             if len(self.vir1code)>1:
                 self.vir1code= [self.vir1code[-1]]
-            self.vir2code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir2.get()[3:]]['VirusCode'].tolist()
-            self.vir3code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir3.get()[3:]]['VirusCode'].tolist()
-            self.vir4code=self.gui.MouseDat.allVirusstock[self.gui.MouseDat.allVirusstock['VirusName']==self.vir4.get()[3:]]['VirusCode'].tolist()
+            self.vir2code=[self.vir2.get()[:self.vir2.get().find(':')]]
+            self.vir3code=[self.vir3.get()[:self.vir3.get().find(':')]]
+            self.vir4code=[self.vir4.get()[:self.vir4.get().find(':')]]
 
             self.vir1dil=self.virus1_dilution.get()
             self.vir2dil=self.virus2_dilution.get()

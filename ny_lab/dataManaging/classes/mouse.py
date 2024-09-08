@@ -34,7 +34,10 @@ class Mouse:
         self.mouse_name=Mouse_Name
         if Mouse_Name=='SPSM':
             print('stop')
+            
+            
         module_logger.info('Loading Mouse ' +self.mouse_name)
+
 
         self.LabNY_object=LabNY_object
         self.data_managing_object=data_managing_object
@@ -48,7 +51,6 @@ class Mouse:
             # # self.mouse_slow_subproject_path=self.mouse_slow_subproject_path.replace('\\?\D:\Projects', '\\?\F:\Projects')
             self.mouse_working_subproject_path_db=self.all_mouse_inf.iloc[0]['WorkingStoragePath']
             
-         
             self.mouse_slow_subproject_path =self.data_managing_object.os_transform_databasepath( self.mouse_slow_subproject_path_db)
             self.mouse_working_subproject_path=self.data_managing_object.os_transform_databasepath( self.mouse_working_subproject_path_db)
 
@@ -64,6 +66,7 @@ class Mouse:
                                 WHERE c.Code=?
                                 """
             params=(self.mouse_name,)
+
             self.imaging_sessions_database=self.Database_ref.arbitrary_query_to_df(quey_imaging_session, params)        
             self.load_all_imaging_sessions_from_database()
             self.get_all_mouse_acquisitions(self.imaging_sessions_objects)

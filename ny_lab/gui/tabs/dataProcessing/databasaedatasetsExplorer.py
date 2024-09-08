@@ -28,7 +28,10 @@ except:
     from scrollbarFrame import ScrollbarFrame
 import time
 import subprocess
+import sys
 
+sys.path.insert(0, r'C:\Users\sp3660\Documents\Github\LabNY\ny_lab\dataManaging\functions')
+from functionsDataOrganization import open_directory
 import numpy as np
 import shutil
 import sys
@@ -849,19 +852,19 @@ class MouseDatasetsPanel(tk.Toplevel):
       
     def open_acquisition_directory_action(self):
         
-      subprocess.Popen(['xdg-open',self.selected_acquisition_object.mouse_aquisition_path])
+     open_directory(self.selected_acquisition_object.mouse_aquisition_path)
         
     def open_slow_mouse_directory_action(self):
         
-      subprocess.Popen(['xdg-open', os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging', self.imaging_session_name)])
+      open_directory(os.path.join(self.selected_mouse_object.mouse_slow_subproject_path,'imaging', self.imaging_session_name))
                
     def open_raw_acquisition_directory_action(self):
         
-      subprocess.Popen(['xdg-open',self.selected_acquisition_object.acquisition_database_info['AcquisitonRawPath'][0]])
+     open_directory(self.selected_acquisition_object.acquisition_database_info['AcquisitonRawPath'][0])
         
     def open_dataset_directory_action(self):
         
-      subprocess.Popen(['xdg-open',self.selected_dataset_to_copy_object.selected_dataset_mmap_path])
+       open_directory(self.selected_dataset_to_copy_object.selected_dataset_mmap_path)
 
     def open_facecamera_button(self):
         pass
@@ -1098,7 +1101,7 @@ if __name__ == "__main__":
     # SET GITHUB TOKEN PATH
     house_PC='DESKTOP-V1MT0U5'
     lab_PC='DESKTOP-NBGKRCG'
-    old_lab_PC='DESKTOP-OKLQSQS'
+    old_lab_PC='DESKTOP-ETJV9PS'
 
     small_laptop_ubuntu='samuel-XPS-13-9380'
     small_laptop_kali='samuel-XPS-13-9380'
@@ -1126,12 +1129,12 @@ if __name__ == "__main__":
             computer=newlab
             githubtoken_path=os.path.join(os.path.expanduser('~'),r'Documents/Github/GitHubToken.txt')
     
-        ProjectManager=ProjectManager(githubtoken_path, computer, platform)
-        gui=0
-        lab=ProjectManager.initialize_a_project('LabNY', gui)   
-        lab.do_datamanaging()
-        datamanaging=lab.datamanaging
-        # for msession not in database
+    ProjectManager=ProjectManager(githubtoken_path, computer, platform)
+    gui=0
+    lab=ProjectManager.initialize_a_project('LabNY', gui)   
+    lab.do_datamanaging()
+    datamanaging=lab.datamanaging
+    # for msession not in database
  
  
 #%% opening the vis app
