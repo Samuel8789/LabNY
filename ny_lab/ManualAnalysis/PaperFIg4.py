@@ -19,9 +19,18 @@ from scipy import stats
 from matplotlib.colors import Normalize
 import os
 from scipy.stats import wilcoxon, ttest_ind
+from sys import platform
+from pathlib import Path
 
 mpl.rcParams['font.family'] = 'Arial'
 mpl.rcParams['svg.fonttype'] = 'none'
+
+if platform == "linux" or platform == "linux2":
+    fig_four_basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY/ChandPaper/Fig4')
+elif platform == "win32":
+    fig_four_basepath=Path(r'C:\Users\sp3660\Desktop\ChandPaper\Fig4')
+    
+
 
 #%%
 trial_activity=cell_act_full
@@ -33,10 +42,10 @@ controlactivity=trial_activity['control_blank'][sorting_peaks[1],:,:]/max(trial_
 optoactivity_grating=trial_activity['opto_grating'][sorting_peaks[0],:,:]/max(trial_activity['opto_blank'].max(),trial_activity['opto_grating'].max(),trial_activity['control_blank'].max(),trial_activity['control_grating'].max())*100
 controlactivity_grating=trial_activity['control_grating'][sorting_peaks[1],:,:]/max(trial_activity['opto_blank'].max(),trial_activity['opto_grating'].max(),trial_activity['control_blank'].max(),trial_activity['control_grating'].max())*100
 
-# optoactivity=trial_activity['opto_blank'][sorting_peaks[0],:,:]
-# controlactivity=trial_activity['control_blank'][sorting_peaks[1],:,:]
-# optoactivity_grating=trial_activity['opto_grating'][sorting_peaks[0],:,:]
-# controlactivity_grating=trial_activity['control_grating'][sorting_peaks[1],:,:]
+optoactivity=trial_activity['opto_blank'][sorting_peaks[0],:,:]
+controlactivity=trial_activity['control_blank'][sorting_peaks[1],:,:]
+optoactivity_grating=trial_activity['opto_grating'][sorting_peaks[0],:,:]
+controlactivity_grating=trial_activity['control_grating'][sorting_peaks[1],:,:]
 
 # for pyramidal cell tuning and cell rewposnivenes
 # Define the orientation pairs to combine
@@ -162,7 +171,7 @@ for stimul in ('Blank','Grating'):
 
     # Remove x-axis margins
     ax.margins(x=0)
-    ax.set_ylim(-0.5,1 )  # Adjust for extra padding
+    ax.set_ylim(-0.5,0.6 )  # Adjust for extra padding
 
     # Customize ticks and tick labels
     ax.tick_params(axis='both', which='major', labelsize=6, width=1)
@@ -218,6 +227,8 @@ def plot_trial_averaged_activity_individual(df, stimuli_type):
     ax.grid(False)  # Remove grid
     ax.set_ylim([-0.5, 1])
     fig.tight_layout()
+    ax.margins(x=0)
+
     # plt.savefig(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\trial_averaged_all_chandeliers_{stimuli_type}.svg', format='svg', bbox_inches='tight')
 
     # Show the plot
@@ -704,7 +715,7 @@ ratios_df = pd.DataFrame(ratios)
 
 # Merge the ratios with the original results
 final_results_df = pd.merge(results_df, ratios_df, on='Cell')
-# final_results_df.to_csv(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\metrics.csv')
+final_results_df.to_csv(str(fig_four_basepath / 'metrics.csv'))
 #%% SELECT CELLS BASED ON SOME ARBIOTRY THREHOLD THAT ARE VISUAL STIMULS RESPONSIVE
 
 
@@ -874,8 +885,8 @@ for k, subset in {'visually_active':all_metrics['Grating']['Control'][0],'opto+g
             mean_df = pd.DataFrame(met_data)
             
             # Ensure consistent order of conditions
-            condition_order = [ 'CB', 'OB','CG','OG']
-            # condition_order = [ 'CB','CG','OG']
+            # condition_order = [ 'CB', 'OB','CG','OG']
+            condition_order = [ 'CB','CG','OG']
             
             # condition_order = [ 'CB', 'OB']
             
@@ -908,7 +919,7 @@ for k, subset in {'visually_active':all_metrics['Grating']['Control'][0],'opto+g
 
 #%% PLOT TRIAL AVERAGED TRACSED FOR GROUPS OF CELLS FOR ALL CONDITIONS
 
-
+    
 def plot_single_cell_activity(ax, df, cell_id, stimulus, treatment):
     # Filter data for the given cell, stimulus, and treatment
     subset = df[(df['Cell'] == cell_id) & (df['Stimuli'] == stimulus) & (df['Treatment'] == treatment)]
@@ -938,12 +949,14 @@ def plot_single_cell_activity(ax, df, cell_id, stimulus, treatment):
     # Remove all spines except for the bottom and left
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
+    ax.margins(x=0)
+
     # ax.set_ylim([-10,40])
 
 
 
 plt.close('all')
-selected_cells=[all_metrics['Grating']['Control'][0].iloc[5],all_metrics['Grating']['Opto'][0].iloc[8]]
+selected_cells=[all_metrics['Grating']['Control'][0].iloc[0],all_metrics['Grating']['Opto'][0].iloc[8]]
 # Plot for each selected cell
 for cell_id in selected_cells:
 
@@ -966,195 +979,161 @@ for cell_id in selected_cells:
         plt.tight_layout()
         
         # Save and show the combined figure
-        # plt.savefig(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\Cell_{cell_id}_{stimulus}_{treatment}.svg', format='svg')
+        plt.savefig(str(fig_four_basepath / f'Cell_{cell_id}_{stimulus}_{treatment}.svg'), format='svg')
         plt.show()
 #%% GROUP BY MOUSE
 
-
+plt.close('all')
 # Define cell subsets
 subset1_cells = all_metrics['Grating']['Control'][0]
   # Replace with actual list of cells
 subset2_cells = all_metrics['Grating']['Opto'][0]
 
-# Function to calculate mean and std for ratio columns
-def calculate_stats(df, subset_cells):
-    subset_df = df[df['Cell'].isin(subset_cells)]
-    ratios = ['ratio_opto_vs_control', 'ratio_grating_vs_control', 'ratio_opto_grating_vs_control', ]
+extended_results_df1, differences_df1 =extended_results_df1, differences_df1 
+extended_results_df2, differences_df2 =extended_results_df2, differences_df2 
+
+
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+# Fit the two-way ANOVA model with interaction
+model = ols('Mean ~ C(Stimulus) * C(Treatment)', data=extended_results_df1).fit()
+# Perform ANOVA
+anova_table = sm.stats.anova_lm(model, typ=2)
+print(anova_table)
+extended_results_df1['Group'] = extended_results_df1['Stimulus'] + ' ' + extended_results_df1['Treatment']
+# Perform Tukey HSD post-hoc test
+tukey = pairwise_tukeyhsd(endog=extended_results_df1['Mean'], groups=extended_results_df1['Group'], alpha=0.05)
+print("\nTukey HSD post-hoc test results:")
+print(tukey.summary())
+
+
+model = ols('Mean ~ C(Stimulus) * C(Treatment)', data=extended_results_df2).fit()
+# Perform ANOVA
+anova_table = sm.stats.anova_lm(model, typ=2)
+print(anova_table)
+extended_results_df1['Group'] = extended_results_df1['Stimulus'] + ' ' + extended_results_df1['Treatment']
+# Perform Tukey HSD post-hoc test
+tukey = pairwise_tukeyhsd(endog=extended_results_df1['Mean'], groups=extended_results_df1['Group'], alpha=0.05)
+print("\nTukey HSD post-hoc test results:")
+print(tukey.summary())
+
+
+
+
+ # Set global parameters
+plt.rcParams.update({
+    'font.size': 5,  # Set font size to 5pt
+    'axes.titlesize': 5,
+    'axes.labelsize': 5,
+    'xtick.labelsize': 5,
+    'ytick.labelsize': 5,
+    'lines.linewidth': 1,  # Set line thickness to 1 pt
+    'figure.figsize': (1.97, 1.97)  # Set figure size to 50x50 mm
+})
+
+def plot_differences(diff_df, color, title_suffix=''):
+    ylimits=[-0.08, 0.18]
+    # Filter for the three comparisons involving Blank/Control
+    comparisons_of_interest = [
+        'Blank/Opto - Blank/Control',
+        'Grating/Control - Blank/Control',
+        'Grating/Opto - Blank/Control'
+    ]
     
-    stats = {}
-    for ratio in ratios:
-        mean_val = subset_df[ratio].mean()
-        std_val = subset_df[ratio].std()
-        stats[ratio] = (mean_val, std_val)
+    # Filter the differences DataFrame for the selected comparisons
+    diff_filtered = diff_df[diff_df['Comparison'].isin(comparisons_of_interest)]
+
+    # Plot 1: Boxplot of differences for selected comparisons
+    f,ax=plt.subplots(figsize=(1.97, 1.97))
+    sns.boxplot(data=diff_filtered, x='Comparison', y='Difference', fliersize=3,color=color,ax=ax)
+    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=True)
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    ax.set_ylim(ylimits)
+    sns.despine(ax=ax)
+    # Set axis line width
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    plt.tight_layout()
+    plt.savefig(str(fig_four_basepath / f'Difference_control_recordings_{title_suffix}.svg'), format='svg')
+    plt.show()
     
-    return stats
-
-# Calculate stats for both subsets
-stats_subset1 = calculate_stats(final_results_df, subset1_cells)
-stats_subset2 = calculate_stats(final_results_df, subset2_cells)
-_averages_subset1=_averages_subset1
-_averages_subset2=_averages_subset2
-# Combine data for plotting
-_averages_subset1['Subset'] = 'Visualy Active'
-_averages_subset2['Subset'] = 'Visual + Opto '
-combined_averages = pd.concat([_averages_subset1, _averages_subset2])
-# Define custom tick labels
-custom_labels = {
-    'ratio_opto_vs_control': 'Opto vs Control',
-    'ratio_grating_vs_control': 'Grating vs Control',
-    'ratio_opto_grating_vs_control': 'Opto+Grating vs Control',
-}
-combined_averages['Ratio'] = combined_averages['Ratio'].map(custom_labels)
-
-
-# Calculate mean and standard deviation for each combination of Subset and Ratio
-stats = combined_averages.groupby(['Subset', 'Ratio'])['Average Difference'].agg(['mean', 'std']).reset_index()
-stats.columns = ['Subset', 'Ratio', 'Mean', 'Std']
-
-print(stats)
-#%%
-# Plotting
-
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-# Assuming `combined__averages` is your DataFrame with data
-
-fig, ax = plt.subplots(figsize=(600 / 25.4, 600 / 25.4))
-
-# Boxplot
-sns.boxplot(x='Subset', y='Average Difference', hue='Ratio', data=combined_averages,
-            fill=False, linewidth=1, ax=ax, palette='grey')
-
-# Strip plot
-stripplot = sns.stripplot(x='Subset', y='Average Difference', hue='Ratio', data=combined_averages,
-                          jitter=False, dodge=True, size=3, edgecolor='black', ax=ax, palette='Set2')
-
-# Get handles and labels for the stripplot legend
-handles, labels = ax.get_legend_handles_labels()
-stripplot_legend_handles = [handle for handle, label in zip(handles, labels) if label in ['Subset 1', 'Subset 2']]
-stripplot_legend_labels = [label for label in labels if label in ['Subset 1', 'Subset 2']]
-
-# Remove the existing legend (which includes the boxplot legend)
-ax.legend_.remove()
-
-# Create a new legend for the stripplot
-ax.legend(stripplot_legend_handles, stripplot_legend_labels, loc='upper left')
-
-# Remove x-axis ticks
-ax.set_xticks([])
-
-# Adjust y-axis tick label size
-ax.tick_params(axis='y', labelsize=5)
-
-# Remove grid and adjust spines
-sns.despine(ax=ax)
-ax.set_xlabel('')  # X-axis label
-ax.set_ylabel('')  # Y-axis label
-ax.spines['bottom'].set_linewidth(1)
-ax.spines['left'].set_linewidth(1)
-plt.grid(False)
-
-
-plt.tight_layout()
-# plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig4\Avg_differences_in_mean_evoked_activity.svg', format='svg')
-plt.show()
-
-
-#%% GROUP BY MOUSE
-
-
-# Define cell subsets
-subset1_cells = all_metrics['Grating']['Control'][0]
-  # Replace with actual list of cells
-subset2_cells = all_metrics['Grating']['Opto'][0]
-
-# Function to calculate mean and std for ratio columns
-def calculate_stats(df, subset_cells):
-    subset_df = df[df['Cell'].isin(subset_cells)]
-    ratios = ['ratio_opto_grating_vs_opto_blank', 'ratio_control_grating_vs_opto_grating', ]
+    # Plot 2: Lineplot of differences across sets for selected comparisons
+    f,ax=plt.subplots(figsize=(1.97, 1.97))
+    # Create a list to store the plot data
+    plot_data = []
+    for comparison in comparisons_of_interest:
+        # Filter for the current comparison
+        comparison_data = diff_df[diff_df['Comparison'] == comparison]
+        
+        # Append the data for plotting
+        plot_data.append(comparison_data)
     
-    stats = {}
-    for ratio in ratios:
-        mean_val = subset_df[ratio].mean()
-        std_val = subset_df[ratio].std()
-        stats[ratio] = (mean_val, std_val)
+    # Combine all plot data into a single DataFrame for easy plotting
+    plot_df = pd.concat(plot_data)
+    # Create the lineplot
+    sns.lineplot(data=plot_df, x='Comparison', y='Difference', hue='Set', marker='o', markersize=3,palette=[color]*len(plot_df['Set'].unique()), legend=None,ax=ax)
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    sns.despine(ax=ax)
+
+    # Set axis line width
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.set_ylim(ylimits)
+    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=True, right=False, labelbottom=False, labelleft=True)
+    plt.tight_layout()
+    plt.savefig(str(fig_four_basepath / f'Lineplot_of_Differences_for_Each_Recording_Across_Comparisons_{title_suffix}.svg'), format='svg')
+    plt.show()
+
+
+# Example usage for subset1_cells (black)
+plot_differences(differences_df1, color='grey', title_suffix='(Subset 1)')
+
+# Example usage for subset2_cells (purple)
+plot_differences(differences_df2, color='purple', title_suffix='(Subset 2)')
+
+def prepare_comparison_data(df, subset_name, color):
+    # Filter for the comparisons of interest
+    comparisons_of_interest = [
+        'Grating/Opto - Blank/Opto',
+        'Grating/Opto - Grating/Control'
+    ]
     
-    return stats
+    # Filter the differences DataFrame for the selected comparisons
+    diff_filtered = df[df['Comparison'].isin(comparisons_of_interest)]
+    
+    # Add a column to identify the subset
+    diff_filtered['Subset'] = subset_name
+    
+    return diff_filtered
 
-# Calculate stats for both subsets
-stats_subset1 = calculate_stats(final_results_df, subset1_cells)
-stats_subset2 = calculate_stats(final_results_df, subset2_cells)
+def plot_combined_boxplots(diff_df1, diff_df2):
+    ylimits=[-0.08, 0.18]
 
-# Generate  averages
-_averages_subset1 = generate_averages(stats_subset1,'visact')
-_averages_subset2 = generate_averages(stats_subset2,'nonvisact')
+    # Prepare data for both subsets
+    diff_filtered1 = prepare_comparison_data(diff_df1, 'Subset 1', 'black')
+    diff_filtered2 = prepare_comparison_data(diff_df2, 'Subset 2', 'purple')
+    
+    # Combine the data for both subsets
+    combined_diff = pd.concat([diff_filtered1, diff_filtered2], ignore_index=True)
+    
+    # Plot: Boxplots of differences for all comparisons in a single plot
+    f,ax=plt.subplots(figsize=(1.97, 1.97))
+    sns.boxplot(data=combined_diff, x='Comparison', y='Difference', hue='Subset', palette={'Subset 1': 'grey', 'Subset 2': 'purple'},fliersize=3, legend=None,ax=ax)
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    sns.despine(ax=ax)
 
-# Combine data for plotting
-_averages_subset1['Subset'] = 'Visualy Active'
-_averages_subset2['Subset'] = 'Visual + Opto '
-combined_averages = pd.concat([_averages_subset1, _averages_subset2])
-# Define custom tick labels
-custom_labels = {
-    'ratio_opto_grating_vs_opto_blank': 'Grating Opto vs Opto Only',
-    'ratio_control_grating_vs_opto_grating': 'Grating Opto vs Grating',
-}
-combined_averages['Ratio'] = combined_averages['Ratio'].map(custom_labels)
+    # Set axis line width
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    ax.set_ylim(ylimits)
+    plt.tick_params(axis='both', which='both', bottom=False, top=False, left=True, right=False, labelbottom=False, labelleft=True)
+    plt.tight_layout()
+    plt.savefig(str(fig_four_basepath / 'Combined_Boxplots_Differences.svg'), format='svg')
+    plt.show()
 
-
-# Calculate mean and standard deviation for each combination of Subset and Ratio
-stats = combined_averages.groupby(['Subset', 'Ratio'])['Average Difference'].agg(['mean', 'std']).reset_index()
-stats.columns = ['Subset', 'Ratio', 'Mean', 'Std']
-
-print(stats)
-#%%
-# Plotting
-
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
-
-# Assuming `combined__averages` is your DataFrame with data
-
-fig, ax = plt.subplots(figsize=(30 / 25.4, 60 / 25.4))
-
-# Boxplot
-sns.boxplot(x='Ratio', y='Average Difference', hue='Subset', data=combined_averages,
-            fill=False, linewidth=1, ax=ax, palette='grey')
-
-# Strip plot
-stripplot = sns.stripplot(x='Ratio', y='Average Difference', hue='Subset', data=combined_averages,
-                          jitter=False, dodge=True, size=3, edgecolor='black', ax=ax, palette='Set2')
-
-# Get handles and labels for the stripplot legend
-handles, labels = ax.get_legend_handles_labels()
-stripplot_legend_handles = [handle for handle, label in zip(handles, labels) if label in ['Subset 1', 'Subset 2']]
-stripplot_legend_labels = [label for label in labels if label in ['Subset 1', 'Subset 2']]
-
-# Remove the existing legend (which includes the boxplot legend)
-ax.legend_.remove()
-
-# Create a new legend for the stripplot
-ax.legend(stripplot_legend_handles, stripplot_legend_labels, loc='upper left')
-
-# Remove x-axis ticks
-ax.set_xticks([])
-
-# Adjust y-axis tick label size
-ax.tick_params(axis='y', labelsize=5)
-
-# Remove grid and adjust spines
-sns.despine(ax=ax)
-ax.set_xlabel('')  # X-axis label
-ax.set_ylabel('')  # Y-axis label
-ax.spines['bottom'].set_linewidth(1)
-ax.spines['left'].set_linewidth(1)
-plt.grid(False)
-
-
-plt.tight_layout()
-plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig4\Avg_differences_in_mean_evoked_activity_optodiferences.svg', format='svg')
-plt.show()
-
-
+# Example usage
+plot_combined_boxplots(differences_df1, differences_df2)

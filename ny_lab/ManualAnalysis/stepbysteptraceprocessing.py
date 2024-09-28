@@ -762,7 +762,7 @@ all_analysis # from to do latesoptoanalaysis it the analysis onbjects of all dat
 
 i=0
 single_experiment=sorted(list(multiple_analysis.keys()))[i]
-temp_data_list=check_temp_data(str(tempprocessingpat),single_experiment)
+temp_data_list=sorted(check_temp_data(str(tempprocessingpat),single_experiment))
 # dict_only_all_data=load_temp_data(temp_data_list,3)
 dict_only_all_data=load_temp_data(temp_data_list,3)
 
@@ -841,9 +841,9 @@ for i,(l, experiment) in enumerate(all_exp_data.items()):
 #%% SELECT CELL TYPE TO ANALYZE
 cell_type=5
 
-if cell_type==4:
+if cell_type==5:
     cell_type_name='chandelier'
-elif cell_type==5:
+elif cell_type==6:
     cell_type_name='non_chandelier'
 
 

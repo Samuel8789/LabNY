@@ -1175,7 +1175,8 @@ multiple_analysis=None
 
 if platform == "linux" or platform == "linux2":
     mouse_loaded=['SPRZ', 'SPSM']
-    
+    mouse_loaded=['SPRZ', 'SPSM']
+
 elif platform == "win32":
     all_analysis=selected_analysis
     selected=all_analysis[0]

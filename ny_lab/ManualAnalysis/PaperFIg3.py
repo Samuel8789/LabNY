@@ -12,6 +12,17 @@ import numpy as np
 from scipy import stats
 from matplotlib.colors import Normalize
 import os
+from sys import platform
+from pathlib import Path
+
+if platform == "linux" or platform == "linux2":
+    fig_three_basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY/ChandPaper/Fig3')
+elif platform == "win32":
+    fig_three_basepath=Path(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3')
+    
+
+timestr=time.strftime("%Y%m%d-%H%M%S")
+
 
 # Figure 3 Pnael B
 # Mult traces of 8 chandelier from same FOV
@@ -22,8 +33,12 @@ sorting_peaks=[np.flip(np.argsort(cell_mean_peaks['opto_blank'])),np.flip(np.arg
 
 optoactivity=trial_activity['opto_blank'][sorting_peaks[0],:,:]/max(trial_activity['opto_blank'].max(),trial_activity['control_blank'].max())*100
 controlactivity=trial_activity['control_blank'][sorting_peaks[1],:,:]/max(trial_activity['opto_blank'].max(),trial_activity['control_blank'].max())*100
+optoactivity=trial_activity['opto_blank'][sorting_peaks[0],:,:]
+controlactivity=trial_activity['control_blank'][sorting_peaks[1],:,:]
 
-
+#%% FIgure matplotlib basics
+mpl.rcParams['font.family'] = 'Arial'
+plt.rcParams['svg.fonttype'] = 'none'
 
 
 #%% REORGANIZE DATA IN DATAFRAME
@@ -42,9 +57,8 @@ for cell in range(optoactivity.shape[0]):
 df = pd.DataFrame(data_list, columns=['Cell', 'Trial', 'Time', 'Value', 'Treatment'])
 
 #%% SINGLE CELL OPTO EFFECT
-mpl.rcParams['font.family'] = 'Arial'
 # Filter the DataFrame for cell 0
-cell_data = df[df['Cell'] == 0]
+cell_data = df[df['Cell'] == 1]
 
 # Set up the matplotlib figure size (convert from millimeters to inches)
 fig, ax = plt.subplots(figsize=(60/25.4, 50/25.4))  # 30x25 mm to inches
@@ -112,7 +126,7 @@ ax.tick_params(axis='both', which='major', labelsize=6, width=1)
 plt.tight_layout()
 
 # Save the plot as an SVG file
-plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\activity_plot_cell_0.svg', format='svg', bbox_inches='tight')
+plt.savefig(str(fig_three_basepath / f'activity_plot_cell_0_{timestr}.svg'), format='svg', bbox_inches='tight')
 
 # Show the plot
 plt.show()
@@ -121,7 +135,7 @@ plt.show()
 cells_to_plot = np.arange(8)
 
 # Set up the matplotlib figure size (convert from millimeters to inches)
-fig, ax = plt.subplots(figsize=(60/25.4, 50/25.4))  # Increase height for vertical stretch
+fig, ax = plt.subplots(figsize=(600/25.4, 500/25.4))  # Increase height for vertical stretch
 
 # Define colors
 control_color = 'black'
@@ -184,7 +198,7 @@ ax.set_ylim(-10, y_offsets[-1] + 80)  # Adjust for extra padding
 plt.tight_layout()
 
 # Save the plot as an SVG file
-plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\activity_plot_8_cells.svg', format='svg', bbox_inches='tight')
+plt.savefig(str(fig_three_basepath / f'activity_plot_8_cells_{timestr}_.svg'), format='svg', bbox_inches='tight')
 
 # Show the plot
 plt.show()
@@ -227,7 +241,7 @@ sns.boxplot(data=max_values, x='Treatment', y='MaxValue',
             ax=ax)
 
 # Add distribution of max points as a swarm plot with smaller points
-sns.swarmplot(data=max_values, x='Treatment', y='MaxValue', color='k', alpha=0.5, size=2, ax=ax)
+# sns.swarmplot(data=max_values, x='Treatment', y='MaxValue', color='k', alpha=0.5, size=2, ax=ax)
 
 # Remove all titles and labels
 ax.set_xlabel('')
@@ -246,7 +260,7 @@ ax.tick_params(axis='both', which='major', labelsize=6, width=1)
 
 # Save the plot as an SVG file
 plt.tight_layout()
-plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\max_value_comparison_boxplot_transparent_no_labels.svg', format='svg', bbox_inches='tight')
+plt.savefig(str(fig_three_basepath / f'max_value_comparison_boxplot_transparent_no_labels_{timestr}_.svg'), format='svg', bbox_inches='tight')
 
 # Show the plot
 plt.show()
@@ -277,7 +291,6 @@ for cell in range(optoactivity.shape[0]):
 df = pd.DataFrame(data_list, columns=['Cell', 'Trial' ,'Time', 'Value', 'Treatment'])
 
 #%% SVAE ACTIVITY DF FORT TZI ZTI RASTER
-plt.rcParams['svg.fonttype'] = 'none'
 # Eliminate every other cell
 filtered_cells = np.arange(0, df['Cell'].nunique(),2)  # Adjust according to your data
 filtered_df = df[df['Cell'].isin(filtered_cells)]
@@ -301,7 +314,7 @@ time_points = pivot_df['Time'].nunique()
 value_array = pivot_df[['Control', 'Opto']].values.reshape(cells, time_points, 2)
 
 # Step 4: Save the array as a .mat file
-savemat(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\cell_time_treatment_data_no_baseline_substarct.mat', {'data': value_array})
+savemat(str(fig_three_basepath / f'cell_time_treatment_data_no_baseline_substarct.mat', {'data': value_array})
 
 
 
@@ -368,7 +381,7 @@ ax1.set_xlabel('')
 ax1.set_ylabel('')
 
 plt.tight_layout()
-# plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\control_raster_image.svg', format='svg', bbox_inches='tight')
+# plt.savefig(str(fig_three_basepath / f'control_raster_image_{timestr}_.svg'), format='svg', bbox_inches='tight')
 plt.show()
 
 # Create opto raster image
@@ -396,7 +409,7 @@ ax2.set_xlabel('')
 ax2.set_ylabel('')
 
 plt.tight_layout()
-# plt.savefig(r'C:\Users\sp3660\Desktop\ChandPaper\Fig3\opto_raster_image.svg', format='svg', bbox_inches='tight')
+# plt.savefig(str(fig_three_basepath / f'opto_raster_image_{timestr}_.svg'), format='svg', bbox_inches='tight')
 plt.show()
 
 #%% SIGNIFICANTLY ACTIVATED AND INHIBITED CELLS
@@ -464,7 +477,6 @@ results_df = pd.DataFrame(results)
 print(results_df)
 
 plt.rcParams['svg.fonttype'] = 'none'
-save_path = r'C:\Users\sp3660\Desktop\ChandPaper\Fig3'
 # Convert mm to inches
 figsize_inches = (100 / 25.4, 100 / 25.4)
 plt.close('all')
@@ -510,7 +522,7 @@ if increased_cells:
     plt.gca().spines['bottom'].set_linewidth(0.5)
     plt.grid(False)  # Remove grid
     plt.tight_layout()
-    # plt.savefig(os.path.join(save_path, 'Cells_with_Significant_Increase.svg'), format='svg')
+    plt.savefig(str(fig_three_basepath /  f'Cells_with_Significant_Increase_{timestr}.svg'), format='svg')
     plt.show()
 
 # Plot cells with significant decreases
@@ -552,7 +564,7 @@ if decreased_cells:
     plt.gca().spines['bottom'].set_linewidth(0.5)
     plt.grid(False)  # Remove grid
     plt.tight_layout()
-    # plt.savefig(os.path.join(save_path, 'Cells_with_Significant_Decrease.svg'), format='svg')
+    plt.savefig(str(fig_three_basepath /  f'Cells_with_Significant_Decrease_{timestr}.svg'), format='svg')
     plt.show()
 
 # Plot pie chart with custom colors
@@ -562,7 +574,7 @@ labels = ['Increased', 'Decreased', 'Unchanged']
 colors = ['yellow', 'cyan', 'gray']
 plt.pie(proportions, labels=labels, autopct='%1.1f%%', colors=colors)
 # plt.title('Proportion of Cells with Significant Changes', fontsize=5)
-# plt.savefig(os.path.join(save_path, 'PieChart.svg'), format='svg')
+# plt.savefig(str(fig_three_basepath /  'PieChart_{timestr}.svg'), format='svg')
 plt.show()
 
 
@@ -595,6 +607,21 @@ mean_activities['Group'] = mean_activities['Cell'].apply(
     lambda x: 'Increased' if x in increased_cells else 'Decreased'
 )
 
+
+mean_activities['Group_ID'] = None  # Create an empty column for group IDs
+
+# Group by 'Condition' and 'Group'
+grouped = mean_activities.groupby(['Condition', 'Group'])
+
+# For each combination of 'Condition' and 'Group', split the cells into 5 groups
+for (condition, group), sub_mean_activities in grouped:
+    num_cells = len(sub_mean_activities)
+    group_labels = np.array_split(np.arange(num_cells), 5)  # Split into 5 groups
+    for i, indices in enumerate(group_labels):
+        mean_activities.loc[sub_mean_activities.index[indices], 'Group_ID'] = i + 1  # Assign group labels
+
+
+
 # Plot boxplots with customizations
 plt.figure(figsize=figsize_inches)
 
@@ -603,8 +630,8 @@ sns.boxplot(data=mean_activities, x='Group', y='Mean Activity', hue='Condition',
             boxprops=dict(facecolor='none', edgecolor='gray', linewidth=0.5), linewidth=0.5)
 
 # Add individual data points using stripplot with manual jitter
-ax = sns.stripplot(data=mean_activities, x='Group', y='Mean Activity', hue='Condition', palette={'Control': 'gray', 'Opto': 'blue'},
-                   dodge=True, jitter=True, size=2, edgecolor='none', linewidth=0.5)
+# ax = sns.stripplot(data=mean_activities, x='Group', y='Mean Activity', hue='Condition', palette={'Control': 'gray', 'Opto': 'blue'},
+#                    dodge=True, jitter=True, size=2, edgecolor='none', linewidth=0.5)
 
 plt.legend(fontsize=5)
 # plt.title('Mean Activity of Cells with Significant Changes', fontsize=5)
@@ -619,7 +646,7 @@ plt.gca().spines['left'].set_linewidth(0.5)
 plt.gca().spines['bottom'].set_linewidth(0.5)
 plt.grid(False)  # Remove grid
 plt.tight_layout()
-# plt.savefig(os.path.join(save_path, 'Mean_Activity_of_Cells_with_Significant_Changes.svg'), format='svg')
+plt.savefig(str(fig_three_basepath /  f'Mean_Activity_of_Cells_with_Significant_Changes_{timestr}.svg'), format='svg')
 plt.show()
 
 # Statistical comparison between increased and decreased cells
@@ -637,6 +664,61 @@ stat, p_value = ttest_ind(control_increased, opto_increased)
 print(f'Test Statistic (Stimulated): {stat}, P-Value: {p_value}')
 stat, p_value = ttest_ind(control_decreased, opto_decreased)
 print(f'Test Statistic (Inhibited): {stat}, P-Value: {p_value}')
+
+# make tzi tzi lie plot
+
+#%% Comparing experiment anfd ploting like tzi tzi
+# Convert figure size from mm to inches
+figsize_mm = (40, 40)
+figsize_inch = (figsize_mm[0] / 25.4, figsize_mm[1] / 25.4)
+group_means=group_means
+# Pivot the dataframe to have 'Control' and 'Opto' as columns
+pivot_df = group_means.pivot_table(index=['Group', 'Group_ID'], columns='Condition', values='Mean Activity').reset_index()
+
+# Perform t-test and store the results
+ttest_results = {}
+
+# Plot for each group (Increased and Decreased)
+for grp in pivot_df['Group'].unique():
+    grp_data = pivot_df[pivot_df['Group'] == grp]  # Filter for the current group
+    
+    # Perform t-test comparing Control and Opto
+    t_stat, p_value = stats.ttest_rel(grp_data['Control'], grp_data['Opto'])
+    ttest_results[grp] = {'t_stat': t_stat, 'p_value': p_value}
+    
+    fig,ax=plt.subplots(figsize=figsize_inch)  # Set the figure size
+    
+    # Create a line plot for the current group
+    for i, row in grp_data.iterrows():
+        ax.plot(['Control', 'Opto'], [row['Control'], row['Opto']], marker='o', color='black', markersize=2,linewidth=0.2)
+    
+    # Adjust axis, font size, and line width
+    # ax.xticks([0, 1], ['Control', 'Opto'], fontsize=5)
+    # ax.yticks(fontsize=5)
+    # plt.gca().tick_params(width=0.2)
+    
+    # Set axis labels and thickness
+    # ax.xlabel('Condition', fontsize=5)
+    # ax.ylabel('Mean Activity', fontsize=5)
+    # Set axis line thickness
+    for spine in plt.gca().spines.values():
+        spine.set_linewidth(0.2)
+    ''
+    # Remove legend
+    plt.legend().set_visible(False)
+    ax.set_ylim([group_means['Mean Activity'].min()*1.5, group_means['Mean Activity'].max()*1.2])
+
+    plt.savefig(str(fig_three_basepath /  f'Final_mean_activity_changed_group_{grp}_{timestr}.svg'), format='svg')
+
+    plt.show()
+
+# Output t-test results
+print("T-test Results:")
+for group, results in ttest_results.items():
+    print(f"{group} Group: t-statistic = {results['t_stat']:.4f}, p-value = {results['p_value']:.4e}")
+
+
+
 
 #%% CORRLATION BWTEN CHANDELIERS
 
@@ -699,7 +781,7 @@ plt.gca().spines['bottom'].set_linewidth(0.5)
 plt.grid(False)  # Remove grid
 plt.legend().remove()
 plt.tight_layout()
-plt.savefig(os.path.join(save_path, 'Mean_chandelier_cell_correlations_per_recording.svg'), format='svg')
+plt.savefig(str(fig_three_basepath /  'Mean_chandelier_cell_correlations_per_recording_{timestr}.svg'), format='svg')
 
 plt.show()
 
