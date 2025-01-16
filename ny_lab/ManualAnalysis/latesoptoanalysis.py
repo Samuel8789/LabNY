@@ -24,12 +24,12 @@ import numpy as np
 from PIL import Image
 import scipy
 import matplotlib.pyplot as plt
-from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore, mode
-import scipy
-from statsmodels.nonparametric.smoothers_lowess import lowess
-import caiman as cm
+# from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore, mode
+# import scipy
+# from statsmodels.nonparametric.smoothers_lowess import lowess
+# import caiman as cm
 from matplotlib.patches import Rectangle
-import scipy.signal as sg
+# import scipy.signal as sg
 import scipy.stats as st
 import pandas as pd
 import shutil
@@ -39,8 +39,7 @@ import seaborn as sns
 from math import sqrt
 import pickle
 import glob
-import scipy.stats as st
-from pylab import *
+# from pylab import *
 import matplotlib
 from sys import platform
 from pathlib import Path
@@ -461,7 +460,7 @@ def create_opto_transitions_array(analysis,stimulated_cells_number,nTrials,opto_
             
     return transition_array
         
-def find_optostim_cells(analysis,all_planes_chand_indexes):
+def find_optostim_cells(analysis,all_planes_chand_indexes,plot=False):
   
     res=analysis.caiman_results[list(analysis.caiman_results.keys())[0]]
     
@@ -517,18 +516,18 @@ def find_optostim_cells(analysis,all_planes_chand_indexes):
             accepted_all_plane_distances=np.hstack(list(accepted_all_plane_distances.values()))
             
                 
-            
-        plane_to_plot='Plane1'
-        f,ax=plt.subplots(1,3)
-        ax[0].imshow(all_planes_As[plane_to_plot][:,:,analysis.full_data['imaging_data'][plane_to_plot]['CellIds']].sum(axis=2).T)
-        ax[1].imshow(all_planes_As[plane_to_plot][:,:,optocellids].sum(axis=2).T)
-        ax[2].imshow(ref_image.resize((256, 256)))
-        for coord in coordinates:
-            circles=[]
-            for i in range(3):
-                ax[i].add_patch(plt.Circle((coord[0], coord[1]), coord[2]/2, color='r', fill=False))
-            
-            optocellids.sort()
+        if plot:    
+            plane_to_plot='Plane1'
+            f,ax=plt.subplots(1,3)
+            ax[0].imshow(all_planes_As[plane_to_plot][:,:,analysis.full_data['imaging_data'][plane_to_plot]['CellIds']].sum(axis=2).T)
+            ax[1].imshow(all_planes_As[plane_to_plot][:,:,optocellids].sum(axis=2).T)
+            ax[2].imshow(ref_image.resize((256, 256)))
+            for coord in coordinates:
+                circles=[]
+                for i in range(3):
+                    ax[i].add_patch(plt.Circle((coord[0], coord[1]), coord[2]/2, color='r', fill=False))
+                
+        optocellids.sort()
             
         
         alloptocellids={'Plane1':optocellids ,'Plane2':np.empty([0])}
@@ -1175,7 +1174,6 @@ multiple_analysis=None
 
 if platform == "linux" or platform == "linux2":
     mouse_loaded=['SPRZ', 'SPSM']
-    mouse_loaded=['SPRZ', 'SPSM']
 
 elif platform == "win32":
     all_analysis=selected_analysis
@@ -1186,6 +1184,8 @@ elif platform == "win32":
     
 if len(mouse_loaded)>1:
     datapath=os.path.join(tempprocessingpat,'_'.join(mouse_loaded))
+    # datapath=os.path.join(tempprocessingpat,'_'.join(mouse_loaded))+'_4s_post'
+
 else:
     datapath=os.path.join(tempprocessingpat,mouse_loaded[0])
         
@@ -1412,8 +1412,8 @@ if not multiple_analysis:
                   'stim_table':sorted_df,
                   'pre_frames_df':pre_frames,
                   'post_frames_df':post_frames,
-                  'pre_time_df':pre_time,
-                  'post_time_df':post_time
+                  'pre_time_df':pretime,
+                  'post_time_df':posttime
                   }
         
         multiple_analysis[analysis.acquisition_object.aquisition_name]=all_info

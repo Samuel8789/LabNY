@@ -471,7 +471,7 @@ for cell in df_combined['Cell'].unique():
         
    
 
-#%% PYRAMIDAL CELL COMARISON RESPONSIVE VS NON RESPONSIVE CELLS
+#%% PYRAMIDAL CELL COMARISON RESPONSIVE VS NON RESPONSIVE CELLS NO
 # active_cells = np.array([int(cell) for cell in prefered_or.keys()]).astype(np.int64)
 # inactive_cells = df['Cell'].unique()[~np.isin( df['Cell'].unique(),active_cells)]
 # cell_subsets={'active_cells':active_cells,'inactive_cells':inactive_cells}
@@ -716,9 +716,99 @@ ratios_df = pd.DataFrame(ratios)
 # Merge the ratios with the original results
 final_results_df = pd.merge(results_df, ratios_df, on='Cell')
 final_results_df.to_csv(str(fig_four_basepath / 'metrics.csv'))
+
+
+#%% SAME DETECTION OF SIGFNIFICANTLY MODIFIED CELLS AS IN FIG 3
+# Step 1: Filter the dataframe for Time between 0 and 1 second
+df_filtered = df[(df['Time'] >= 0) & (df['Time'] <= 1)]
+
+# Step 2: Calculate mean values for each combination of Cell, Trial, Treatment, and Stimuli across time
+mean_values = df_filtered.groupby(['Cell', 'Trial', 'Treatment', 'Stimuli']).agg({'Value': 'max'}).reset_index()
+significance=0.05
+# Step 3: Initialize results storage
+significant_grating_control = []
+significant_grating_opto = []
+significant_grating_opto_only=[]
+# Unique cells in the mean_values dataframe
+unique_cells = mean_values['Cell'].unique()
+
+# Step 4: Loop through each unique cell
+for cell in unique_cells:
+    # Filter for the current cell
+    cell_data = mean_values[mean_values['Cell'] == cell]
+    
+    # Extract values for the relevant groups
+    blank_control = cell_data[(cell_data['Stimuli'] == 'Blank') & (cell_data['Treatment'] == 'Control')]['Value']
+    grating_control = cell_data[(cell_data['Stimuli'] == 'Grating') & (cell_data['Treatment'] == 'Control')]['Value']
+    grating_opto = cell_data[(cell_data['Stimuli'] == 'Grating') & (cell_data['Treatment'] == 'Opto')]['Value']
+    blank_opto = cell_data[(cell_data['Stimuli'] == 'Blank') & (cell_data['Treatment'] == 'Opto')]['Value']
+
+    
+    # Calculate mean values for comparison
+    mean_blank_control = blank_control.mean() if not blank_control.empty else np.nan
+    mean_grating_control = grating_control.mean() if not grating_control.empty else np.nan
+    mean_grating_opto = grating_opto.mean() if not grating_opto.empty else np.nan
+    mean_blank_opto = blank_opto.mean() if not blank_opto.empty else np.nan
+
+
+    # Perform Wilcoxon tests
+    if len(blank_control) > len(grating_control):
+        blank_control_sample = np.random.choice(blank_control, size=len(grating_control), replace=False)
+    else:
+        blank_control_sample = blank_control
+        
+    if len(blank_control) > len(grating_opto):
+        blank_control_sample_opto = np.random.choice(blank_control, size=len(grating_opto), replace=False)
+    else:
+        blank_control_sample_opto = blank_control
+        
+    if len(blank_control) > len(blank_opto):
+        blank_control_sample_opto_only = np.random.choice(blank_control, size=len(blank_opto), replace=False)
+    else:
+        blank_control_sample_opto_only = blank_control
+        
+
+
+    # Test for Grating Control vs Blank Control
+    if len(blank_control_sample) > 0 and len(grating_control) > 0:
+        stat_gc, p_gc = wilcoxon(blank_control_sample, grating_control)
+        # Check for significance and mean increase
+        if p_gc < significance and mean_grating_control > mean_blank_control:
+            significant_grating_control.append(cell)
+
+    # Test for Grating Opto vs Blank Control
+    if len(blank_control_sample_opto) > 0 and len(grating_opto) > 0:
+        stat_go, p_go = wilcoxon(blank_control_sample_opto, grating_opto)
+        # Check for significance and mean increase
+        if p_go < significance and mean_grating_opto > mean_blank_control:
+            significant_grating_opto.append(cell)
+            
+
+    # Test for Grating Opto vs Blank Opto
+    if len(blank_control_sample_opto_only) > 0 and len(blank_opto) > 0:
+        stat_go, p_go = wilcoxon(blank_control_sample_opto_only, blank_opto)
+        # Check for significance and mean increase
+        if p_go < significance and mean_blank_opto > mean_blank_control:
+            significant_grating_opto_only.append(cell)
+            
+            
+ 
+# Step 5: Create DataFrames for significant cells
+significant_gc_df = pd.DataFrame(significant_grating_control, columns=['Significant Grating Control Cells'])
+significant_go_df = pd.DataFrame(significant_grating_opto, columns=['Significant Grating Opto Cells'])
+significant_bo_df = pd.DataFrame(significant_grating_opto_only, columns=['Significant Blank Opto Cells'])
+print(len(significant_gc_df)*100/len(unique_cells))
+print(len(significant_go_df)*100/len(unique_cells))
+
+
+
+# Display the significant cells
+print("Cells with Significant Increase in Grating Control:")
+print(significant_gc_df)
+
+print("\nCells with Significant Increase in Grating Opto:")
+print(significant_go_df)
 #%% SELECT CELLS BASED ON SOME ARBIOTRY THREHOLD THAT ARE VISUAL STIMULS RESPONSIVE
-
-
 
 
 import matplotlib.pyplot as plt
@@ -727,7 +817,7 @@ import numpy as np
 
 
 all_metrics={}
-
+significance=0.05
 # Assuming results_df is the DataFrame containing the difference calculations
 for stimulus in ['Blank', 'Grating']:
     all_metrics[stimulus]={}
@@ -785,15 +875,15 @@ for stimulus in ['Blank', 'Grating']:
         max_subset_stim = filtdf_stimres[filtdf_stimres['Max_Difference'] > max_threshold]['Cell']
 
 
-        mean_subset_stim_un = filtdf_stimres[filtdf_stimres['Mean_Difference']< 0.5]['Cell']
-        median_subset_stim_un  = filtdf_stimres[filtdf_stimres['Median_Difference'] < 0.5]['Cell']
-        max_subset_stim_un  = filtdf_stimres[filtdf_stimres['Max_Difference']< 0.5]['Cell']
+        mean_subset_stim_un = filtdf_stimres[filtdf_stimres['Mean_Difference']< significance]['Cell']
+        median_subset_stim_un  = filtdf_stimres[filtdf_stimres['Median_Difference'] < significance]['Cell']
+        max_subset_stim_un  = filtdf_stimres[filtdf_stimres['Max_Difference']< significance]['Cell']
 
 
         # Example: Printing the number of cells in each subset
-        print(f'Number of cells with mean difference > {thresh} SD: {len(mean_subset_stim)}')
-        print(f'Number of cells with median difference > {thresh} SD: {len(median_subset_stim)}')
-        print(f'Number of cells with max difference > {thresh} SD: {len(max_subset_stim)}')
+        print(f'{stimulus} {treatment} Number of cells with mean difference > {thresh} SD: {len(mean_subset_stim)}')
+        print(f'{stimulus} {treatment} Number of cells with median difference > {thresh} SD: {len(median_subset_stim)}')
+        print(f'{stimulus} {treatment} Number of cells with max difference > {thresh} SD: {len(max_subset_stim)}')
         all_metrics[stimulus][treatment]=[mean_subset_stim,median_subset_stim,max_subset_stim,mean_subset_stim_un,median_subset_stim_un,max_subset_stim_un]
         
         
@@ -838,17 +928,27 @@ def plot_trial_averaged_activity(cells, stimulus_type, title):
     plt.tight_layout()
     # plt.savefig(fr'C:\Users\sp3660\Desktop\ChandPaper\Fig4\{title}_{stimulus_type}_Activity.svg')
 
+
+visually_active_cells=all_metrics['Grating']['Control'][2]
+both_active_cells=all_metrics['Grating']['Opto'][2]
+opto_only_cells=all_metrics['Blank']['Opto'][2]
+
+
+visually_active_cells=significant_gc_df['Significant Grating Control Cells']
+both_active_cells=significant_go_df['Significant Grating Opto Cells']
+opto_only_cells=significant_bo_df['Significant Blank Opto Cells']
+
 # Plot for active cells with Blank stimulus
-plot_trial_averaged_activity(all_metrics['Grating']['Control'][0], 'Blank', 'Active Cells')
+plot_trial_averaged_activity(visually_active_cells, 'Blank', 'Active Cells')
 
 # Plot for active cells with Grating stimulus
-plot_trial_averaged_activity(all_metrics['Grating']['Control'][0], 'Grating', 'Active Cells')
+plot_trial_averaged_activity(visually_active_cells, 'Grating', 'Active Cells')
 
 # Plot for inactive cells with Blank stimulus
-plot_trial_averaged_activity(all_metrics['Grating']['Opto'][0], 'Blank', 'Inactive Cells')
+plot_trial_averaged_activity(both_active_cells, 'Blank', 'Inactive Cells')
 
 # Plot for inactive cells with Grating stimulus
-plot_trial_averaged_activity(all_metrics['Grating']['Opto'][0], 'Grating', 'Inactive Cells')
+plot_trial_averaged_activity(both_active_cells, 'Grating', 'Inactive Cells')
 
 
 
@@ -859,7 +959,7 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 
 # List of selected cells
-for k, subset in {'visually_active':all_metrics['Grating']['Control'][0],'opto+grating active': all_metrics['Grating']['Opto'][0],'opto+blank active': all_metrics['Blank']['Opto'][0]}.items():
+for k, subset in {'visually_active':visually_active_cells,'opto+grating active': both_active_cells,'opto+blank active': all_metrics['Blank']['Opto'][0]}.items():
     for window in (2,):
         for metric in ('Mean',):#,'Median', 'Max'):
             # Extract mean values for the selected cells
@@ -883,6 +983,10 @@ for k, subset in {'visually_active':all_metrics['Grating']['Control'][0],'opto+g
             
             # Create DataFrame for plotting
             mean_df = pd.DataFrame(met_data)
+ 
+            # Calculate and print mean and standard deviation
+            mean_stats = mean_df.groupby('Condition').agg({f'{metric}': ['mean', 'std']})
+            print(mean_stats)
             
             # Ensure consistent order of conditions
             # condition_order = [ 'CB', 'OB','CG','OG']
@@ -919,7 +1023,6 @@ for k, subset in {'visually_active':all_metrics['Grating']['Control'][0],'opto+g
 
 #%% PLOT TRIAL AVERAGED TRACSED FOR GROUPS OF CELLS FOR ALL CONDITIONS
 
-    
 def plot_single_cell_activity(ax, df, cell_id, stimulus, treatment):
     # Filter data for the given cell, stimulus, and treatment
     subset = df[(df['Cell'] == cell_id) & (df['Stimuli'] == stimulus) & (df['Treatment'] == treatment)]
@@ -956,7 +1059,7 @@ def plot_single_cell_activity(ax, df, cell_id, stimulus, treatment):
 
 
 plt.close('all')
-selected_cells=[all_metrics['Grating']['Control'][0].iloc[0],all_metrics['Grating']['Opto'][0].iloc[8]]
+selected_cells=[visually_active_cells.iloc[0],both_active_cells.iloc[8]]
 # Plot for each selected cell
 for cell_id in selected_cells:
 
@@ -982,44 +1085,153 @@ for cell_id in selected_cells:
         plt.savefig(str(fig_four_basepath / f'Cell_{cell_id}_{stimulus}_{treatment}.svg'), format='svg')
         plt.show()
 #%% GROUP BY MOUSE
-
+import statsmodels.api as sm
+import scikit_posthocs as sp
 plt.close('all')
 # Define cell subsets
-subset1_cells = all_metrics['Grating']['Control'][0]
+subset1_cells = visually_active_cells
   # Replace with actual list of cells
-subset2_cells = all_metrics['Grating']['Opto'][0]
+subset2_cells = both_active_cells
 
 extended_results_df1, differences_df1 =extended_results_df1, differences_df1 
 extended_results_df2, differences_df2 =extended_results_df2, differences_df2 
-
-
-import statsmodels.api as sm
-from statsmodels.formula.api import ols
-from statsmodels.stats.multicomp import pairwise_tukeyhsd
-# Fit the two-way ANOVA model with interaction
-model = ols('Mean ~ C(Stimulus) * C(Treatment)', data=extended_results_df1).fit()
-# Perform ANOVA
-anova_table = sm.stats.anova_lm(model, typ=2)
-print(anova_table)
 extended_results_df1['Group'] = extended_results_df1['Stimulus'] + ' ' + extended_results_df1['Treatment']
-# Perform Tukey HSD post-hoc test
-tukey = pairwise_tukeyhsd(endog=extended_results_df1['Mean'], groups=extended_results_df1['Group'], alpha=0.05)
-print("\nTukey HSD post-hoc test results:")
-print(tukey.summary())
-
-
-model = ols('Mean ~ C(Stimulus) * C(Treatment)', data=extended_results_df2).fit()
-# Perform ANOVA
-anova_table = sm.stats.anova_lm(model, typ=2)
-print(anova_table)
-extended_results_df1['Group'] = extended_results_df1['Stimulus'] + ' ' + extended_results_df1['Treatment']
-# Perform Tukey HSD post-hoc test
-tukey = pairwise_tukeyhsd(endog=extended_results_df1['Mean'], groups=extended_results_df1['Group'], alpha=0.05)
-print("\nTukey HSD post-hoc test results:")
-print(tukey.summary())
+extended_results_df2['Group'] = extended_results_df2['Stimulus'] + ' ' + extended_results_df2['Treatment']
+extended_results_df1_filtered = extended_results_df1[extended_results_df1['Group'] != 'Blank Opto']
+extended_results_df2_filtered = extended_results_df2[extended_results_df2['Group'] != 'Blank Opto']
 
 
 
+for cell_group in [extended_results_df1,extended_results_df2]:
+    bc=cell_group[cell_group['Group']=='Blank Control']['Mean']
+    gc=cell_group[cell_group['Group']=='Grating Control']['Mean']
+    go=cell_group[cell_group['Group']=='Grating Opto']['Mean']
+    means = {
+        'Blank Control': (bc.mean(), bc.std()),
+        'Grating Control': (gc.mean(), gc.std()),
+        'Grating Opto': (go.mean(), go.std())
+    }
+    print("Means and Standard Deviations:")
+    for condition, (mean, std) in means.items():
+        print(f"{condition} - Mean: {mean:.3f}, Std: {std:.3f}")
+    normality_results = {
+        'Blank Control': stats.shapiro(bc),
+        'Grating Control': stats.shapiro(gc),
+        'Grating Opto': stats.shapiro(go)
+    }
+    
+    print(
+        f'Change in activity for gropued cells '
+        f'for blank control {round(bc.mean(), 3):.3f} ± {round(bc.std(), 3):.3f} '
+        f'and Grating Control {round(gc.mean(), 3):.3f} ± {round(gc.std(), 3):.3f}'
+        f'and Grating Opto {round(go.mean(), 3):.3f} ± {round(go.std(), 3):.3f}'
+
+    )
+    
+    
+    
+    for condition, result in normality_results.items():
+        print(f"{condition} - W-statistic: {result[0]}, p-value: {result[1]}")
+    
+    # Homogeneity of variances
+    levene_stat, levene_p = stats.levene(bc, gc, go)
+    print(f"Levene's Test - Statistic: {levene_stat}, p-value: {levene_p}")
+    
+    # Step 2: Perform ANOVA or Kruskal-Wallis test based on assumptions
+    if all(result[1] > 0.05 for result in normality_results.values()) and levene_p > 0.05:
+        # Assumptions hold; perform ANOVA
+        f_stat, p_value = stats.f_oneway(bc, gc, go)
+        print(f"ANOVA F-statistic: {f_stat}, p-value: {p_value}")
+    
+        # Post-hoc analysis if significant
+        if p_value < 0.05:
+            combined_data = np.concatenate([bc, gc, go])
+            labels = ['bc'] * len(bc) + ['gc'] * len(gc) + ['go'] * len(go)
+            df_test = pd.DataFrame({'correlation': combined_data, 'condition': labels})
+            
+            tukey = sm.stats.multicomp.pairwise_tukeyhsd(df_test['correlation'], df_test['condition'])
+            print(tukey)
+    
+    else:
+        # Assumptions do not hold; perform Kruskal-Wallis test
+        h_stat, p_value_kw = stats.kruskal(bc, gc, go)
+        print(f"Kruskal-Wallis H-statistic: {h_stat}, p-value: {p_value_kw}")
+        if p_value_kw < 0.05:
+               combined_data = np.concatenate([bc, gc, go])
+               labels = ['bc'] * len(bc) + ['gc'] * len(gc) + ['go'] * len(go)
+               df_test = pd.DataFrame({'correlation': combined_data, 'condition': labels})
+       
+               # Perform Dunn's test
+               dunn_result = sp.posthoc_dunn(df_test, val_col='correlation', group_col='condition', p_adjust='bonferroni')
+               print(dunn_result)
+    
+    
+
+
+#%%
+def plot_mice(diff_df, color, title_suffix=''):
+    ylimits=[-0.08, 0.18]
+    sns.set_style("white")
+    # Filter the differences DataFrame for the selected comparisons
+    df_filtered = diff_df[~((diff_df['Stimulus'] == 'Blank') & (diff_df['Treatment'] == 'Opto'))]
+    df_filtered['Comparison'] = df_filtered['Stimulus'] + '_' + df_filtered['Treatment']
+    comparisons_of_interest = [
+        'Blank_Control',
+        'Grating_Control',
+        'Grating_Opto'
+    ]
+
+    f,ax=plt.subplots(figsize=(1.97, 1.97))
+    sns.boxplot(data=df_filtered, x='Comparison', y='Mean', fliersize=3,color=color,ax=ax)
+    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=False, right=False, labelbottom=False, labelleft=True)
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    ax.set_ylim(ylimits)
+    sns.despine(ax=ax)
+    # Set axis line width
+    ax.spines['bottom'].set_linewidth(1)
+    ax.spines['left'].set_linewidth(1)
+    plt.tight_layout()
+    plt.savefig(str(fig_four_basepath / f'global_mice_recordings_{title_suffix}.svg'), format='svg')
+    plt.show()
+
+    # Plot 2: Lineplot of differences across sets for selected comparisons
+    f,ax=plt.subplots(figsize=(1.97, 1.97))
+    # Create a list to store the plot data
+    plot_data = []
+    for comparison in comparisons_of_interest:
+        # Filter for the current comparison
+        comparison_data = df_filtered[df_filtered['Comparison'] == comparison]
+        
+        # Append the data for plotting
+        plot_data.append(comparison_data)
+
+    # Combine all plot data into a single DataFrame for easy plotting
+    plot_df = pd.concat(plot_data)
+    # Create the lineplot
+    sns.lineplot(data=plot_df, x='Comparison', y='Mean', hue='Set', marker='o', markersize=3,palette=[color]*len(plot_df['Set'].unique()), legend=None,ax=ax)
+    ax.set_ylabel('')
+    ax.set_xlabel('')
+    sns.despine(ax=ax)
+
+    # Set axis line width
+    ax.spines['bottom'].set_linewidth(0.2)
+    ax.spines['left'].set_linewidth(0.2)
+    ax.set_ylim(ylimits)
+    ax.tick_params(axis='both', which='both', bottom=False, top=False, left=True, right=False, labelbottom=False, labelleft=True)
+    plt.tight_layout()
+    # plt.savefig(str(fig_four_basepath / f'Lineplot_of_for_Each_Recording_Across_Comparisons_{title_suffix}.svg'), format='svg')
+    plt.show()
+    
+    
+
+
+plot_mice(extended_results_df1, color='grey', title_suffix='(Subset 1)')
+
+# Example usage for subset2_cells (purple)
+plot_mice(extended_results_df2, color='purple', title_suffix='(Subset 2)')
+
+#%%
 
  # Set global parameters
 plt.rcParams.update({
@@ -1084,7 +1296,7 @@ def plot_differences(diff_df, color, title_suffix=''):
     ax.set_ylim(ylimits)
     ax.tick_params(axis='both', which='both', bottom=False, top=False, left=True, right=False, labelbottom=False, labelleft=True)
     plt.tight_layout()
-    plt.savefig(str(fig_four_basepath / f'Lineplot_of_Differences_for_Each_Recording_Across_Comparisons_{title_suffix}.svg'), format='svg')
+    # plt.savefig(str(fig_four_basepath / f'Lineplot_of_Differences_for_Each_Recording_Across_Comparisons_{title_suffix}.svg'), format='svg')
     plt.show()
 
 
@@ -1132,8 +1344,35 @@ def plot_combined_boxplots(diff_df1, diff_df2):
     ax.set_ylim(ylimits)
     plt.tick_params(axis='both', which='both', bottom=False, top=False, left=True, right=False, labelbottom=False, labelleft=True)
     plt.tight_layout()
-    plt.savefig(str(fig_four_basepath / 'Combined_Boxplots_Differences.svg'), format='svg')
+    # plt.savefig(str(fig_four_basepath / 'Combined_Boxplots_Differences.svg'), format='svg')
     plt.show()
 
 # Example usage
 plot_combined_boxplots(differences_df1, differences_df2)
+
+#%% GET TRHE RASTER AND TRY TO CALCULATE THE SUM OF ACTIVITIES AS TZI TZI
+
+results_df['Mean_Difference']
+
+
+even_cells = np.arange(0, df['Cell'].nunique(),2)  
+odd_cells = np.arange(1, df['Cell'].nunique(),2)  
+
+
+
+non_opto = results_df[ (results_df['Stimulus'] == 'Grating') & (results_df['Treatment'] == 'Control')][['Cell','Mean_Difference']]
+non_opto_e = non_opto[non_opto['Cell'].isin(even_cells)]
+non_opto_o = non_opto[non_opto['Cell'].isin(odd_cells)]
+
+non_opto_e_vis_res=non_opto_e[non_opto_e['Cell'].isin(visually_active_cells)]
+non_opto_o_vis_res=non_opto_o[non_opto_o['Cell'].isin(visually_active_cells)]
+
+
+
+opto = results_df[ (results_df['Stimulus'] == 'Grating') & (results_df['Treatment'] == 'Opto')][['Cell','Mean_Difference']]
+opto_e = opto[opto['Cell'].isin(even_cells)]
+opto_o = opto[opto['Cell'].isin(odd_cells)]
+
+opto_e_vis_res=opto_e[opto_e['Cell'].isin(visually_active_cells)]
+opto_o_vis_res=opto_o[opto_o['Cell'].isin(visually_active_cells)]
+

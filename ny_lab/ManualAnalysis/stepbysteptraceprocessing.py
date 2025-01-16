@@ -11,38 +11,34 @@ import numpy as np
 import pandas as pd
 from statsmodels.nonparametric.smoothers_lowess import lowess
 import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches as patches
-import numpy as np
 from pathlib import Path
-from PIL import Image
-import scipy
-import matplotlib.pyplot as plt
-from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore, mode
-import scipy
+# from PIL import Image
+# import scipy
+# import matplotlib.pyplot as plt
+# from scipy.stats import kendalltau, pearsonr, spearmanr, ttest_ind, zscore, mode
 from scipy.signal import gaussian, convolve,find_peaks
-from statsmodels.nonparametric.smoothers_lowess import lowess
-import caiman as cm
-from matplotlib.patches import Rectangle
-import scipy.signal as sg
+# from statsmodels.nonparametric.smoothers_lowess import lowess
+# import caiman as cm
+# from matplotlib.patches import Rectangle
+# import scipy.signal as sg
 import scipy.stats as st
-import pandas as pd
-import shutil
-from copy import deepcopy
+# import shutil
+# from copy import deepcopy
 import os
-import seaborn as sns
-from math import sqrt
+# from math import sqrt
 import pickle
 import glob
-import scipy.stats as st
-from pylab import *
+# import scipy.stats as st
+# from pylab import *
 import matplotlib
-import matplotlib.patches as patches
+# import matplotlib.patches as patches
 # import zetapy as pz
 matplotlib.use('Agg')
 import random
+import time
 from sys import platform
 if platform == "linux" or platform == "linux2":
     basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY')
@@ -53,7 +49,7 @@ elif platform == "win32":
 temppath=basepath / 'TempPythonFigs'
 tempprocessingpat= basepath / 'TempPythonObjects'
 
-
+#%% functions
 def plot_image_with_mean_and_std(data,  x_values=None, labels=None, line_index=None, use_std=True, 
                                  cmap='viridis', interpolation='nearest', aspect='auto', origin='upper', 
                                  vmin=None, vmax=None,ylim=None, alpha=None, fig_size=(8, 6),
@@ -754,8 +750,8 @@ def check_temp_data(tempprocessingpat,experimentalmousename) :
 
 #%%OBJECTS FORM OTHER SCCRIPS
 
-all_analysis # from to do latesoptoanalaysis it the analysis onbjects of all datasets
-
+all_analysis=all_analysis # from to do latesoptoanalaysis it the analysis onbjects of all datasets
+multiple_analysis=multiple_analysis
 
 #%% load data form optoanalysis script
 
@@ -763,7 +759,6 @@ all_analysis # from to do latesoptoanalaysis it the analysis onbjects of all dat
 i=0
 single_experiment=sorted(list(multiple_analysis.keys()))[i]
 temp_data_list=sorted(check_temp_data(str(tempprocessingpat),single_experiment))
-# dict_only_all_data=load_temp_data(temp_data_list,3)
 dict_only_all_data=load_temp_data(temp_data_list,3)
 
 
@@ -839,7 +834,7 @@ for i,(l, experiment) in enumerate(all_exp_data.items()):
     all_datasets[l]=  all_treatments  
    
 #%% SELECT CELL TYPE TO ANALYZE
-cell_type=5
+cell_type=6
 
 if cell_type==5:
     cell_type_name='chandelier'
@@ -930,9 +925,9 @@ sorting_visual_responsiveness=np.flip(np.argsort([peaks])[0])
 #%% CROSs VALIDATION SORT
 fulloptodata=[cell_act_full['opto_blank'],cell_act_full['control_blank'],cell_act_full['opto_grating'],cell_act_full['control_grating']]
 sorting_trialls=0.5
-
+np.random.seed(99) 
 n_cross=[ list(range(m.shape[1])) for m in fulloptodata]
-[random.shuffle(l) for l in n_cross]
+[np.random.shuffle(l) for l in n_cross]
 cross_trials=[j[:int(len(j)*sorting_trialls)] for j in n_cross]
 data_trials=[j[int(len(j)*sorting_trialls):] for j in n_cross]
 

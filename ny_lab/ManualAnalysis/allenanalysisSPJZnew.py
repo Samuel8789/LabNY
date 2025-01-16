@@ -68,6 +68,13 @@ import matplotlib
 matplotlib.rc('xtick', labelsize=8) 
 matplotlib.rc('ytick', labelsize=8) 
 
+from sys import platform
+from pathlib import Path
+
+if platform == "linux" or platform == "linux2":
+    fig_two_basepath=Path(r'/home/samuel/Dropbox/Projects/LabNY/ChandPaper/Fig2')
+elif platform == "win32":
+    fig_two_basepath=Path(r'C:\Users\sp3660\Desktop\ChandPaper\Fig2')
 """
 
 """
@@ -315,6 +322,13 @@ def compute_locomotion_bouts(analysis,pretime=20,posttime=20):
         locomotion_on_offsets[j]=(i[0],i[1],i[1]-i[0])
         
     return locomotion_on_offsets, upsampled_signal, list(zip(boutstarts,boutsends)),upsampled_time_milliseconds_stamps
+
+def review_cell_locations():
+    
+    
+    
+    pass
+
 #%% LOAD OPTIC FLOW
 from PIL import Image
 import matplotlib.pyplot as plt
@@ -531,11 +545,56 @@ dataset, datset_name=[1, 'Session B']
 dtset_list=[[0, 'Session C'],[1, 'Session B'],[2, 'Session A']]
 
 
+
+
+
+
+
+
+
 single_dataset=all_analysis[dataset]
 analysis=single_dataset['analysis']
 full_data=single_dataset['full_data']# ==analysis.full_data but I extract for easierr acces
 print(analysis.caiman_results[next(iter(analysis.caiman_results))].mat_results_paths[0])
 cell=0
+
+
+allpos = []
+fig, axs = plt.subplots(1, 3, figsize=(15, 5))  # Correct the fig and axs assignment for subplots
+for i, (dataset, dataset_name) in enumerate(dtset_list):
+    single_dataset = all_analysis[dataset]
+    analysis = single_dataset['analysis']
+    cmres = analysis.caiman_results[list(analysis.caiman_results.keys())[0]]
+    cmres.get_rois_center_of_mass()
+    cell_positions = cmres.accepted_center_of_mass
+    neorder = cell_positions[cell_equivalences[dataset, :].astype('int')]
+    
+    # Use axs[i] to plot on the correct subplot
+    axs[i].scatter(neorder[:, 0], neorder[:, 1], s=100, c='blue')
+    for j, (x, y) in enumerate(neorder):
+        axs[i].text(x + 5, y, f'Cell {j + 1}', fontsize=8)
+    
+    axs[i].set_xlim(0, cmres.caiman_object.cnm_object.img_norm.shape[0])
+    axs[i].set_ylim(0, cmres.caiman_object.cnm_object.img_norm.shape[1])
+    axs[i].set_title(f'Cell positions in {dataset_name}')
+    axs[i].set_aspect('equal', adjustable='box')
+    axs[i].set_xlabel('X position (µm)')
+    axs[i].set_ylabel('Y position (µm)')
+    axs[i].invert_yaxis()  # Flip the y-axis
+    
+    allpos.append(neorder)
+
+plt.tight_layout()  # Adjust layout so plots don't overlap
+plt.show()
+
+    
+
+
+
+
+
+
+
 
 #% organize the cells betwen datasets
 #check same number of cells
@@ -668,6 +727,10 @@ axs[1].legend(loc='upper center', bbox_to_anchor=(0.5, -0.05),
 
 
 #%% PLOT ALL CELL ALL TRACE
+dtset_list=[[0, 'Session C'],[1, 'Session B'],[2, 'Session A']]
+dtset_list=[[0, 'Session C']]
+
+
 plt.close('all')
 for dataset,datset_name in dtset_list:
 
@@ -687,19 +750,18 @@ for dataset,datset_name in dtset_list:
    
     timestr = time.strftime("%Y%m%d-%H%M%S")
     fuptit=f'{datset_name} Chandelier Cell Activity'
-
-    f,axs=plt.subplots(8,sharex=True,figsize=(3.54,3.54), dpi=300)
+    f,axs=plt.subplots(8,sharex=True,figsize=(4,4), dpi=300)
     f.suptitle(fuptit)
     axs[-1].plot(speed_timestamps,speed,'b',linewidth=0.1)
     axs[-1].set_ylim([0,None])
     axs[-1].set_xlabel('Time (s)',fontsize=15)
     
     for cell in range(7):
-        axs[cell].plot(activity_timestamps,activity[translate_selected_cell(cell, cell_equivalences, dataset) ,:],linewidth=0.1)
+        axs[cell].plot(activity_timestamps,activity[translate_selected_cell(cell, cell_equivalences, dataset) ,:],linewidth=0.2)
         axs[cell].set_ylim([0,activity.max()])
 
         for i,trial in enumerate(para_movie_starts):
-            axs[cell].vlines(x=activity_timestamps[trial],ymin=0,ymax=activity.max(),linestyles ='dashed',color='r',linewidths=0.2)
+            axs[cell].vlines(x=activity_timestamps[trial],ymin=0,ymax=activity.max(),linestyles ='dashed',color='r',linewidths=1)
         axs[-1].vlines(x=speed_timestamps[para_volt_starts[i]],ymin=0,ymax=speed.max(),color='r')
     for ax in axs:
         ax. margins(x=0)
@@ -708,8 +770,8 @@ for dataset,datset_name in dtset_list:
                 ax.spines[sp].set_visible(False)
             else:
                 ax.spines[sp].set_linewidth(0.2)
-  
-    plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+    fig_filename = os.path.join(fig_two_basepath, f'{datset_name} Chandelier Cell Activity.svg')
+    plt.savefig(fig_filename,  format='svg', dpi=300, bbox_inches='tight')
 #%% PLOT ALL CELL ACTIVTY AROUND THE MOVIE1 SEGMENT THI
 
 #ghet movie 1 paradigm
@@ -789,7 +851,7 @@ for dataset,datset_name in dtset_list:
         #     axes[-1].vlines(x=speed_timestamps[trial],ymin=0,ymax=max(speed),color='r')
     
         axes[-1].set_xlabel('Time (s)')
-        plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+        # plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
     
     
     
@@ -817,9 +879,9 @@ for dataset,datset_name in dtset_list:
                     else:
                         ax.spines[sp].set_linewidth(0.2)
                         
-            plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+            # plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
             
-plt.close('all')
+# plt.close('all')
 #%% PLOT ONE CELL ACTIVTY AROUND THE MOVIE1 SEGMENT THI
 
 #ghet movie 1 paradigm
@@ -899,7 +961,7 @@ for dataset,datset_name in dtset_list:
         #     axes[-1].vlines(x=speed_timestamps[trial],ymin=0,ymax=max(speed),color='r')
     
         axes[-1].set_xlabel('Time (s)')
-        plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+        # plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
     
     
     
@@ -927,9 +989,9 @@ for dataset,datset_name in dtset_list:
                     else:
                         ax.spines[sp].set_linewidth(0.2)
                         
-            plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+            # plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
             
-plt.close('all')
+# plt.close('all')
 
 #%% PLOT ONE CELL SLICED ACTIVTY AND TRIAL AVERAGED
 plt.close('all')
@@ -1068,7 +1130,7 @@ for dataset,datset_name in dtset_list:
             axs[0].get_legend().remove()
             axs[1].plot(np.linspace(0,30,899),np.abs(np.diff(np.abs(angl),prepend=0)),linewidth=0.01)
             axs[2].plot(np.linspace(0,30,900),intensity,linewidth=0.5)
-            plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
+            # plt.savefig(temppath /  Path(fuptit+f'_{timestr}.pdf'), dpi=300, bbox_inches='tight')
 
         
             #PLot trial averaged activity and trials in separeted subplots
@@ -1130,21 +1192,28 @@ for dataset,datset_name in dtset_list:
     all_datasets_tr_av_mean.append(all_para_tr_av_mean)
     all_datasets_tr_av_sem.append(all_para_tr_av_sem)
  
-plt.close('all')
+# plt.close('all')
   
 #%% CHEK GRAND AVERAGRE OF CELLS AND SESSIONS AGAINST MOTION
 timestr = time.strftime("%Y%m%d-%H%M%S")
 ffuptit=f'Grand Average Against Motion'
-f,axes=plt.subplots(5,figsize=(20,20), constrained_layout=True)
+f,axes=plt.subplots(4,figsize=(20,20), constrained_layout=True)
 f.suptitle(ffuptit)
 tosave=[]
 for sess in range(3):  
     axes[0].plot(np.vstack(all_datasets_tr_av_mean[sess][0]).mean(axis=0)[0:847])
     tosave.append(np.vstack(all_datasets_tr_av_mean[sess][0]).mean(axis=0)[0:847])
 axes[1].plot(np.vstack(tosave).mean(axis=0))
-axes[2].plot(np.linspace(0,30,899),angl)
-axes[3].plot(np.linspace(0,30,899),np.abs(angl))
-axes[4].plot(np.linspace(0,30,899),np.abs(np.diff(angl,prepend=0)))
+# axes[2].plot(np.linspace(0,30,899),angl)
+# axes[3].plot(np.linspace(0,30,899),np.abs(angl))
+axes[2].plot(np.linspace(0,30,899),np.abs(np.diff(angl,prepend=0)))
+axes[3].imshow(contrast_spectrogram.T, aspect='auto', cmap='inferno')
+for ax in axes:
+    ax.margins(x=0)
+    
+    
+    
+
 
 
 #%% COMPARE CELSS BETWEEN SESSIONS
