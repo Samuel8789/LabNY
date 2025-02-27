@@ -465,11 +465,15 @@ class ExperimentalDatabase():
         if mouse_line in [5,12,13]:
             project=4
         elif mouse_line in [18,19,20,21,22,23]:
-            project=2               
+            project=2     
+        elif mouse_line in [9,10,16,17]:
+            project=9  
         elif mouse_line in [16,17]:
             project=7
         elif mouse_line in [26]:
             project=8   
+      
+                    
                 
             
         # update MICE_table
